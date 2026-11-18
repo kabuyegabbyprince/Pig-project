@@ -119,10 +119,14 @@ export function formatActivity(action: string, entity: string): string {
 export function getRecordReference(log: {
   entityId: string;
   entity: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   newValue?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   previousValue?: any;
 }): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nv = log.newValue as Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pv = log.previousValue as Record<string, any> | null;
 
   if (nv?.tagNumber) return nv.tagNumber;
@@ -143,10 +147,14 @@ export function formatChangeDescription(log: {
   action: string;
   entity: string;
   entityId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   newValue?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   previousValue?: any;
 }): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nv = log.newValue as Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pv = log.previousValue as Record<string, any> | null;
   const action = (log.action || "").toUpperCase();
   const entity = (log.entity || "").toUpperCase();

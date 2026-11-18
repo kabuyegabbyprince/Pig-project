@@ -3,6 +3,7 @@ import { getFinanceUser } from "@/lib/finance-access";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export default async function NewTransactionPage() {
   const user = await getFinanceUser();
@@ -82,13 +83,13 @@ export default async function NewTransactionPage() {
             >
               Cancel
             </Link>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors"
+            <SubmitButton
+              pendingText="Submitting..."
+              className="inline-flex items-center justify-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors cursor-pointer"
             >
               <Save className="-ml-1 mr-2 h-4 w-4" />
               Submit Transaction
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

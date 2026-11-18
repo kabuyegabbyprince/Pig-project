@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Pencil, Plus, Trash2, Eye, EyeOff, Star, StarOff } from "lucide-react";
 import { deleteTeamMember, toggleTeamMemberFeatured, toggleTeamMemberPublished } from "@/app/actions/team";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -64,28 +65,28 @@ export default async function TeamManagementPage() {
                   <td className="px-4 py-4 text-sm text-[#1c2b23]">{member.role}</td>
                   <td className="px-4 py-4">
                     <form action={toggleTeamMemberPublished.bind(null, member.id)}>
-                      <button
-                        type="submit"
-                        className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      <SubmitButton
+                        pendingText="Saving..."
+                        className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer ${
                           member.isPublished ? "bg-green-100 text-green-800" : "bg-[#e4ede6] text-[#5d6e64]"
                         }`}
                       >
                         {member.isPublished ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                         {member.isPublished ? "Published" : "Draft"}
-                      </button>
+                      </SubmitButton>
                     </form>
                   </td>
                   <td className="px-4 py-4">
                     <form action={toggleTeamMemberFeatured.bind(null, member.id)}>
-                      <button
-                        type="submit"
-                        className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      <SubmitButton
+                        pendingText="Saving..."
+                        className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer ${
                           member.isFeatured ? "bg-[#fce7f3] text-[#9d3b60]" : "bg-[#f2f5f0] text-[#5d6e64]"
                         }`}
                       >
                         {member.isFeatured ? <Star className="h-3.5 w-3.5" /> : <StarOff className="h-3.5 w-3.5" />}
                         {member.isFeatured ? "Featured" : "Standard"}
-                      </button>
+                      </SubmitButton>
                     </form>
                   </td>
                   <td className="px-4 py-4">
@@ -98,13 +99,13 @@ export default async function TeamManagementPage() {
                         Edit
                       </Link>
                       <form action={deleteTeamMember.bind(null, member.id)}>
-                        <button
-                          type="submit"
-                          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                        <SubmitButton
+                          pendingText="Deleting..."
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 cursor-pointer"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   </td>

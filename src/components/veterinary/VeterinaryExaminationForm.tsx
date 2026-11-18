@@ -75,8 +75,8 @@ export function VeterinaryExaminationForm({ backHref = "/dashboard/vet" }: Veter
           router.refresh();
         }, 1200);
       }
-    } catch (err: any) {
-      setErrorMessage(err?.message || "An unexpected error occurred while saving.");
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred while saving.");
       setIsSubmitting(false);
     }
   };

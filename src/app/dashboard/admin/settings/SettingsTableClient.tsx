@@ -101,8 +101,8 @@ export function SettingsTableClient({ initialSettings, userRole }: Props) {
           setIsModalOpen(false);
           triggerSuccess(`Setting '${activeKey}' saved successfully.`);
         }
-      } catch (err: any) {
-        triggerError(err.message || "Failed to save system setting.");
+      } catch (err: unknown) {
+        triggerError(err instanceof Error ? err.message : "Failed to save system setting.");
       }
     });
   };
@@ -127,8 +127,8 @@ export function SettingsTableClient({ initialSettings, userRole }: Props) {
           );
           triggerSuccess(`Setting '${key}' was successfully reset to default.`);
         }
-      } catch (err: any) {
-        triggerError(err.message || "Failed to reset setting.");
+      } catch (err: unknown) {
+        triggerError(err instanceof Error ? err.message : "Failed to reset setting.");
       }
     });
   };
@@ -148,8 +148,8 @@ export function SettingsTableClient({ initialSettings, userRole }: Props) {
           })
         );
         triggerSuccess("All system settings have been restored to defaults.");
-      } catch (err: any) {
-        triggerError(err.message || "Failed to restore all settings.");
+      } catch (err: unknown) {
+        triggerError(err instanceof Error ? err.message : "Failed to restore all settings.");
       }
     });
   };

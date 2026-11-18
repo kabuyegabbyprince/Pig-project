@@ -399,6 +399,7 @@ model Pig {
   transactions    FinanceTransaction[]
   repayments      Repayment[]
   documents       Document[]
+  storeProducts   StoreProduct[]
   legacyMortality MortalityRecord?     @relation("LegacyMortality")
 
   @@index([tagNumber])
@@ -1019,4 +1020,71 @@ model BackendUser {
 
   @@map("users")
 }
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
+model StoreProduct {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  price        Decimal  @db.Decimal(12, 2)
+  stock        Int      @default(0)
+  category     String?
+  imageUrl     String?
+  isAvailable  Boolean  @default(true)
+  pigId        String?  @map("pig_id")
+  pig          Pig?     @relation(fields: [pigId], references: [id], onDelete: SetNull)
+  sourcePigTag String?  @map("source_pig_tag")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orderItems StoreOrderItem[]
+
+  @@index([pigId])
+  @@map("store_products")
+}
+
+model StoreOrder {
+  id               String      @id @default(cuid())
+  orderNumber      String      @unique @map("order_number")
+  customerName     String      @map("customer_name")
+  customerEmail    String?     @map("customer_email")
+  customerPhone    String?     @map("customer_phone")
+  shippingAddress  String?     @map("shipping_address")
+  totalAmount      Decimal     @db.Decimal(12, 2) @map("total_amount")
+  status           OrderStatus @default(PENDING)
+  paymentMethod    String?     @map("payment_method")
+  paymentReference String?     @map("payment_reference")
+  notes            String?
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  items StoreOrderItem[]
+
+  @@index([orderNumber])
+  @@index([status])
+  @@map("store_orders")
+}
+
+model StoreOrderItem {
+  id        String       @id @default(cuid())
+  orderId   String       @map("order_id")
+  order     StoreOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?      @map("product_id")
+  product   StoreProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  quantity  Int
+  price     Decimal      @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("store_order_items")
+}
+
 

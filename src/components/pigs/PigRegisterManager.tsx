@@ -77,10 +77,10 @@ export function PigRegisterManager({
           setCreateQuantity(1);
           setCreateDate(new Date().toISOString().split("T")[0]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         setFeedback({
           type: "error",
-          message: err?.message || "Failed to register pigs. Please try again.",
+          message: err instanceof Error ? err.message : "Failed to register pigs. Please try again.",
         });
       }
     });
@@ -132,10 +132,10 @@ export function PigRegisterManager({
             message: `Receipt record updated successfully (${result.batch.quantity} pigs on ${result.batch.dateReceived}).`,
           });
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         setFeedback({
           type: "error",
-          message: err?.message || "Failed to update record. Please try again.",
+          message: err instanceof Error ? err.message : "Failed to update record. Please try again.",
         });
       }
     });
@@ -158,10 +158,10 @@ export function PigRegisterManager({
           });
           setDeletingBatch(null);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         setFeedback({
           type: "error",
-          message: err?.message || "Failed to delete record. Please try again.",
+          message: err instanceof Error ? err.message : "Failed to delete record. Please try again.",
         });
         setDeletingBatch(null);
       }

@@ -7,6 +7,7 @@ import { getUserPreferences } from "@/app/actions/settings";
 import { User, Lock, Palette, CheckCircle, AlertCircle, Settings as SettingsIcon, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { SettingsPreferences } from "./settings-preferences";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -150,12 +151,12 @@ export default async function PersonalSettingsPage({
           </div>
 
           <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              className="rounded-xl bg-[#173d2e] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#102a22] transition"
+            <SubmitButton
+              pendingText="Saving profile..."
+              className="rounded-xl bg-[#173d2e] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#102a22] transition cursor-pointer"
             >
               Save Profile Details
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>
@@ -234,12 +235,12 @@ export default async function PersonalSettingsPage({
           </div>
 
           <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              className="rounded-xl bg-[#a44d67] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#883e54] transition"
+            <SubmitButton
+              pendingText="Updating password..."
+              className="rounded-xl bg-[#a44d67] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#883e54] transition cursor-pointer"
             >
               Update Password
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

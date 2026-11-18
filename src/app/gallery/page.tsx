@@ -22,21 +22,21 @@ export default async function GalleryPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 antialiased">
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <div className="app-container mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" aria-label="Pig Project Rwanda home" className="flex items-center shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda Logo" className="h-10 w-auto" />
+            <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda Logo" className="h-8 w-auto sm:h-10" />
           </Link>
-          <div className="flex items-center gap-1 rounded-full border border-slate-200/70 bg-slate-50/80 px-2 py-1 text-xs font-semibold text-slate-600">
-            <Link href="/" className="rounded-full px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Home</Link>
-            <Link href="/team" className="rounded-full px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Our Team</Link>
-            <Link href="/contact" className="rounded-full px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Contact Us</Link>
-            <Link href="/login" className="rounded-full px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Staff Login</Link>
+          <div className="flex flex-wrap items-center justify-end gap-1 rounded-2xl sm:rounded-full border border-slate-200/70 bg-slate-50/80 px-1.5 py-1 text-[11px] sm:text-xs font-semibold text-slate-600">
+            <Link href="/" className="rounded-full px-2.5 sm:px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Home</Link>
+            <Link href="/team" className="rounded-full px-2.5 sm:px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Our Team</Link>
+            <Link href="/contact" className="rounded-full px-2.5 sm:px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Contact Us</Link>
+            <Link href="/login" className="rounded-full px-2.5 sm:px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Staff Login</Link>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <main className="app-container mx-auto max-w-7xl px-4 py-12 sm:py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Visual Documentation</p>
           <h1 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">Project Field Gallery</h1>

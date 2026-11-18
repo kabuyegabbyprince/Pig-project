@@ -17,9 +17,12 @@ export type { SystemSettingItem, UserPreferences };
 
 const ALL_ROLES = [
   Role.SUPER_ADMIN,
+  Role.PROJECT_MANAGER,
   Role.FIELD_OFFICER,
   Role.VETERINARIAN,
   Role.FINANCE_OFFICER,
+  Role.TRAINER,
+  Role.FUNDER,
 ] as const;
 
 async function requireAdmin() {

@@ -1,0 +1,269 @@
+================================================================================
+E-COMMERCE STOREFRONT APPLICATION — COMPLETE INTEGRATION & BUILD BLUEPRINT
+================================================================================
+Save or paste this entire file into your standalone E-Commerce project
+(Project #2) so it connects seamlessly to the exact same Supabase PostgreSQL
+database controlled by the Pig Project Control Panel (Project #1).
+
+================================================================================
+1. SHARED ARCHITECTURE & HOW THE TWO APPS WORK TOGETHER
+================================================================================
+- Shared Database: Supabase PostgreSQL
+  * SUPABASE_PROJECT_ID : nepauafqpehbirvjzyeq
+  * SUPABASE_URL        : https://nepauafqpehbirvjzyeq.supabase.co
+- Project #1 (Pig Project Control Panel — already built):
+  * Manages staff users (7 RBAC roles), beneficiaries, pigs, veterinary
+    clearances, revolving fund returns, financial ledger, and Super Admin
+    E-Commerce Control (`/dashboard/admin/ecommerce`).
+  * Publishes products into `"store_products"` (optionally linked to a
+    vet-cleared pig tag via `pig_id` & `source_pig_tag`).
+  * Views incoming orders from `"store_orders"` + `"store_order_items"`, prints
+    receipts (`/dashboard/admin/ecommerce/[orderId]`), updates statuses
+    (`PENDING -> PAID -> PROCESSING -> DISPATCHED -> COMPLETED | CANCELLED`),
+    restores inventory on cancellation, and auto-posts verified `INCOME` or
+    `EXPENSE` refund reversals into `"FinanceTransaction"`.
+- Project #2 (E-Commerce Storefront — YOUR STOREFRONT APP):
+  * Connects to the SAME Supabase project (`nepauafqpehbirvjzyeq`).
+  * Reads ONLY published, in-stock products (`isAvailable = true` and `stock > 0`)
+    from `"store_products"`.
+  * Allows customers to browse, filter by category, manage a shopping cart,
+    place orders (`store_orders` + `store_order_items`), pay via Mobile Money
+    (MTN MoMo / Airtel Money) or Cash on Delivery, and track their orders by
+    `order_number`.
+
+================================================================================
+2. ENVIRONMENT VARIABLES (.env for Project #2 E-Commerce App)
+================================================================================
+Copy your actual values from Project #1's `/.env` file into Project #2's `.env`:
+
+  SUPABASE_URL=https://nepauafqpehbirvjzyeq.supabase.co
+  SUPABASE_PROJECT_ID=nepauafqpehbirvjzyeq
+  SUPABASE_ANON_KEY=<copy SUPABASE_ANON_KEY from Project #1 /.env>
+  SUPABASE_SERVICE_ROLE_KEY=<copy SUPABASE_SERVICE_ROLE_KEY from Project #1 /.env>
+
+  # Optional: If Project #2 calls Project #1's webhook or API directly
+  CONTROL_PANEL_BASE_URL=<deployed URL of Project #1>
+  ECOMMERCE_WEBHOOK_SECRET=<same secret configured in Project #1>
+
+IMPORTANT SECURITY RULE:
+- NEVER expose `SUPABASE_SERVICE_ROLE_KEY` to the browser (no `NEXT_PUBLIC_`).
+- Use `SUPABASE_SERVICE_ROLE_KEY` ONLY in server-side Next.js API routes
+  (`app/api/*`) or Server Actions for order placement & stock updates.
+- Browser client code (if reading Supabase directly) may ONLY use
+  `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (protected by RLS).
+
+================================================================================
+3. REQUIRED SUPABASE SQL MIGRATION & ROW-LEVEL SECURITY (RUN ONCE)
+================================================================================
+Before launching Project #2, open Supabase Dashboard -> SQL Editor -> New Query
+and execute this exact idempotent SQL script:
+
+--------------------------------------------------------------------------------
+DO $$ BEGIN
+  CREATE TYPE "OrderStatus" AS ENUM (
+    'PENDING', 'PAID', 'PROCESSING', 'DISPATCHED', 'COMPLETED', 'CANCELLED'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "store_products" (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "description" TEXT,
+  "price" NUMERIC(12, 2) NOT NULL,
+  "stock" INTEGER NOT NULL DEFAULT 0,
+  "category" TEXT,
+  "imageUrl" TEXT,
+  "isAvailable" BOOLEAN NOT NULL DEFAULT true,
+  "pig_id" TEXT REFERENCES "Pig"("id") ON DELETE SET NULL,
+  "source_pig_tag" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "pig_id" TEXT REFERENCES "Pig"("id") ON DELETE SET NULL;
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "source_pig_tag" TEXT;
+
+CREATE TABLE IF NOT EXISTS "store_orders" (
+  "id" TEXT PRIMARY KEY,
+  "order_number" TEXT UNIQUE NOT NULL,
+  "customer_name" TEXT NOT NULL,
+  "customer_email" TEXT,
+  "customer_phone" TEXT,
+  "shipping_address" TEXT,
+  "total_amount" NUMERIC(12, 2) NOT NULL,
+  "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
+  "payment_method" TEXT,
+  "payment_reference" TEXT,
+  "notes" TEXT,
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE "store_orders" ADD COLUMN IF NOT EXISTS "shipping_address" TEXT;
+ALTER TABLE "store_orders" ADD COLUMN IF NOT EXISTS "payment_reference" TEXT;
+
+CREATE TABLE IF NOT EXISTS "store_order_items" (
+  "id" TEXT PRIMARY KEY,
+  "order_id" TEXT NOT NULL REFERENCES "store_orders"("id") ON DELETE CASCADE,
+  "product_id" TEXT REFERENCES "store_products"("id") ON DELETE SET NULL,
+  "quantity" INTEGER NOT NULL,
+  "price" NUMERIC(12, 2) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS "store_products_pig_id_idx" ON "store_products"("pig_id");
+CREATE INDEX IF NOT EXISTS "store_orders_order_number_idx" ON "store_orders"("order_number");
+CREATE INDEX IF NOT EXISTS "store_orders_status_idx" ON "store_orders"("status");
+CREATE INDEX IF NOT EXISTS "store_order_items_order_id_idx" ON "store_order_items"("order_id");
+CREATE INDEX IF NOT EXISTS "store_order_items_product_id_idx" ON "store_order_items"("product_id");
+
+-- Supabase Row-Level Security (RLS)
+ALTER TABLE "store_products" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "store_orders" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "store_order_items" ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public read available store products" ON "store_products";
+CREATE POLICY "Public read available store products"
+  ON "store_products" FOR SELECT
+  TO anon, authenticated
+  USING ("isAvailable" = true);
+--------------------------------------------------------------------------------
+
+================================================================================
+4. DATABASE SCHEMA CONTRACT (EXACT COLUMN NAMES IN SUPABASE)
+================================================================================
+1) Table: "store_products"
+   - id             : TEXT (UUID / CUID)
+   - name           : TEXT (Product title)
+   - description    : TEXT (Optional product description)
+   - price          : NUMERIC(12,2) (Currency: RWF - Rwandan Francs)
+   - stock          : INTEGER (Remaining units; decrement atomically on checkout)
+   - category       : TEXT (Suggested categories: "Livestock", "Pork Products",
+                      "Feed", "Training Guides")
+   - imageUrl       : TEXT (HTTPS image URL)
+   - isAvailable    : BOOLEAN (Only display where isAvailable = true)
+   - pig_id         : TEXT (Nullable FK -> Pig.id for traceable vet-cleared pigs)
+   - source_pig_tag : TEXT (e.g. "PF-RW-2026-00012" shown as Vet-Cleared badge)
+   - createdAt      : TIMESTAMP
+   - updatedAt      : TIMESTAMP
+
+2) Table: "store_orders"
+   - id                : TEXT (UUID)
+   - order_number      : TEXT UNIQUE (Format: "ORD-YYYY-XXXX", e.g. "ORD-2026-4812AB")
+   - customer_name     : TEXT NOT NULL
+   - customer_email    : TEXT
+   - customer_phone    : TEXT (e.g. "0788..." or "+250788...")
+   - shipping_address  : TEXT (District / Sector / Cell / Street or Farm Pickup)
+   - total_amount      : NUMERIC(12,2) (Always computed server-side from DB prices!)
+   - status            : OrderStatus ('PENDING' on checkout)
+   - payment_method    : TEXT ("MTN MoMo" | "Airtel Money" | "Bank Transfer" | "Cash on Delivery")
+   - payment_reference : TEXT (MoMo/Airtel/Stripe TX reference)
+   - notes             : TEXT
+   - created_at        : TIMESTAMP
+   - updated_at        : TIMESTAMP
+
+3) Table: "store_order_items"
+   - id         : TEXT (UUID)
+   - order_id   : TEXT FK -> store_orders.id (ON DELETE CASCADE)
+   - product_id : TEXT FK -> store_products.id (ON DELETE SET NULL)
+   - quantity   : INTEGER (>= 1)
+   - price      : NUMERIC(12,2) (Unit price snapshot at time of purchase)
+
+================================================================================
+5. ORDER CREATION & STOCK RESERVATION RULES (CHECKOUT LOGIC)
+================================================================================
+When a customer submits checkout in Project #2 (`POST /api/orders` or Server Action):
+1. Validate customer_name (min 2 chars), at least one of customer_phone or
+   customer_email, and non-empty items array (`[{ productId, quantity }]`).
+2. Fetch all referenced rows from `store_products` using SUPABASE_SERVICE_ROLE_KEY.
+3. Verify EVERY item:
+   - `product.isAvailable === true`
+   - `product.stock >= item.quantity`
+   - Never trust client-supplied prices: compute `total_amount` from `product.price * quantity`.
+4. Generate unique `order_number = "ORD-" + year + "-" + 4digits + 2letters`.
+5. Insert row into `store_orders` (`status: 'PENDING'`).
+6. Insert rows into `store_order_items` (`order_id`, `product_id`, `quantity`, `price`).
+7. Decrement `store_products.stock = product.stock - item.quantity` for each item.
+   - If `product.pig_id` is set and new stock reaches 0, update `Pig.status = 'SOLD'`
+     in `"Pig"` table so the pig cannot be distributed or double-sold!
+8. Insert an `INFO` notification in `"Notification"` for active `SUPER_ADMIN` users
+   in `"User"` (optional bonus, or Project #1 polls live from `"store_orders"`).
+
+================================================================================
+6. PAYMENT CALLBACK / WEBHOOK INTEGRATION WITH CONTROL PANEL
+================================================================================
+Project #1 already exposes ready-to-use endpoints you can call or integrate:
+- Public Catalog API (JSON):
+  GET  <CONTROL_PANEL_BASE_URL>/api/ecommerce/products
+       Query params: ?category=Livestock&includeOutOfStock=false
+- Public Checkout & Order Tracking API (JSON):
+  POST <CONTROL_PANEL_BASE_URL>/api/ecommerce/orders
+  GET  <CONTROL_PANEL_BASE_URL>/api/ecommerce/orders?orderNumber=ORD-2026-XXXX&contact=0788...
+- Payment Confirmation Webhook (MTN MoMo / Airtel Money / Stripe):
+  POST <CONTROL_PANEL_BASE_URL>/api/ecommerce/webhooks/payment
+  Headers:
+    Content-Type: application/json
+    x-webhook-secret: <ECOMMERCE_WEBHOOK_SECRET>   (if configured)
+  Body:
+    {
+      "orderNumber": "ORD-2026-4812AB",
+      "status": "PAID",                 // PAID | SUCCESSFUL | FAILED | CANCELLED
+      "transactionReference": "MOMO-987654321",
+      "provider": "MTN MoMo",
+      "amount": 45000
+    }
+  What Project #1 automatically does when this webhook receives "PAID":
+  - Marks `store_orders.status = 'PAID'` and saves `payment_reference`.
+  - Automatically posts an `APPROVED` `INCOME` row (`ECOM-<orderNumber>`)
+    into `"FinanceTransaction"` under category `"E-Commerce Sales"`.
+  - Records an `AuditLog` entry.
+  What Project #1 automatically does if status becomes "CANCELLED":
+  - Restores item quantities back into `store_products.stock`.
+  - Restores linked `Pig.status` back to `'ACTIVE'` if it was marked `'SOLD'`.
+  - If already `PAID`, posts an `EXPENSE` refund reversal (`ECOM-REFUND-<orderNumber>`)
+    and alerts `FINANCE_OFFICER` + `SUPER_ADMIN`.
+
+================================================================================
+7. COPY-PASTE PROMPT FOR GENERATING / UPDATING YOUR PROJECT #2 E-COMMERCE APP
+================================================================================
+You can paste the prompt below directly when building Project #2:
+
+--- START PROMPT ---
+Build the public E-Commerce Storefront application for "Abafashamyumvire
+Cooperative Pig Farm Marketplace" connected to the shared Supabase project
+(`SUPABASE_URL=https://nepauafqpehbirvjzyeq.supabase.co`) over HTTPS REST using
+`SUPABASE_SERVICE_ROLE_KEY` in server-side Next.js API routes.
+
+Requirements:
+1. Visual Style & Responsive Design:
+   - Warm forest-green (`#173d2e`) and clean off-white (`#f3f5f1`, `#ffffff`,
+     border `#dfe7df`) design matching the Pig Project Control Panel.
+   - Fully responsive across phones, tablets, laptops, and large monitors with
+     zero horizontal overflow (`overflow-x-hidden`).
+   - All monetary values formatted in RWF (`45,000 RWF`).
+2. Storefront Pages:
+   - `/` (Marketplace Catalog): Fetch published products (`isAvailable = true` and
+     `stock > 0`) from `"store_products"`. Category filter tabs (`All`, `Livestock`,
+     `Pork Products`, `Feed`, `Training Guides`), search bar, product cards showing
+     image, category, stock badge, and `Vet-Cleared Tag: PF-RW-...` badge when
+     `source_pig_tag` is present.
+   - `/products/[id]` (Product Detail): Full description, veterinary traceability
+     badge if `source_pig_tag` exists, live stock count, quantity picker, Add to Cart.
+   - `/cart` & `/checkout`: Persistent cart, customer checkout form (`customerName`,
+     `customerPhone` or `customerEmail`, `shippingAddress`, `paymentMethod`
+     [MTN MoMo, Airtel Money, Bank Transfer, Cash on Delivery], `notes`).
+     Server-side `POST /api/orders` computes total from DB prices, verifies stock,
+     generates unique `ORD-YYYY-XXXX` order number, writes to `"store_orders"` and
+     `"store_order_items"`, decrements `"store_products".stock`, and marks linked
+     `"Pig".status = 'SOLD'` if stock hits 0.
+   - `/track` (Order Tracker): Customer enters `order_number` + phone/email to see
+     real-time fulfillment status (`PENDING`, `PAID`, `PROCESSING`, `DISPATCHED`,
+     `COMPLETED`, `CANCELLED`), itemized breakdown, and payment status synced from
+     the Super Admin Control Panel.
+3. Payment Callback Route:
+   - Optional `/api/payments/callback` confirming MTN MoMo / Airtel Money payments
+     and forwarding verified payment notifications to the Control Panel webhook
+     or updating `"store_orders"` + `"FinanceTransaction"` cleanly.
+--- END PROMPT ---
+================================================================================

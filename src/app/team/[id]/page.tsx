@@ -38,26 +38,26 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+      <main className="app-container mx-auto max-w-6xl px-4 py-10 sm:py-16 sm:px-6 lg:px-8">
         <div className="overflow-hidden rounded-3xl border border-[#d9e1d8] bg-white shadow-sm">
-          <div className="grid gap-8 p-6 md:grid-cols-[320px,1fr] md:p-10">
+          <div className="grid gap-8 p-5 sm:p-6 md:grid-cols-[280px_1fr] lg:grid-cols-[320px_1fr] md:p-10">
             <div className="flex items-center justify-center">
-              <div className="h-72 w-72 overflow-hidden rounded-full border-4 border-[#e4ede6] bg-[#e4ede6] shadow-sm">
+              <div className="aspect-square w-48 max-w-full sm:w-64 lg:w-72 overflow-hidden rounded-full border-4 border-[#e4ede6] bg-[#e4ede6] shadow-sm">
                 {member.photoUrl ? (
                   <img src={member.photoUrl} alt={member.fullName} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-5xl font-bold text-[#2c5a43]">
+                  <div className="flex h-full w-full items-center justify-center text-4xl sm:text-5xl font-bold text-[#2c5a43]">
                     {member.fullName.split(" ").map((part) => part[0]).slice(0,2).join("").toUpperCase() || "TM"}
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#2c5a43]">Team Member</p>
-                <h1 className="mt-3 text-4xl font-bold font-serif text-[#1c2b23]">{member.fullName}</h1>
-                <p className="mt-2 text-lg font-semibold text-[#2c5a43]">{member.role}</p>
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.18em] text-[#2c5a43]">Team Member</p>
+                <h1 className="mt-3 text-2xl sm:text-4xl font-bold font-serif text-[#1c2b23] break-words">{member.fullName}</h1>
+                <p className="mt-2 text-base sm:text-lg font-semibold text-[#2c5a43]">{member.role}</p>
               </div>
 
               {member.specialization && (
@@ -66,20 +66,20 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
                 </span>
               )}
 
-              {member.bio && <p className="text-base leading-8 text-[#5d6e64]">{member.bio}</p>}
+              {member.bio && <p className="text-sm sm:text-base leading-7 sm:leading-8 text-[#5d6e64]">{member.bio}</p>}
 
               {member.responsibilities && (
                 <div>
                   <h2 className="text-lg font-bold text-[#1c2b23]">Responsibilities</h2>
-                  <p className="mt-2 text-base leading-7 text-[#5d6e64]">{member.responsibilities}</p>
+                  <p className="mt-2 text-sm sm:text-base leading-7 text-[#5d6e64]">{member.responsibilities}</p>
                 </div>
               )}
 
               <div className="grid gap-3 pt-2 text-sm text-[#5d6e64] sm:grid-cols-2">
                 {member.showEmailPublic && member.email && (
-                  <a href={`mailto:${member.email}`} className="inline-flex items-center gap-2 rounded-lg border border-[#d9e1d8] px-3 py-2 hover:bg-[#f2f5f0]">
-                    <Mail className="h-4 w-4" />
-                    {member.email}
+                  <a href={`mailto:${member.email}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-[#d9e1d8] px-3 py-2 hover:bg-[#f2f5f0] break-all">
+                    <Mail className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{member.email}</span>
                   </a>
                 )}
                 {member.showPhonePublic && member.phone && (

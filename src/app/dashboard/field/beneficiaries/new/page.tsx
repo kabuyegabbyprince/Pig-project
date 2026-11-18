@@ -2,6 +2,7 @@ import { createBeneficiary } from "@/app/actions/beneficiary";
 import { LocationPicker } from "@/components/LocationPicker";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export default function NewBeneficiaryPage() {
   return (
@@ -57,13 +58,13 @@ export default function NewBeneficiaryPage() {
             >
               Cancel
             </Link>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors"
+            <SubmitButton
+              pendingText="Saving beneficiary..."
+              className="inline-flex items-center justify-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors cursor-pointer"
             >
               <Save className="-ml-1 mr-2 h-4 w-4" />
               Save Beneficiary
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

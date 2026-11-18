@@ -133,7 +133,7 @@ export function PigReturnsTableClient({
       <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
           {/* Date Picker Filter */}
-          <div className="relative min-w-[220px]">
+          <div className="relative w-full sm:w-[220px] shrink-0">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#5d6e64]">
               <Calendar className="h-4 w-4" />
             </div>

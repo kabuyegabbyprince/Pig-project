@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteGalleryItem, toggleGalleryItemPublished } from "@/app/actions/gallery";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +59,10 @@ export default async function GalleryManagementPage() {
                   <td className="px-4 py-4 text-sm text-[#1c2b23]">{item.category || "Other"}</td>
                   <td className="px-4 py-4">
                     <form action={toggleGalleryItemPublished.bind(null, item.id)}>
-                      <button type="submit" className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${item.isPublished ? "bg-green-100 text-green-800" : "bg-[#e4ede6] text-[#5d6e64]"}`}>
+                      <SubmitButton pendingText="Saving..." className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer ${item.isPublished ? "bg-green-100 text-green-800" : "bg-[#e4ede6] text-[#5d6e64]"}`}>
                         {item.isPublished ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                         {item.isPublished ? "Published" : "Draft"}
-                      </button>
+                      </SubmitButton>
                     </form>
                   </td>
                   <td className="px-4 py-4">
@@ -71,10 +72,10 @@ export default async function GalleryManagementPage() {
                         Edit
                       </Link>
                       <form action={deleteGalleryItem.bind(null, item.id)}>
-                        <button type="submit" className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
+                        <SubmitButton pendingText="Deleting..." className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 cursor-pointer">
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   </td>

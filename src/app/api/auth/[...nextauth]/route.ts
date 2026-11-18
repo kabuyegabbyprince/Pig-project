@@ -4,6 +4,10 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 import { Role } from "@prisma/client";
+import { getPhoneLookupCandidates } from "@/lib/phone-utils";
+import { getNextAuthSecret } from "@/lib/auth-secret";
+import { verifySupabaseAuthPassword } from "@/lib/supabase-auth";
+import { getBootstrapStatus, SUPER_ADMIN_BOOTSTRAPPED_KEY } from "@/lib/auth-bootstrap";
 
 const validRoles = [
   Role.SUPER_ADMIN,
@@ -33,24 +37,61 @@ type BackendLoginResponse = {
 };
 
 export const authOptions: NextAuthOptions = {
+  cookies: {
+    sessionToken: {
+      name: "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+    callbackUrl: {
+      name: "next-auth.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+    csrfToken: {
+      name: "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+  },
   providers: [
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        email: { label: "Email or Telephone", type: "text" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const cleanEmail = String(credentials?.email || "").trim().toLowerCase();
+        const rawIdentifier = String(credentials?.email || "").trim();
+        const cleanEmail = rawIdentifier.toLowerCase();
         const cleanPassword = String(credentials?.password || "");
 
-        if (!cleanEmail || !cleanPassword) {
+        if (!rawIdentifier || !cleanPassword) {
           return null;
         }
 
-        const localUser = await prisma.user.findUnique({
-          where: { email: cleanEmail },
-        });
+        const isEmail = rawIdentifier.includes("@");
+        const localUser = isEmail
+          ? await prisma.user.findUnique({
+              where: { email: cleanEmail },
+            })
+          : await prisma.user.findFirst({
+              where: {
+                OR: getPhoneLookupCandidates(rawIdentifier).map((p) => ({ phone: p })),
+              },
+            });
 
         if (localUser) {
           if (!localUser.isActive || localUser.deletedAt) {
@@ -68,7 +109,32 @@ export const authOptions: NextAuthOptions = {
 
           if (passwordMatches || legacyPasswordMatches) {
             return {
-              id: localUser.id,
+              id: String(localUser.id),
+              email: localUser.email,
+              name: localUser.name,
+              role: localUser.role,
+              accessLevel: localUser.accessLevel,
+              assignedDistrictId: localUser.assignedDistrictId,
+              assignedSectorId: localUser.assignedSectorId,
+              assignedCellId: localUser.assignedCellId,
+              assignedVillageId: localUser.assignedVillageId,
+            };
+          }
+
+          // Fallback: if password was updated directly inside Supabase Authentication, verify via auth.users and sync hash
+          const supaUser = await verifySupabaseAuthPassword(localUser.email, cleanPassword);
+          if (supaUser) {
+            try {
+              const syncedHash = await bcrypt.hash(cleanPassword, 10);
+              await prisma.user.update({
+                where: { id: String(localUser.id) },
+                data: { password: syncedHash },
+              });
+            } catch (syncErr) {
+              console.error("Failed to sync updated Supabase Auth password:", syncErr);
+            }
+            return {
+              id: String(localUser.id),
               email: localUser.email,
               name: localUser.name,
               role: localUser.role,
@@ -81,81 +147,144 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        const backendUrl =
-          process.env.BACKEND_URL ||
-          (process.env.NODE_ENV === "production"
-            ? "https://pig-project-backend.onrender.com"
-            : "http://127.0.0.1:8081");
-        let res: Response;
+        // Direct Supabase Auth user lookup (e.g. account created directly in Supabase Authentication UI)
+        if (!localUser && isEmail) {
+          const supaUser = await verifySupabaseAuthPassword(cleanEmail, cleanPassword);
+          if (supaUser) {
+            const { isFirstSuperAdminAvailable } = await getBootstrapStatus();
+            const meta = supaUser.user_metadata ?? {};
+            const metaRole = normalizeRole(
+              typeof meta.role === "string"
+                ? meta.role
+                : typeof supaUser.app_metadata?.role === "string"
+                  ? supaUser.app_metadata.role
+                  : undefined
+            );
+            const assignedRole =
+              metaRole || (isFirstSuperAdminAvailable ? Role.SUPER_ADMIN : Role.FIELD_OFFICER);
+            const fullName =
+              typeof meta.full_name === "string" && meta.full_name.trim()
+                ? meta.full_name.trim()
+                : typeof meta.name === "string" && meta.name.trim()
+                  ? meta.name.trim()
+                  : cleanEmail.split("@")[0];
+            const phone =
+              typeof meta.phone === "string" && meta.phone.trim()
+                ? meta.phone.trim()
+                : supaUser.phone || null;
 
-        try {
-          res = await fetch(`${backendUrl}/api/auth/login`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
+            const syncedPublicUser = await prisma.user.create({
+              data: {
+                email: cleanEmail,
+                name: fullName,
+                phone,
+                password: await bcrypt.hash(cleanPassword, 10),
+                role: assignedRole,
+                isActive: true,
+              },
+            });
+
+            if (isFirstSuperAdminAvailable) {
+              await prisma.systemSetting.upsert({
+                where: { key: SUPER_ADMIN_BOOTSTRAPPED_KEY },
+                create: {
+                  key: SUPER_ADMIN_BOOTSTRAPPED_KEY,
+                  value: "true",
+                  description: "Tracks whether the initial Super Admin has claimed master control.",
+                  updatedById: String(syncedPublicUser.id),
+                },
+                update: {
+                  value: "true",
+                  updatedById: String(syncedPublicUser.id),
+                },
+              });
+            }
+
+            return {
+              id: String(syncedPublicUser.id),
+              email: syncedPublicUser.email,
+              name: syncedPublicUser.name,
+              role: syncedPublicUser.role,
+              accessLevel: syncedPublicUser.accessLevel,
+              assignedDistrictId: syncedPublicUser.assignedDistrictId,
+              assignedSectorId: syncedPublicUser.assignedSectorId,
+              assignedCellId: syncedPublicUser.assignedCellId,
+              assignedVillageId: syncedPublicUser.assignedVillageId,
+            };
+          }
+        }
+
+        if (process.env.BACKEND_URL) {
+          const backendUrl = process.env.BACKEND_URL.replace(/\/+$/, "");
+          let res: Response;
+
+          try {
+            res = await fetch(`${backendUrl}/api/auth/login`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                email: cleanEmail,
+                password: cleanPassword,
+              }),
+            });
+          } catch {
+            console.error("Authentication backend request failed.");
+            return null;
+          }
+
+          if (!res.ok) {
+            return null;
+          }
+
+          const result = (await res.json()) as BackendLoginResponse;
+          const user = result?.data;
+          if (!result?.success || !user) {
+            return null;
+          }
+
+          const email = String(user.email || cleanEmail).trim().toLowerCase();
+          const role = normalizeRole(user.role) || Role.FIELD_OFFICER;
+          const mappedUser = await prisma.user.upsert({
+            where: { email },
+            update: {
+              name: user.name || user.email || "System User",
+              role,
+              isActive: true,
+              deletedAt: null,
             },
-            body: JSON.stringify({
-              email: cleanEmail,
-              password: cleanPassword,
-            }),
+            create: {
+              name: user.name || user.email || "System User",
+              email,
+              password: await bcrypt.hash(randomUUID(), 10),
+              role,
+              isActive: true,
+            },
           });
-        } catch {
-          console.error("Authentication backend request failed.");
-          throw new Error("The authentication service is unavailable.");
-        }
 
-        if (res.status === 400 || res.status === 401) {
-          return null;
-        }
-        if (!res.ok) {
-          console.error("Authentication backend returned HTTP", res.status);
-          throw new Error("The authentication service is unavailable.");
-        }
-
-        const result = (await res.json()) as BackendLoginResponse;
-        const user = result?.data;
-        if (!result?.success || !user) {
-          return null;
-        }
-
-        const email = String(user.email || cleanEmail).trim().toLowerCase();
-        const role = normalizeRole(user.role) || Role.FIELD_OFFICER;
-        const mappedUser = await prisma.user.upsert({
-          where: { email },
-          update: {
-            name: user.name || user.email || "System User",
-            role,
-            isActive: true,
-            deletedAt: null,
-          },
-          create: {
-            name: user.name || user.email || "System User",
+          return {
+            id: String(mappedUser.id),
             email,
-            password: await bcrypt.hash(randomUUID(), 10),
+            name: mappedUser.name,
             role,
-            isActive: true,
-          },
-        });
+            accessLevel: mappedUser.accessLevel,
+            assignedDistrictId: mappedUser.assignedDistrictId,
+            assignedSectorId: mappedUser.assignedSectorId,
+            assignedCellId: mappedUser.assignedCellId,
+            assignedVillageId: mappedUser.assignedVillageId,
+            token: user.token,
+          };
+        }
 
-        return {
-          id: mappedUser.id,
-          email,
-          name: mappedUser.name,
-          role,
-          accessLevel: mappedUser.accessLevel,
-          assignedDistrictId: mappedUser.assignedDistrictId,
-          assignedSectorId: mappedUser.assignedSectorId,
-          assignedCellId: mappedUser.assignedCellId,
-          assignedVillageId: mappedUser.assignedVillageId,
-          token: user.token,
-        };
+        return null;
       }
     })
   ],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.id = String(user.id);
         token.role = normalizeRole(user.role);
         token.accessToken = user.token;
         token.accessLevel = user.accessLevel;
@@ -163,12 +292,31 @@ export const authOptions: NextAuthOptions = {
         token.assignedSectorId = user.assignedSectorId;
         token.assignedCellId = user.assignedCellId;
         token.assignedVillageId = user.assignedVillageId;
+        return token;
       }
+
+      if (token?.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: String(token.id) },
+            select: { role: true, isActive: true, deletedAt: true, name: true },
+          });
+          if (!dbUser || !dbUser.isActive || dbUser.deletedAt) {
+            token.role = "";
+          } else {
+            token.role = normalizeRole(dbUser.role);
+            token.name = dbUser.name;
+          }
+        } catch {
+          // Preserve existing token claims if database is temporarily unreachable
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id;
+        session.user.id = String(token.id ?? "");
         session.user.role = normalizeRole(String(token.role ?? ""));
         session.accessToken = token.accessToken;
         session.user.accessLevel = String(token.accessLevel ?? "ALL");
@@ -187,22 +335,20 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) {
       if (user?.id) {
         try {
+          const userId = String(user.id);
+          const userRole = "role" in user && user.role ? String(user.role) : null;
           await prisma.auditLog.create({
             data: {
-              userId: user.id,
-              role: (user as any).role ? String((user as any).role) : null,
+              userId,
+              role: userRole,
               action: "LOGIN",
               entity: "AUTH",
-              entityId: user.id,
+              entityId: userId,
               newValue: {
                 email: user.email,
                 name: user.name,
               },
             },
-          });
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() },
           });
         } catch (err) {
           console.error("Failed to record login audit log:", err);
@@ -210,7 +356,7 @@ export const authOptions: NextAuthOptions = {
       }
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || "your-super-secret-jwt-key-for-next-auth",
+  secret: getNextAuthSecret(),
 };
 
 const handler = NextAuth(authOptions);

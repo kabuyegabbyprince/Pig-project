@@ -90,7 +90,14 @@ export default async function AdminDistributionsAndReturnsPage() {
             Monitor livestock distribution agreements and track the revolving mandate of two returned piglets per family.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            href="/dashboard/admin/revolving"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#173d2e] shadow-xs hover:bg-slate-50 transition"
+          >
+            <Clock className="h-4 w-4" />
+            <span>Cycles &amp; Allocation</span>
+          </Link>
           <Link
             href="/dashboard/field/distributions/new"
             className="inline-flex items-center gap-2 rounded-lg bg-[#064e3b] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#053d2e] transition"

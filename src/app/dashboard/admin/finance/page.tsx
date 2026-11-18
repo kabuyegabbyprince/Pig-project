@@ -6,6 +6,7 @@ import { Plus, CreditCard, DollarSign, ArrowUpRight, ArrowDownRight, CheckCircle
 import { approveTransaction } from "@/app/actions/finance";
 import { getFinanceUser } from "@/lib/finance-access";
 import { formatRwf } from "@/lib/format-rwf";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -130,9 +131,9 @@ export default async function FinancePage() {
                       {t.status === 'SUBMITTED' && (
                         <form action={approveTransaction}>
                           <input type="hidden" name="transactionId" value={t.id} />
-                          <button type="submit" className="text-sm text-[#2c5a43] hover:underline font-medium inline-flex items-center">
+                          <SubmitButton pendingText="Approving..." className="text-sm text-[#2c5a43] hover:underline font-medium inline-flex items-center cursor-pointer">
                             <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                          </button>
+                          </SubmitButton>
                         </form>
                       )}
                     </td>

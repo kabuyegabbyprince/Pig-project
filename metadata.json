@@ -1,0 +1,5 @@
+{
+  "name": "Rwanda Pig Project & Revolving Fund",
+  "description": "Comprehensive livestock management, beneficiary tracking, and revolving fund system for the Pig Project in Rwanda.",
+  "requestCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

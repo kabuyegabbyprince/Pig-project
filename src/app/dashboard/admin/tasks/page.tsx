@@ -5,6 +5,7 @@ import { completeTask } from "@/app/actions/task";
 import { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { getActiveUser } from "@/lib/active-user";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -102,9 +103,9 @@ export default async function TasksPage() {
                       {t.status !== 'COMPLETED' && (activeUser.role === Role.SUPER_ADMIN || activeUser.id === t.assignedUser.id) && (
                         <form action={completeTask}>
                           <input type="hidden" name="taskId" value={t.id} />
-                          <button type="submit" className="text-[#2c5a43] hover:underline font-medium text-xs">
+                          <SubmitButton pendingText="Completing..." className="text-[#2c5a43] hover:underline font-medium text-xs cursor-pointer">
                             Mark Done
-                          </button>
+                          </SubmitButton>
                         </form>
                       )}
                     </td>

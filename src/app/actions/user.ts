@@ -6,6 +6,11 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { Prisma, Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
+import { normalizePhone } from "@/lib/phone-utils";
+import {
+  deleteSupabaseAuthUserByEmail,
+  syncSupabaseAuthUser,
+} from "@/lib/supabase-auth";
 
 const assignableRoles = [
   Role.SUPER_ADMIN,
@@ -46,7 +51,7 @@ export async function createUser(formData: FormData) {
   }
   const role = requestedRole;
 
-  const normalizedPhone = phone || null;
+  const normalizedPhone = phone ? normalizePhone(phone) : null;
 
   const existingUser = await prisma.user.findFirst({
     where: {
@@ -70,6 +75,7 @@ export async function createUser(formData: FormData) {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   try {
+    let createdUserId = "";
     await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -81,6 +87,7 @@ export async function createUser(formData: FormData) {
           isActive: true,
         },
       });
+      createdUserId = newUser.id;
 
       await tx.auditLog.create({
         data: {
@@ -92,6 +99,16 @@ export async function createUser(formData: FormData) {
           newValue: { name, email, role },
         },
       });
+    });
+
+    await syncSupabaseAuthUser({
+      email,
+      password,
+      name,
+      role,
+      phone: normalizedPhone,
+      publicUserId: createdUserId,
+      isActive: true,
     });
 
     revalidatePath("/dashboard/admin");
@@ -121,7 +138,8 @@ export async function updatePersonalProfile(formData: FormData) {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const name = String(formData.get("name") || "").trim();
-  const phone = String(formData.get("phone") || "").trim();
+  const rawPhone = String(formData.get("phone") || "").trim();
+  const phone = rawPhone ? normalizePhone(rawPhone) : "";
   if (!name) {
     redirect("/dashboard/settings?profileError=Full+Name+is+required");
   }
@@ -129,7 +147,7 @@ export async function updatePersonalProfile(formData: FormData) {
   try {
     const prevUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, phone: true, role: true },
+      select: { email: true, name: true, phone: true, role: true },
     });
 
     if (phone) {
@@ -152,6 +170,14 @@ export async function updatePersonalProfile(formData: FormData) {
       },
     });
 
+    if (prevUser?.email) {
+      await syncSupabaseAuthUser({
+        email: prevUser.email,
+        name,
+        phone: phone || null,
+      });
+    }
+
     await prisma.auditLog.create({
       data: {
         userId: session.user.id,
@@ -163,9 +189,10 @@ export async function updatePersonalProfile(formData: FormData) {
         newValue: { name, phone: phone || null },
       },
     });
-  } catch (err: any) {
-    if (err?.message?.includes("NEXT_REDIRECT")) throw err;
-    redirect(`/dashboard/settings?profileError=${encodeURIComponent(err?.message || "Failed to update profile")}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update profile";
+    if (message.includes("NEXT_REDIRECT")) throw err;
+    redirect(`/dashboard/settings?profileError=${encodeURIComponent(message)}`);
   }
 
   revalidatePath("/dashboard");
@@ -209,6 +236,10 @@ export async function changeUserPassword(formData: FormData) {
     where: { id: user.id },
     data: { password: hashedPassword },
   });
+  await syncSupabaseAuthUser({
+    email: user.email,
+    password: newPassword,
+  });
 
   await prisma.auditLog.create({
     data: {
@@ -248,6 +279,7 @@ export async function deleteUser(userId: string) {
   try {
     try {
       await prisma.user.delete({ where: { id: userId } });
+      await deleteSupabaseAuthUserByEmail(targetUser.email);
     } catch {
       await prisma.user.update({
         where: { id: userId },
@@ -255,6 +287,10 @@ export async function deleteUser(userId: string) {
           deletedAt: new Date(),
           isActive: false,
         },
+      });
+      await syncSupabaseAuthUser({
+        email: targetUser.email,
+        isActive: false,
       });
     }
 
@@ -270,9 +306,135 @@ export async function deleteUser(userId: string) {
     });
 
     revalidatePath("/dashboard/admin/users");
+    revalidatePath("/dashboard/admin");
     return { success: true };
   } catch (error) {
     console.error("Failed to delete user:", error);
     return { success: false, error: "Failed to delete user" };
   }
 }
+
+export async function updateUserRole(userId: string, newRole: string) {
+  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  if (!actor) {
+    return { success: false, error: "Unauthorized: Only Super Admins can change user roles." };
+  }
+
+  if (actor.id === userId) {
+    return { success: false, error: "You cannot change your own role." };
+  }
+
+  if (!isAssignableRole(newRole)) {
+    return { success: false, error: "Invalid role selected." };
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, email: true, role: true, deletedAt: true },
+  });
+
+  if (!targetUser || targetUser.deletedAt) {
+    return { success: false, error: "User not found." };
+  }
+
+  if (targetUser.role === newRole) {
+    return { success: true };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole },
+    });
+    await syncSupabaseAuthUser({
+      email: targetUser.email,
+      role: newRole,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "ROLE_UPDATED",
+        entity: "USER",
+        entityId: userId,
+        userId: actor.id,
+        role: actor.role,
+        previousValue: { role: targetUser.role },
+        newValue: { name: targetUser.name, email: targetUser.email, role: newRole },
+      },
+    });
+
+    try {
+      await prisma.notification.create({
+        data: {
+          userId,
+          title: "Role Updated",
+          message: `Your workspace role was updated from ${targetUser.role} to ${newRole} by ${actor.name}.`,
+          relatedEntity: "USER",
+          relatedEntityId: userId,
+        },
+      });
+    } catch {
+      // Non-blocking notification failure
+    }
+
+    revalidatePath("/dashboard/admin/users");
+    revalidatePath("/dashboard/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update user role:", error);
+    return { success: false, error: "Failed to update user role." };
+  }
+}
+
+export async function toggleUserActive(userId: string) {
+  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  if (!actor) {
+    return { success: false, error: "Unauthorized: Only Super Admins can manage user status." };
+  }
+
+  if (actor.id === userId) {
+    return { success: false, error: "You cannot suspend your own account." };
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, email: true, role: true, isActive: true, deletedAt: true },
+  });
+
+  if (!targetUser || targetUser.deletedAt) {
+    return { success: false, error: "User not found." };
+  }
+
+  const nextActive = !targetUser.isActive;
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: nextActive },
+    });
+    await syncSupabaseAuthUser({
+      email: targetUser.email,
+      isActive: nextActive,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: nextActive ? "ACTIVATED" : "SUSPENDED",
+        entity: "USER",
+        entityId: userId,
+        userId: actor.id,
+        role: actor.role,
+        previousValue: { isActive: targetUser.isActive },
+        newValue: { name: targetUser.name, email: targetUser.email, isActive: nextActive },
+      },
+    });
+
+    revalidatePath("/dashboard/admin/users");
+    revalidatePath("/dashboard/admin");
+    return { success: true, isActive: nextActive };
+  } catch (error) {
+    console.error("Failed to toggle user status:", error);
+    return { success: false, error: "Failed to update user status." };
+  }
+}
+

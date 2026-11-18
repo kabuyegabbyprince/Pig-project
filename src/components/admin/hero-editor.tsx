@@ -4,6 +4,7 @@ import { saveHeroSection } from "@/app/actions/website-content";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { WebsiteContent } from "@prisma/client";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 const fallbackImage = "/pig-hero-real.jpg";
 
@@ -182,20 +183,20 @@ export default function HeroEditor({ initialContent }: { initialContent?: Websit
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#edf1ee] pt-4">
-          <button
-            type="submit"
+          <SubmitButton
             name="removeImage"
             value="true"
-            className="rounded-md border border-[#d9e1d8] bg-white px-4 py-2 text-sm font-medium text-[#5d6e64] hover:bg-[#f2f5f0]"
+            pendingText="Removing..."
+            className="rounded-md border border-[#d9e1d8] bg-white px-4 py-2 text-sm font-medium text-[#5d6e64] hover:bg-[#f2f5f0] cursor-pointer"
           >
             Remove Image
-          </button>
-          <button
-            type="submit"
-            className="rounded-md bg-[#2c5a43] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2b23]"
+          </SubmitButton>
+          <SubmitButton
+            pendingText="Saving changes..."
+            className="rounded-md bg-[#2c5a43] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2b23] cursor-pointer"
           >
             Save Changes
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>

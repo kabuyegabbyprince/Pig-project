@@ -2,9 +2,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, ShieldCheck, UserCircle2, History, BarChart3 } from "lucide-react";
+import { Plus, UserCircle2, History, BarChart3 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { DeleteUserButton } from "./DeleteUserButton";
+import { UserRoleActions } from "@/components/admin/UserRoleActions";
+import { formatUserContact } from "@/lib/phone-utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,7 @@ export default async function UsersManagementPage() {
       id: true,
       name: true,
       email: true,
+      phone: true,
       role: true,
       isActive: true,
       createdAt: true,
@@ -32,8 +35,8 @@ export default async function UsersManagementPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold font-serif text-[#1c2b23]">Users</h1>
-          <p className="mt-1 text-sm text-[#5d6e64]">Manage system users and roles.</p>
+          <h1 className="text-2xl font-bold font-serif text-[#1c2b23]">Users &amp; Role Governance</h1>
+          <p className="mt-1 text-sm text-[#5d6e64]">Assign roles, toggle active access, and audit all platform accounts.</p>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -60,9 +63,8 @@ export default async function UsersManagementPage() {
             <thead className="bg-[#f5f7f4] text-xs uppercase tracking-wide text-[#5d6e64]">
               <tr>
                 <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Email / Telephone</th>
+                <th className="px-4 py-3">Role &amp; Access Status</th>
                 <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -70,7 +72,7 @@ export default async function UsersManagementPage() {
             <tbody className="divide-y divide-[#edf2ee]">
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-[#5d6e64]">
+                  <td colSpan={5} className="px-4 py-8 text-center text-[#5d6e64]">
                     No users found yet.
                   </td>
                 </tr>
@@ -85,17 +87,14 @@ export default async function UsersManagementPage() {
                         <span className="font-medium">{user.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[#384b42]">{user.email}</td>
+                    <td className="px-4 py-3 text-[#384b42]">{formatUserContact(user.email, user.phone)}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-[#edf3ef] px-2.5 py-1 text-xs font-medium text-[#1c2b23]">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {user.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      <UserRoleActions
+                        userId={user.id}
+                        currentRole={user.role}
+                        isActive={user.isActive}
+                        isCurrentUser={user.id === session.user.id}
+                      />
                     </td>
                     <td className="px-4 py-3 text-[#5d6e64]">
                       {new Date(user.createdAt).toLocaleDateString()}

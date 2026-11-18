@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
 import { Prisma, Role, PigHealthStatus, PigStatus, RevolvingStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { checkPigVetClearance } from "@/lib/vet-clearance";
 
 export async function transferPig(data: {
   pigId: string;
@@ -166,6 +167,7 @@ export async function distributePig(data: {
     if (!beneficiary) throw new Error("Selected beneficiary does not exist.");
 
     // Update beneficiary with nationalId and location if provided
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateBeneficiaryData: Record<string, any> = {
       status: "ACTIVE",
     };
@@ -186,19 +188,12 @@ export async function distributePig(data: {
       data: updateBeneficiaryData,
     });
 
-    // Determine the pig asset for distribution
+    // Determine the pig asset for distribution (with Phase 6.1 Veterinary Clearance Guardrail)
     let targetPigId = data.pigId?.trim();
     if (targetPigId) {
-      const pigToDistribute = await tx.pig.findFirst({
-        where: {
-          id: targetPigId,
-          deletedAt: null,
-          currentBeneficiaryId: null,
-          status: { notIn: [PigStatus.DISTRIBUTED, PigStatus.DECEASED, PigStatus.SOLD, PigStatus.INACTIVE] },
-        },
-      });
-      if (!pigToDistribute) {
-        throw new Error("The selected pig is not available in stock for distribution.");
+      const clearance = await checkPigVetClearance(targetPigId, "DISTRIBUTION");
+      if (!clearance.cleared) {
+        throw new Error(clearance.reason || "The selected pig has not passed veterinary clearance.");
       }
       await tx.pig.update({
         where: { id: targetPigId },
@@ -208,18 +203,30 @@ export async function distributePig(data: {
         },
       });
     } else {
-      // Find an existing pig in stock that is not distributed
-      const availablePig = await tx.pig.findFirst({
+      // Find an existing healthy, vet-cleared pig in stock that is not distributed
+      const candidatePigs = await tx.pig.findMany({
         where: {
           currentBeneficiaryId: null,
+          healthStatus: PigHealthStatus.HEALTHY,
           status: { notIn: [PigStatus.DISTRIBUTED, PigStatus.DECEASED, PigStatus.SOLD, PigStatus.INACTIVE] },
           deletedAt: null,
         },
         orderBy: { createdAt: "asc" },
       });
 
+      let availablePig: (typeof candidatePigs)[number] | null = null;
+      for (const candidate of candidatePigs) {
+        const clearance = await checkPigVetClearance(candidate.id, "DISTRIBUTION");
+        if (clearance.cleared) {
+          availablePig = candidate;
+          break;
+        }
+      }
+
       if (!availablePig) {
-        throw new Error("No pigs are currently available in stock for distribution. Please register pigs first.");
+        throw new Error(
+          "No healthy, vet-cleared pigs are currently available in stock for distribution. Please register and clear pigs first."
+        );
       }
 
       targetPigId = availablePig.id;

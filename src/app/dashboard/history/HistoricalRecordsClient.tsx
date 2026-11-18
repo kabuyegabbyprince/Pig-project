@@ -31,7 +31,9 @@ export interface SerializedAuditLog {
   action: string;
   entity: string;
   entityId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   previousValue: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   newValue: any;
   ipAddress: string | null;
   userAgent: string | null;

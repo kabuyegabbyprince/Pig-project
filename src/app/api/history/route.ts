@@ -155,7 +155,7 @@ export async function GET(request: Request) {
       count: activities.length,
       data: activities,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to query historical records:", err);
     return NextResponse.json(
       { error: "Failed to retrieve historical records." },

@@ -1,3 +1,5 @@
+import { SubmitButton } from "@/components/ui/SubmitButton";
+
 const inputClass =
   "block w-full border border-[#d9e1d8] rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#c9577a] focus:border-[#c9577a] sm:text-sm text-[#1c2b23] bg-white";
 
@@ -26,12 +28,12 @@ export function LocationAddForm({
         <label className="block text-sm font-medium text-[#5d6e64] mb-1">Code (optional)</label>
         <input type="text" name="code" className={inputClass} />
       </div>
-      <button
-        type="submit"
-        className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors"
+      <SubmitButton
+        pendingText="Saving..."
+        className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors cursor-pointer"
       >
         {submitLabel}
-      </button>
+      </SubmitButton>
     </form>
   );
 }

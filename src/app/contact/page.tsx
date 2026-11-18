@@ -82,18 +82,18 @@ export default function ContactPage() {
                   href={href}
                   target={href.startsWith("http") ? "_blank" : undefined}
                   rel={href.startsWith("http") ? "noreferrer" : undefined}
-                  className="group flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all hover:bg-white hover:border-slate-300 hover:shadow-xs"
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all hover:bg-white hover:border-slate-300 hover:shadow-xs"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                  <div className="flex min-w-0 items-center gap-3.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-                      <div className="text-sm font-bold text-slate-900 sm:text-base">{value}</div>
+                      <div className="text-sm font-bold text-slate-900 sm:text-base break-all">{value}</div>
                     </div>
                   </div>
-                  <div className="text-slate-400 group-hover:text-emerald-700 transition-colors">
+                  <div className="shrink-0 text-slate-400 group-hover:text-emerald-700 transition-colors">
                     <ArrowRight className="h-4 w-4" />
                   </div>
                 </a>

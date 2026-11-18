@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Save, TrendingDown, TrendingUp } from "lucide-react";
 import { createFinanceTransaction } from "@/app/actions/finance";
 import { getFinanceUser } from "@/lib/finance-access";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -144,13 +145,13 @@ export default async function NewFinanceTransactionPage({
             >
               Cancel
             </Link>
-            <button 
-              type="submit"
-              className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#2c5a43] hover:bg-[#1c2b23] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2c5a43]"
+            <SubmitButton
+              pendingText="Saving record..."
+              className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#2c5a43] hover:bg-[#1c2b23] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2c5a43] cursor-pointer"
             >
               <Save className="h-4 w-4 mr-2" />
               Save Record
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

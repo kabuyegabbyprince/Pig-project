@@ -60,7 +60,6 @@ export function LocationPicker({
   // Load districts on mount
   useEffect(() => {
     let active = true;
-    setLoadingDistricts(true);
     getDistricts()
       .then((data) => {
         if (!active) return;
@@ -84,12 +83,19 @@ export function LocationPicker({
     let active = true;
     const targetDistrict = initialDistrictId || initialDistrictName;
     if (!targetDistrict) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDistrictId("");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSectorId("");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCellId("");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVillageId("");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSectors([]);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCells([]);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVillages([]);
       return;
     }

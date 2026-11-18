@@ -1,27 +1,60 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Lock, Mail, Loader2, ArrowLeft } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+} from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const registeredParam = searchParams.get("registered") === "1";
+  const identifierParam = searchParams.get("identifier") || "";
+  const urlError = searchParams.get("error");
+
+  const [email, setEmail] = useState(identifierParam);
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState(
+    urlError === "CredentialsSignin"
+      ? "Invalid email/telephone or password. Please verify your credentials."
+      : urlError
+        ? "Authentication could not be completed. Please try again."
+        : ""
+  );
+  const [successMessage, setSuccessMessage] = useState(
+    registeredParam
+      ? "Account created successfully! Please sign in with your credentials."
+      : ""
+  );
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
     setError("");
+    setSuccessMessage("");
 
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedIdentifier = email.trim();
+    const cleanIdentifier = trimmedIdentifier.includes("@")
+      ? trimmedIdentifier.toLowerCase()
+      : trimmedIdentifier;
+
     try {
       const res = await signIn("credentials", {
-        email: trimmedEmail,
+        email: cleanIdentifier,
         password,
         redirect: false,
       });
@@ -29,18 +62,21 @@ export default function LoginPage() {
       if (res?.error) {
         setError(
           res.error === "CredentialsSignin"
-            ? "Invalid email or password. Please verify your credentials."
+            ? "Invalid email/telephone or password. Please verify your credentials."
             : "Unable to sign in right now. Please try again."
         );
+        setLoading(false);
       } else if (res?.ok) {
+        setLoading(false);
+        setSuccessMessage("Signed in successfully! Redirecting to your workspace...");
         router.push("/dashboard");
         router.refresh();
       } else {
         setError("Unable to sign in right now. Please try again.");
+        setLoading(false);
       }
     } catch {
       setError("Unable to connect to the sign-in service. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -49,7 +85,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 via-white to-slate-50 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <Link href="/" className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors mb-6"
+          >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to public website</span>
           </Link>
@@ -60,33 +99,49 @@ export default function LoginPage() {
             Operations Workspace
           </h1>
           <p className="mt-1 text-xs text-slate-500">
-            Sign in with your authorized staff credentials
+            Sign in with your authorized credentials
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
+          {loading && (
+            <div className="mb-5 flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-700">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#064e3b]" />
+              <span>Verifying credentials and loading workspace...</span>
+            </div>
+          )}
+
+          {successMessage && !loading && (
+            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700 mt-0.5" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+
           {error && (
-            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 text-center font-medium">
-              {error}
+            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                Email Address
+                Email or Telephone
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                   <Mail className="h-4 w-4" />
                 </div>
                 <input
-                  type="email"
+                  type="text"
                   required
+                  disabled={loading}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                  placeholder="name@valueprotocols.rw"
+                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-60"
+                  placeholder="name@example.com or +250 788 000 000"
                 />
               </div>
             </div>
@@ -100,29 +155,42 @@ export default function LoginPage() {
                   <Lock className="h-4 w-4" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
+                  disabled={loading}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                  className="block w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-60"
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-700"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-[#064e3b] hover:bg-[#053d2e] shadow-xs disabled:opacity-50 transition-all cursor-pointer mt-2"
+              className="w-full flex justify-center items-center py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-[#064e3b] hover:bg-[#053d2e] shadow-xs disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer mt-2"
             >
-              {loading ? (
-                <Loader2 className="animate-spin h-4 w-4 mr-2" />
-              ) : null}
+              {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
               {loading ? "Signing in..." : "Sign In to Workspace"}
             </button>
           </form>
 
-          <div className="mt-6 border-t border-slate-100 pt-4 text-center">
+          <div className="mt-6 border-t border-slate-100 pt-4 text-center space-y-2">
+            <p className="text-xs text-slate-600">
+              Need an account?{" "}
+              <Link href="/signup" className="font-semibold text-[#064e3b] hover:underline">
+                Register here
+              </Link>
+            </p>
             <p className="text-[11px] text-slate-400">
               Value Protocols Rwanda &bull; Revolving Livestock Platform
             </p>
@@ -130,5 +198,20 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-600">
+          <Loader2 className="h-5 w-5 animate-spin mr-2 text-[#064e3b]" />
+          Loading sign in...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

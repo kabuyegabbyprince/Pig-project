@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 import { createEmployeeReport } from "@/app/actions/report";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -114,13 +115,13 @@ export default async function NewEmployeeReportPage() {
             >
               Cancel
             </Link>
-            <button 
-              type="submit"
-              className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#2c5a43] hover:bg-[#1c2b23] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2c5a43]"
+            <SubmitButton
+              pendingText="Submitting report..."
+              className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#2c5a43] hover:bg-[#1c2b23] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2c5a43] cursor-pointer"
             >
               <Save className="h-4 w-4 mr-2" />
               Submit Report
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

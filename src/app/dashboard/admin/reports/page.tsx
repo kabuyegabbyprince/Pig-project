@@ -17,7 +17,8 @@ export default async function AdminReportsPage({
   searchParams: Promise<{ period?: string }>;
 }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "SUPER_ADMIN") {
+  const role = session?.user?.role;
+  if (!session || (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER" && role !== "FUNDER")) {
     redirect("/dashboard");
   }
 
@@ -56,6 +57,8 @@ export default async function AdminReportsPage({
     // Finance
     incomeAggr,
     expenseAggr,
+    ecomIncomeAggr,
+    ecomRefundAggr,
   ] = await Promise.all([
     prisma.pig.count({
       where: {
@@ -119,6 +122,26 @@ export default async function AdminReportsPage({
         deletedAt: null,
       },
     }),
+    prisma.financeTransaction.aggregate({
+      _sum: { amount: true },
+      where: {
+        type: "INCOME",
+        status: "APPROVED",
+        reference: "E-Commerce Sales",
+        transactionDate: dateFilter,
+        deletedAt: null,
+      },
+    }),
+    prisma.financeTransaction.aggregate({
+      _sum: { amount: true },
+      where: {
+        type: "EXPENSE",
+        status: "APPROVED",
+        reference: "E-Commerce Refunds",
+        transactionDate: dateFilter,
+        deletedAt: null,
+      },
+    }),
   ]);
 
   const totalPigletsReturned = pigletsReturnedAggr._sum.quantity ?? 0;
@@ -128,6 +151,12 @@ export default async function AdminReportsPage({
   const totalIncome = incomeAggr._sum.amount ?? new Prisma.Decimal(0);
   const totalExpenses = expenseAggr._sum.amount ?? new Prisma.Decimal(0);
   const netBalance = totalIncome.minus(totalExpenses);
+
+  const ecomGrossSales = ecomIncomeAggr._sum.amount ?? new Prisma.Decimal(0);
+  const ecomRefunds = ecomRefundAggr._sum.amount ?? new Prisma.Decimal(0);
+  const ecomNetRevenue = ecomGrossSales.minus(ecomRefunds);
+  const fieldIncome = totalIncome.minus(ecomGrossSales);
+  const fieldExpenses = totalExpenses.minus(ecomRefunds);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
@@ -308,6 +337,44 @@ export default async function AdminReportsPage({
             <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4">
               <span className="text-xs font-semibold uppercase text-[#5d6d64]">Net Financial Balance</span>
               <p className="mt-2 text-2xl font-bold text-[#1b2d24]">{formatRwf(netBalance)}</p>
+            </div>
+          </div>
+
+          {/* Store Revenue vs Field Expenses Breakdown */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 border-t border-[#dfe7df] pt-4">
+            <div className="rounded-xl border border-[#dfe7df] bg-[#f6fbf7] p-3.5">
+              <span className="text-[11px] font-semibold uppercase text-[#173d2e]">E-Commerce Net Revenue</span>
+              <p className="mt-1 text-lg font-bold text-[#173d2e]">{formatRwf(ecomNetRevenue)}</p>
+              <p className="text-[11px] text-[#5d6e64]">Gross {formatRwf(ecomGrossSales)} minus {formatRwf(ecomRefunds)} refunds</p>
+            </div>
+            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-3.5">
+              <span className="text-[11px] font-semibold uppercase text-[#5d6d64]">Field / Grant Income</span>
+              <p className="mt-1 text-lg font-bold text-[#1b2d24]">{formatRwf(fieldIncome)}</p>
+              <p className="text-[11px] text-[#5d6e64]">Donor, project &amp; field inflows</p>
+            </div>
+            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-3.5">
+              <span className="text-[11px] font-semibold uppercase text-[#a44d67]">Field Program Expenses</span>
+              <p className="mt-1 text-lg font-bold text-[#a44d67]">{formatRwf(fieldExpenses)}</p>
+              <p className="text-[11px] text-[#5d6e64]">Vet, feed, transport &amp; operations</p>
+            </div>
+            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-3.5 flex flex-col justify-between">
+              <span className="text-[11px] font-semibold uppercase text-[#5d6d64]">CSV Exports</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <a
+                  href="/api/finance/export?source=ecommerce"
+                  download
+                  className="text-xs font-semibold text-[#173d2e] underline"
+                >
+                  E-Commerce CSV
+                </a>
+                <a
+                  href="/api/finance/export?source=field"
+                  download
+                  className="text-xs font-semibold text-[#2d5b78] underline"
+                >
+                  Field CSV
+                </a>
+              </div>
             </div>
           </div>
         </div>

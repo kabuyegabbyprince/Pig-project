@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Stethoscope, FileText, Shield, LogOut, Menu, X,
   ArrowRightCircle, ArrowLeftCircle, History, Settings,
   UserPlus, ImageIcon, TrendingUp, TrendingDown, RefreshCw, Calendar, PlusCircle, UserCog,
-  Send, ChevronDown
+  Send, ChevronDown, ShoppingBag
 } from "lucide-react";
 import { useState } from "react";
 
@@ -15,6 +15,7 @@ type NavItem = {
   name: string;
   href?: string;
   icon: React.ComponentType<{ className?: string }>;
+  superAdminOnly?: boolean;
   children?: { name: string; href: string }[];
 };
 
@@ -25,6 +26,7 @@ const adminNavigation: NavItem[] = [
   { name: 'Distributions', href: '/dashboard/admin/distributions', icon: ArrowRightCircle },
   { name: 'Veterinary', href: '/dashboard/admin/veterinary', icon: Stethoscope },
   { name: 'Finance', href: '/dashboard/admin/finance', icon: TrendingUp },
+  { name: 'E-Commerce', href: '/dashboard/admin/ecommerce', icon: ShoppingBag, superAdminOnly: true },
   {
     name: 'Post',
     icon: Send,
@@ -35,9 +37,9 @@ const adminNavigation: NavItem[] = [
   },
   { name: 'Reports', href: '/dashboard/admin/reports', icon: FileText },
   { name: 'Historical Records', href: '/dashboard/history', icon: History },
-  { name: 'Website Content', href: '/dashboard/admin/website', icon: ImageIcon },
-  { name: 'Users', href: '/dashboard/admin/users', icon: Shield },
-  { name: 'System Settings', href: '/dashboard/admin/settings', icon: Settings },
+  { name: 'Website Content', href: '/dashboard/admin/website', icon: ImageIcon, superAdminOnly: true },
+  { name: 'Users', href: '/dashboard/admin/users', icon: Shield, superAdminOnly: true },
+  { name: 'System Settings', href: '/dashboard/admin/settings', icon: Settings, superAdminOnly: true },
   { name: 'Personal Settings', href: '/dashboard/settings', icon: UserCog },
 ];
 
@@ -94,7 +96,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const role = normalizeRole(session?.user?.role as string | undefined);
   let navigation: NavItem[] = [];
-  if (role === 'SUPER_ADMIN' || role === 'PROJECT_MANAGER') navigation = adminNavigation;
+  if (role === 'SUPER_ADMIN') navigation = adminNavigation;
+  if (role === 'PROJECT_MANAGER') navigation = adminNavigation.filter((item) => !item.superAdminOnly);
   if (role === 'FIELD_OFFICER' || role === 'TRAINER') navigation = fieldNavigation;
   if (role === 'VETERINARIAN') navigation = vetNavigation;
   if (role === 'FINANCE_OFFICER') navigation = financeNavigation;
@@ -186,10 +189,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const userInitial = session?.user?.name ? session.user.name.charAt(0).toUpperCase() : "U";
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 antialiased">
-      <div className="flex min-h-screen">
-        {/* Sleek, professional dark-forest sidebar */}
-        <aside className="hidden w-64 shrink-0 border-r border-emerald-950/30 bg-[#072419] text-white md:flex md:flex-col shadow-xs">
+    <div className="min-h-screen w-full overflow-x-clip bg-[#f8fafc] text-slate-900 antialiased">
+      <div className="flex min-h-screen w-full">
+        {/* Sleek, professional dark-forest sidebar (laptops & large desktops >=1024px) */}
+        <aside className="dashboard-sidebar hidden w-64 shrink-0 border-r border-emerald-950/30 bg-[#072419] text-white lg:flex lg:flex-col shadow-xs">
           <div className="flex h-16 items-center border-b border-white/10 px-5">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-sm">
@@ -239,34 +242,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-          {/* Mobile Header */}
-          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md md:hidden">
-            <div className="flex items-center justify-between px-4 py-2.5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pig Project Rwanda</p>
-                <h1 className="text-sm font-bold text-slate-900">Operations Workspace</h1>
+        <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
+          {/* Mobile & Tablet Header (<1024px) */}
+          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-md lg:hidden">
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pig Project Rwanda</p>
+                <h1 className="truncate text-sm font-bold text-slate-900">Operations Workspace</h1>
               </div>
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
-                aria-label="Toggle navigation"
-              >
-                {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+                  title="Sign out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+                  aria-label="Toggle navigation"
+                >
+                  {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </header>
 
           {mobileMenuOpen && (
-            <div className="max-h-[calc(100vh-57px)] overflow-y-auto border-b border-emerald-950/40 bg-[#072419] p-4 md:hidden text-white">
+            <div className="max-h-[calc(100dvh-57px)] overflow-y-auto border-b border-emerald-950/40 bg-[#072419] p-4 lg:hidden text-white">
               <nav className="space-y-1">
                 {renderNav(navigation, true)}
               </nav>
             </div>
           )}
 
-          <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl min-w-0">{children}</div>
+          <main className="dashboard-main min-w-0 flex-1 p-3.5 sm:p-6 lg:p-8">
+            <div className="dashboard-container mx-auto w-full max-w-7xl min-w-0">{children}</div>
           </main>
         </div>
       </div>

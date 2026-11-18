@@ -1,7 +1,8 @@
-﻿import { createTask } from "@/app/actions/task";
+import { createTask } from "@/app/actions/task";
 import { prisma } from "@/lib/prisma";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 
 export const dynamic = 'force-dynamic';
@@ -77,13 +78,13 @@ export default async function NewTaskPage() {
             >
               Cancel
             </Link>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors"
+            <SubmitButton
+              pendingText="Assigning task..."
+              className="inline-flex items-center justify-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors cursor-pointer"
             >
               <Save className="-ml-1 mr-2 h-4 w-4" />
               Assign Task
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

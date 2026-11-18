@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -101,19 +101,19 @@ export function HomePageClient({
           borderBottom: "1px solid rgba(255,255,255,0.10)",
         }}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <div className="app-container mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3 lg:px-8">
           {/* Logo */}
           <Link href="/" aria-label="Pig Project Rwanda home" className="flex shrink-0 items-center">
             <img
               src="/pig-project-rwanda-logo.svg"
               alt="Pig Project Rwanda"
-              className="h-10 w-auto"
+              className="h-8 w-auto sm:h-10"
               style={{ filter: "brightness(0) invert(1)" }}
             />
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-0.5">
+          <nav className="hidden lg:flex items-center gap-0.5">
             {NAV_LINKS.map(({ href, label }) => (
               <Link
                 key={label}
@@ -126,26 +126,32 @@ export function HomePageClient({
           </nav>
 
           {/* Right actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <Link
               href="/login"
-              className="hidden sm:inline-block text-sm font-medium text-white/80 hover:text-white px-3 py-1.5 transition-colors"
+              className="hidden sm:inline-block text-sm font-medium text-white/80 hover:text-white px-2.5 py-1.5 transition-colors"
             >
               Staff Login
             </Link>
             <Link
+              href="/signup"
+              className="hidden sm:inline-block text-sm font-medium text-emerald-200 hover:text-white px-2.5 py-1.5 transition-colors"
+            >
+              Sign Up
+            </Link>
+            <Link
               href="/contact"
-              className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#064e3b] shadow-sm hover:bg-emerald-50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#064e3b] shadow-sm hover:bg-emerald-50 transition-colors whitespace-nowrap"
             >
               <span>Contact Us</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
-            {/* Hamburger — mobile only */}
+            {/* Hamburger — mobile & tablet */}
             <button
               type="button"
               aria-label="Toggle menu"
               onClick={() => setMobileOpen((v) => !v)}
-              className="md:hidden ml-1 flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/20 transition-colors"
+              className="lg:hidden ml-0.5 flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/20 transition-colors"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -180,27 +186,22 @@ export function HomePageClient({
               >
                 Staff Login
               </Link>
+              <Link
+                href="/signup"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-lg px-4 py-2.5 text-sm font-medium text-emerald-200 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                Create Account
+              </Link>
             </nav>
           </div>
         )}
       </header>
 
       {/* ══════════════════════════════════════════════
-          HERO — 100vw × 100dvh full-screen background
+          HERO — responsive full-viewport shell with zero overlap
           ══════════════════════════════════════════════ */}
-      <section
-        id="home"
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "100vh",
-          /* dynamic viewport height for mobile browsers */
-          minHeight: "-webkit-fill-available",
-          margin: 0,
-          padding: 0,
-          overflow: "hidden",
-        }}
-      >
+      <section id="home" className="hero-section">
         {/* Full-bleed background image */}
         <div
           aria-hidden="true"
@@ -227,53 +228,41 @@ export function HomePageClient({
         />
 
         {/* Hero content — vertically centred */}
-        <div
-          style={{
-            position: "relative",
-            zIndex: 10,
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            /* push down past the fixed navbar */
-            paddingTop: "72px",
-          }}
-        >
-          <div className="mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+        <div className="hero-content-wrap">
+          <div className="app-container mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/10 px-4 py-1.5 text-xs font-semibold tracking-wide text-emerald-200 backdrop-blur-sm mb-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold tracking-wide text-emerald-200 backdrop-blur-sm mb-5 sm:mb-7">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Pig Project Rwanda &bull; Revolving Fund
             </div>
 
-            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.10]">
+            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.12]">
               {heroData.title}
             </h1>
 
-            <p className="mt-5 max-w-2xl mx-auto text-base leading-relaxed text-emerald-100/85 sm:text-lg lg:text-xl">
+            <p className="mt-4 sm:mt-5 max-w-2xl mx-auto text-sm leading-relaxed text-emerald-100/85 sm:text-lg lg:text-xl">
               {heroData.description}
             </p>
 
             {/* CTA Buttons */}
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+            <div className="mt-7 sm:mt-9 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
               <Link
                 href={heroData.primaryButtonLink}
-                className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-[#064e3b] shadow-md hover:bg-emerald-50 transition-all"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 sm:px-7 sm:py-3.5 text-xs sm:text-sm font-bold text-[#064e3b] shadow-md hover:bg-emerald-50 transition-all"
               >
                 <span>{heroData.primaryButtonText}</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href={heroData.secondaryButtonLink}
-                className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-7 py-3.5 text-sm font-bold text-white backdrop-blur-sm hover:bg-white/20 transition-all"
+                className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3 sm:px-7 sm:py-3.5 text-xs sm:text-sm font-bold text-white backdrop-blur-sm hover:bg-white/20 transition-all"
               >
                 {heroData.secondaryButtonText}
               </Link>
             </div>
 
-            {/* Trust pills */}
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-emerald-200/70 uppercase tracking-widest">
+            {/* Trust indicators */}
+            <div className="mt-7 sm:mt-10 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[10px] sm:text-xs font-semibold text-emerald-200/70 uppercase tracking-widest">
               {["Community-Led", "Rwanda Operations", "Revolving Mandate"].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -284,43 +273,18 @@ export function HomePageClient({
           </div>
         </div>
 
-        {/* Bottom stat chips */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: "1.75rem",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 20,
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: "0.75rem",
-            width: "90%",
-          }}
-        >
+        {/* Bottom stat chips — flows cleanly on small/short viewports */}
+        <div className="hero-stat-chips">
           {[
-            { value: totalBeneficiaries,  label: "Families" },
-            { value: totalPigsDistributed,label: "Pigs Distributed" },
-            { value: litterbornCount,     label: "Piglets Born" },
+            { value: totalBeneficiaries, label: "Families" },
+            { value: totalPigsDistributed, label: "Pigs Distributed" },
+            { value: litterbornCount, label: "Piglets Born" },
           ].map((s) => (
-            <div
-              key={s.label}
-              style={{
-                background: "rgba(255,255,255,0.12)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                border: "1px solid rgba(255,255,255,0.18)",
-                borderRadius: "0.875rem",
-                padding: "0.75rem 1.25rem",
-                textAlign: "center",
-                minWidth: "90px",
-              }}
-            >
-              <p style={{ fontSize: "1.375rem", fontWeight: 800, color: "#fff", lineHeight: 1 }}>
+            <div key={s.label} className="hero-stat-chip">
+              <p className="text-lg sm:text-[1.375rem] font-extrabold text-white leading-none">
                 {s.value}
               </p>
-              <p style={{ marginTop: "0.2rem", fontSize: "0.625rem", fontWeight: 600, color: "rgba(167,243,208,0.85)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <p className="mt-1 text-[10px] font-semibold text-emerald-200/85 uppercase tracking-wider">
                 {s.label}
               </p>
             </div>
@@ -574,6 +538,7 @@ export function HomePageClient({
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">Operations</h4>
               <ul className="space-y-2 text-xs">
                 <li><Link href="/login"   className="hover:text-slate-900 transition-colors">Staff Login</Link></li>
+                <li><Link href="/signup"  className="hover:text-slate-900 transition-colors">Create Account</Link></li>
                 <li><Link href="/contact" className="hover:text-slate-900 transition-colors">Contact Support</Link></li>
                 <li><span className="text-slate-400">Value Protocols, Rwanda</span></li>
               </ul>
