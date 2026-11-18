@@ -115,7 +115,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
               <ul className="mt-4 space-y-2 text-sm text-[#5d6e64]">
                 <li><Link href="/" className="hover:text-[#1c2b23]">About</Link></li>
                 <li><Link href="/#how-it-works" className="hover:text-[#1c2b23]">How It Works</Link></li>
-                <li><Link href="/#impact" className="hover:text-[#1c2b23]">Impact</Link></li>
+                <li><Link href="/" className="hover:text-[#1c2b23]">Impact</Link></li>
                 <li><Link href="/gallery" className="hover:text-[#1c2b23]">Gallery</Link></li>
                 <li><Link href="/team" className="hover:text-[#1c2b23]">Our Team</Link></li>
                 <li><Link href="/#stories" className="hover:text-[#1c2b23]">Stories</Link></li>

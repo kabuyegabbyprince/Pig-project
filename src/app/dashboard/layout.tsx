@@ -21,6 +21,7 @@ type NavItem = {
 
 const adminNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
+  { name: 'Staff', href: '/dashboard/admin/users', icon: Shield, superAdminOnly: true },
   { name: 'Beneficiaries', href: '/dashboard/admin/beneficiaries', icon: Users },
   { name: 'Pig Register', href: '/dashboard/admin/pigs/new', icon: PlusCircle },
   { name: 'Distributions', href: '/dashboard/admin/distributions', icon: ArrowRightCircle },
@@ -38,7 +39,6 @@ const adminNavigation: NavItem[] = [
   { name: 'Reports', href: '/dashboard/admin/reports', icon: FileText },
   { name: 'Historical Records', href: '/dashboard/history', icon: History },
   { name: 'Website Content', href: '/dashboard/admin/website', icon: ImageIcon, superAdminOnly: true },
-  { name: 'Users', href: '/dashboard/admin/users', icon: Shield, superAdminOnly: true },
   { name: 'System Settings', href: '/dashboard/admin/settings', icon: Settings, superAdminOnly: true },
   { name: 'Personal Settings', href: '/dashboard/settings', icon: UserCog },
 ];

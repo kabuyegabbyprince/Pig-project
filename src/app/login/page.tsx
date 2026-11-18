@@ -7,6 +7,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
+  Briefcase,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -14,6 +15,15 @@ import {
   Lock,
   Mail,
 } from "lucide-react";
+
+const STAFF_ROLES = [
+  { value: "FIELD_OFFICER", label: "Field Officer (Abafashamyumvire)" },
+  { value: "VETERINARIAN", label: "Veterinarian (Umuvuzi w'Amatungo)" },
+  { value: "PROJECT_MANAGER", label: "Project Manager" },
+  { value: "FINANCE_OFFICER", label: "Finance Officer" },
+  { value: "TRAINER", label: "Trainer" },
+  { value: "FUNDER", label: "Funder / Partner" },
+];
 
 function LoginForm() {
   const router = useRouter();
@@ -23,6 +33,7 @@ function LoginForm() {
   const urlError = searchParams.get("error");
 
   const [email, setEmail] = useState(identifierParam);
+  const [selectedRole, setSelectedRole] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(
@@ -56,21 +67,54 @@ function LoginForm() {
       const res = await signIn("credentials", {
         email: cleanIdentifier,
         password,
+        selectedRole: selectedRole.trim(),
         redirect: false,
       });
 
       if (res?.error) {
-        setError(
-          res.error === "CredentialsSignin"
-            ? "Invalid email/telephone or password. Please verify your credentials."
-            : "Unable to sign in right now. Please try again."
-        );
+        if (res.error === "ROLE_REQUIRED") {
+          setError("Please select your staff role to sign in (or sign in with Admin credentials).");
+        } else if (res.error.startsWith("ROLE_MISMATCH")) {
+          const parts = res.error.split(":");
+          const actualRole = parts[1] ? parts[1].replace(/_/g, " ") : "another role";
+          setError(`Invalid role selected. Your account credentials belong to ${actualRole}. Please select your correct role.`);
+        } else if (res.error === "CredentialsSignin") {
+          setError("Invalid email/telephone or password. Please verify your credentials.");
+        } else {
+          setError(res.error || "Unable to sign in right now. Please try again.");
+        }
         setLoading(false);
-      } else if (res?.ok) {
+        return;
+      }
+
+      if (res?.ok) {
         setLoading(false);
-        setSuccessMessage("Signed in successfully! Redirecting to your workspace...");
-        router.push("/dashboard");
-        router.refresh();
+        setSuccessMessage("Credentials verified! Loading your authorized workspace...");
+
+        try {
+          const sessionRes = await fetch("/api/auth/session");
+          const sessionData = await sessionRes.json();
+          const userRole = sessionData?.user?.role;
+
+          let target = "/dashboard";
+          if (userRole === "SUPER_ADMIN" || userRole === "PROJECT_MANAGER") {
+            target = "/dashboard/admin";
+          } else if (userRole === "FIELD_OFFICER" || userRole === "TRAINER") {
+            target = "/dashboard/field";
+          } else if (userRole === "VETERINARIAN") {
+            target = "/dashboard/vet";
+          } else if (userRole === "FINANCE_OFFICER") {
+            target = "/dashboard/finance";
+          } else if (userRole === "FUNDER") {
+            target = "/dashboard/admin/reports";
+          }
+
+          router.push(target);
+          router.refresh();
+        } catch {
+          router.push("/dashboard");
+          router.refresh();
+        }
       } else {
         setError("Unable to sign in right now. Please try again.");
         setLoading(false);
@@ -143,6 +187,35 @@ function LoginForm() {
                   className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-60"
                   placeholder="name@example.com or +250 788 000 000"
                 />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Staff Role
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  Admin detected automatically
+                </span>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Briefcase className="h-4 w-4" />
+                </div>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  disabled={loading}
+                  className="block w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  <option value="">Select staff role (leave blank if Admin)...</option>
+                  {STAFF_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

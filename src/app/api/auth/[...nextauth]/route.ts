@@ -71,12 +71,14 @@ export const authOptions: NextAuthOptions = {
       name: "Credentials",
       credentials: {
         email: { label: "Email or Telephone", type: "text" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        selectedRole: { label: "Staff Role", type: "text" },
       },
       async authorize(credentials) {
         const rawIdentifier = String(credentials?.email || "").trim();
         const cleanEmail = rawIdentifier.toLowerCase();
         const cleanPassword = String(credentials?.password || "");
+        const rawSelectedRole = String(credentials?.selectedRole || "").trim();
 
         if (!rawIdentifier || !cleanPassword) {
           return null;
@@ -107,7 +109,34 @@ export const authOptions: NextAuthOptions = {
               ? await bcrypt.compare(cleanPassword.trim(), localUser.password)
               : false;
 
-          if (passwordMatches || legacyPasswordMatches) {
+          let authed = passwordMatches || legacyPasswordMatches;
+
+          // Fallback: if password was updated directly inside Supabase Authentication, verify via auth.users and sync hash
+          if (!authed) {
+            const supaUser = await verifySupabaseAuthPassword(localUser.email, cleanPassword);
+            if (supaUser) {
+              try {
+                const syncedHash = await bcrypt.hash(cleanPassword, 10);
+                await prisma.user.update({
+                  where: { id: String(localUser.id) },
+                  data: { password: syncedHash },
+                });
+                authed = true;
+              } catch (syncErr) {
+                console.error("Failed to sync updated Supabase Auth password:", syncErr);
+              }
+            }
+          }
+
+          if (!authed) {
+            return null;
+          }
+
+          // Credentials verified! Now verify role routing:
+          const userRole = normalizeRole(localUser.role);
+
+          // If the credential is the one of admin, handle it automatically:
+          if (userRole === Role.SUPER_ADMIN) {
             return {
               id: String(localUser.id),
               email: localUser.email,
@@ -121,30 +150,27 @@ export const authOptions: NextAuthOptions = {
             };
           }
 
-          // Fallback: if password was updated directly inside Supabase Authentication, verify via auth.users and sync hash
-          const supaUser = await verifySupabaseAuthPassword(localUser.email, cleanPassword);
-          if (supaUser) {
-            try {
-              const syncedHash = await bcrypt.hash(cleanPassword, 10);
-              await prisma.user.update({
-                where: { id: String(localUser.id) },
-                data: { password: syncedHash },
-              });
-            } catch (syncErr) {
-              console.error("Failed to sync updated Supabase Auth password:", syncErr);
-            }
-            return {
-              id: String(localUser.id),
-              email: localUser.email,
-              name: localUser.name,
-              role: localUser.role,
-              accessLevel: localUser.accessLevel,
-              assignedDistrictId: localUser.assignedDistrictId,
-              assignedSectorId: localUser.assignedSectorId,
-              assignedCellId: localUser.assignedCellId,
-              assignedVillageId: localUser.assignedVillageId,
-            };
+          // For non-admin staff, user must select their assigned role:
+          if (!rawSelectedRole) {
+            throw new Error("ROLE_REQUIRED");
           }
+
+          const normSelected = normalizeRole(rawSelectedRole);
+          if (normSelected !== userRole) {
+            throw new Error(`ROLE_MISMATCH:${localUser.role}`);
+          }
+
+          return {
+            id: String(localUser.id),
+            email: localUser.email,
+            name: localUser.name,
+            role: localUser.role,
+            accessLevel: localUser.accessLevel,
+            assignedDistrictId: localUser.assignedDistrictId,
+            assignedSectorId: localUser.assignedSectorId,
+            assignedCellId: localUser.assignedCellId,
+            assignedVillageId: localUser.assignedVillageId,
+          };
         }
 
         // Direct Supabase Auth user lookup (e.g. account created directly in Supabase Authentication UI)
@@ -198,6 +224,16 @@ export const authOptions: NextAuthOptions = {
                   updatedById: String(syncedPublicUser.id),
                 },
               });
+            }
+
+            if (assignedRole !== Role.SUPER_ADMIN) {
+              if (!rawSelectedRole) {
+                throw new Error("ROLE_REQUIRED");
+              }
+              const normSelected = normalizeRole(rawSelectedRole);
+              if (normSelected !== assignedRole) {
+                throw new Error(`ROLE_MISMATCH:${assignedRole}`);
+              }
             }
 
             return {

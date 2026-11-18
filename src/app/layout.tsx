@@ -34,10 +34,18 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
+                if (window.location.hash === "#impact" || window.location.hash === "#/impact") {
+                  if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, "", window.location.pathname || "/");
+                  }
+                  window.scrollTo({ top: 0, behavior: "instant" });
+                }
                 var navEntries = window.performance && window.performance.getEntriesByType ? window.performance.getEntriesByType("navigation") : [];
                 var navType = navEntries && navEntries[0] ? navEntries[0].type : "";
-                if (navType === "reload" && window.location.pathname !== "/") {
-                  window.location.replace("/");
+                if (navType === "reload") {
+                  if (window.location.pathname !== "/" || window.location.hash) {
+                    window.location.replace("/");
+                  }
                 }
                 var theme = localStorage.getItem("pp_pref_theme") || "light";
                 var size = localStorage.getItem("pp_pref_text_size") || "default";

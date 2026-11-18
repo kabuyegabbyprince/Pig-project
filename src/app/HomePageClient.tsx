@@ -55,6 +55,17 @@ export function HomePageClient({
 }: HomePageClientProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const handleHashLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith("#")) {
+      e.preventDefault();
+      const targetId = href.replace(/^#/, "");
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
+
   const impactStats = [
     { value: totalBeneficiaries,  label: "Families Supported" },
     { value: totalPigsDistributed,label: "Pigs Distributed" },
@@ -118,6 +129,7 @@ export function HomePageClient({
               <Link
                 key={label}
                 href={href}
+                onClick={(e) => handleHashLinkClick(e, href)}
                 className="rounded-full px-3.5 py-1.5 text-sm font-medium text-white/85 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {label}
@@ -173,7 +185,10 @@ export function HomePageClient({
                 <Link
                   key={label}
                   href={href}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={(e) => {
+                    handleHashLinkClick(e, href);
+                    setMobileOpen(false);
+                  }}
                   className="rounded-lg px-4 py-2.5 text-sm font-medium text-white/85 hover:text-white hover:bg-white/10 transition-colors"
                 >
                   {label}
@@ -248,6 +263,7 @@ export function HomePageClient({
             <div className="mt-7 sm:mt-9 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
               <Link
                 href={heroData.primaryButtonLink}
+                onClick={(e) => handleHashLinkClick(e, heroData.primaryButtonLink)}
                 className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 sm:px-7 sm:py-3.5 text-xs sm:text-sm font-bold text-[#064e3b] shadow-md hover:bg-emerald-50 transition-all"
               >
                 <span>{heroData.primaryButtonText}</span>
@@ -255,6 +271,7 @@ export function HomePageClient({
               </Link>
               <Link
                 href={heroData.secondaryButtonLink}
+                onClick={(e) => handleHashLinkClick(e, heroData.secondaryButtonLink)}
                 className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3 sm:px-7 sm:py-3.5 text-xs sm:text-sm font-bold text-white backdrop-blur-sm hover:bg-white/20 transition-all"
               >
                 {heroData.secondaryButtonText}
@@ -526,11 +543,11 @@ export function HomePageClient({
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">Navigation</h4>
               <ul className="space-y-2 text-xs">
-                <li><Link href="#about"       className="hover:text-slate-900 transition-colors">About Us</Link></li>
-                <li><Link href="#how-it-works"className="hover:text-slate-900 transition-colors">How It Works</Link></li>
-                <li><Link href="#impact"      className="hover:text-slate-900 transition-colors">Impact Summary</Link></li>
-                <li><Link href="/gallery"     className="hover:text-slate-900 transition-colors">Field Gallery</Link></li>
-                <li><Link href="/team"        className="hover:text-slate-900 transition-colors">Our Team</Link></li>
+                <li><Link href="#about" onClick={(e) => handleHashLinkClick(e, "#about")} className="hover:text-slate-900 transition-colors">About Us</Link></li>
+                <li><Link href="#how-it-works" onClick={(e) => handleHashLinkClick(e, "#how-it-works")} className="hover:text-slate-900 transition-colors">How It Works</Link></li>
+                <li><Link href="#impact" onClick={(e) => handleHashLinkClick(e, "#impact")} className="hover:text-slate-900 transition-colors">Impact Summary</Link></li>
+                <li><Link href="/gallery" className="hover:text-slate-900 transition-colors">Field Gallery</Link></li>
+                <li><Link href="/team" className="hover:text-slate-900 transition-colors">Our Team</Link></li>
               </ul>
             </div>
 
