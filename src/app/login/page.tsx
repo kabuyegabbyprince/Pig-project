@@ -23,7 +23,6 @@ const STAFF_ROLES = [
   { value: "CELL_MANAGER", label: "Cell Manager" },
   { value: "VETERINARIAN", label: "Veterinarian" },
   { value: "ACCOUNTANT", label: "Accountant" },
-  { value: "FIELD_OFFICER", label: "Field Officer" },
   { value: "FINANCE_OFFICER", label: "Finance Officer" },
 ];
 
