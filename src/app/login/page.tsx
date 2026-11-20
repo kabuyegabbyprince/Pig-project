@@ -75,7 +75,7 @@ function LoginForm() {
 
       if (res?.error) {
         if (res.error === "ROLE_REQUIRED") {
-          setError("Please select your staff role to sign in (or leave blank if you are signing in as Admin).");
+          setError("Please select your staff role to sign in.");
         } else if (res.error.startsWith("ROLE_MISMATCH")) {
           const parts = res.error.split(":");
           const actualRole = parts[1] ? parts[1].replace(/_/g, " ") : "another role";
@@ -145,7 +145,7 @@ function LoginForm() {
             Operations Workspace
           </h1>
           <p className="mt-1 text-xs text-slate-500">
-            Sign in with your authorized credentials (select role or leave blank for Admin)
+            Sign in with your authorized credentials
           </p>
         </div>
 
@@ -195,7 +195,7 @@ function LoginForm() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Staff Role (Optional if Admin)
+                  Staff Role
                 </label>
                 <span className="text-[11px] text-slate-400">
                   Select your assigned role
@@ -211,7 +211,7 @@ function LoginForm() {
                   disabled={loading}
                   className="block w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-[#101827] focus:bg-white focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none transition-all disabled:opacity-60 cursor-pointer"
                 >
-                  <option value="">-- Select Staff Role (Leave blank if Admin) --</option>
+                  <option value="">-- Select Staff Role --</option>
                   {STAFF_ROLES.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}

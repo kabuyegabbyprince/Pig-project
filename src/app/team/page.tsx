@@ -21,7 +21,7 @@ export default async function TeamPage() {
         <div className="app-container mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" aria-label="Pig Project Rwanda home" className="flex items-center shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda Logo" className="h-8 w-auto sm:h-10" />
+            <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-8 w-auto sm:h-10 object-contain" />
           </Link>
           <div className="flex flex-wrap items-center justify-end gap-1 rounded-2xl sm:rounded-full border border-slate-200/70 bg-slate-50/80 px-1.5 py-1 text-[11px] sm:text-xs font-semibold text-slate-600">
             <Link href="/" className="rounded-full px-2.5 sm:px-3 py-1 hover:text-slate-900 hover:bg-white transition-colors">Home</Link>
@@ -102,7 +102,7 @@ export default async function TeamPage() {
             <div>
               <Link href="/" aria-label="Pig Project Rwanda home" className="inline-flex items-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda Logo" className="h-10 w-auto" />
+                <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-10 w-auto object-contain" />
               </Link>
               <p className="mt-3 text-sm font-semibold text-slate-900">One Piglet. One Family. A Fund That Keeps Moving.</p>
               <p className="mt-2 text-xs leading-relaxed text-slate-500">Supporting vulnerable families in Rwanda through livestock empowerment and a sustainable revolving fund.</p>

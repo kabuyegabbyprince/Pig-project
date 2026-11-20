@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   description: "Comprehensive livestock management, beneficiary tracking, and revolving fund system for the Pig Project in Rwanda.",
   icons: {
     icon: [
-      { url: "/pig-project-rwanda-logo.svg", type: "image/svg+xml" },
+      { url: "/pplog-.png", type: "image/png" },
       { url: "/favicon.ico", type: "image/x-icon" },
     ],
-    shortcut: "/pig-project-rwanda-logo.svg",
-    apple: "/pig-project-rwanda-logo.svg",
+    shortcut: "/pplog-.png",
+    apple: "/pplog-.png",
   },
 };
 

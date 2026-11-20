@@ -29,7 +29,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
       <header className="border-b border-[#d9e1d8] bg-white sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" aria-label="Pig Project Rwanda home" className="flex items-center shrink-0">
-            <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda Logo" className="h-11 w-auto" />
+            <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-11 w-auto object-contain" />
           </Link>
           <div className="flex items-center gap-4 text-sm text-[#5d6e64]">
             <Link href="/team" className="hover:text-[#1c2b23]">Back to Team</Link>
@@ -105,7 +105,7 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             <div>
               <Link href="/" aria-label="Pig Project Rwanda home" className="inline-flex items-center">
-                <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda Logo" className="h-12 w-auto" />
+                <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-12 w-auto object-contain" />
               </Link>
               <p className="mt-3 text-2xl font-serif text-[#1c2b23]">One Piglet. One Family. A Fund That Keeps Moving.</p>
               <p className="mt-3 text-sm leading-6 text-[#5d6e64]">Supporting vulnerable families in Rwanda through livestock empowerment and a sustainable revolving fund.</p>
