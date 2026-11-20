@@ -113,20 +113,20 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 via-white to-slate-50 px-4 py-10 sm:py-12">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F5F5] px-4 py-10 sm:py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-[#101827] transition-colors mb-6"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to public website</span>
           </Link>
           <div className="flex justify-center">
-            <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda" className="h-12 w-auto" />
+            <img src="/pplog-.png" alt="Pig Project Rwanda" className="h-14 w-auto object-contain" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-[#101827]">
             Create Account
           </h1>
           <p className="mt-1 text-xs text-slate-500">
@@ -229,9 +229,9 @@ export default function SignUpPage() {
             <button
               type="submit"
               disabled={loading || Boolean(successMessage)}
-              className="w-full flex justify-center items-center py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-[#064e3b] hover:bg-[#053d2e] shadow-xs disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer mt-2"
+              className="w-full flex justify-center items-center py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-[#101827] hover:bg-[#1f2937] shadow-xs disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer mt-2"
             >
-              {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+              {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2 text-[#FF8A00]" /> : null}
               {loading
                 ? "Creating account..."
                 : successMessage
@@ -245,7 +245,7 @@ export default function SignUpPage() {
           <div className="mt-6 border-t border-slate-100 pt-4 text-center space-y-2">
             <p className="text-xs text-slate-600">
               Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-[#064e3b] hover:underline">
+              <Link href="/login" className="font-semibold text-[#101827] hover:text-[#FF8A00] hover:underline">
                 Sign in here
               </Link>
             </p>

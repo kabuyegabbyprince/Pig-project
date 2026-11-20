@@ -17,12 +17,14 @@ import {
 } from "lucide-react";
 
 const STAFF_ROLES = [
-  { value: "FIELD_OFFICER", label: "Field Officer (Abafashamyumvire)" },
-  { value: "VETERINARIAN", label: "Veterinarian (Umuvuzi w'Amatungo)" },
   { value: "PROJECT_MANAGER", label: "Project Manager" },
+  { value: "COOPERATIVE_LEADER", label: "Cooperative Leader" },
+  { value: "COOPERATIVE_MEMBER", label: "Cooperative Member" },
+  { value: "CELL_MANAGER", label: "Cell Manager" },
+  { value: "VETERINARIAN", label: "Veterinarian" },
+  { value: "ACCOUNTANT", label: "Accountant" },
+  { value: "FIELD_OFFICER", label: "Field Officer" },
   { value: "FINANCE_OFFICER", label: "Finance Officer" },
-  { value: "TRAINER", label: "Trainer" },
-  { value: "FUNDER", label: "Funder / Partner" },
 ];
 
 function LoginForm() {
@@ -73,11 +75,11 @@ function LoginForm() {
 
       if (res?.error) {
         if (res.error === "ROLE_REQUIRED") {
-          setError("Please select your staff role to sign in (or sign in with Admin credentials).");
+          setError("Please select your staff role to sign in (or leave blank if you are signing in as Admin).");
         } else if (res.error.startsWith("ROLE_MISMATCH")) {
           const parts = res.error.split(":");
           const actualRole = parts[1] ? parts[1].replace(/_/g, " ") : "another role";
-          setError(`Invalid role selected. Your account credentials belong to ${actualRole}. Please select your correct role.`);
+          setError(`Invalid role selected. Your account credentials belong to ${actualRole}. Please select your correct account/role.`);
         } else if (res.error === "CredentialsSignin") {
           setError("Invalid email/telephone or password. Please verify your credentials.");
         } else {
@@ -99,11 +101,11 @@ function LoginForm() {
           let target = "/dashboard";
           if (userRole === "SUPER_ADMIN" || userRole === "PROJECT_MANAGER") {
             target = "/dashboard/admin";
-          } else if (userRole === "FIELD_OFFICER" || userRole === "TRAINER") {
+          } else if (userRole === "FIELD_OFFICER" || userRole === "TRAINER" || userRole === "COOPERATIVE_MEMBER" || userRole === "CELL_MANAGER") {
             target = "/dashboard/field";
           } else if (userRole === "VETERINARIAN") {
             target = "/dashboard/vet";
-          } else if (userRole === "FINANCE_OFFICER") {
+          } else if (userRole === "FINANCE_OFFICER" || userRole === "ACCOUNTANT") {
             target = "/dashboard/finance";
           } else if (userRole === "FUNDER") {
             target = "/dashboard/admin/reports";
@@ -126,31 +128,31 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 via-white to-slate-50 px-4 py-12">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F5F5] px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-[#101827] transition-colors mb-6"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to public website</span>
           </Link>
           <div className="flex justify-center">
-            <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda" className="h-12 w-auto" />
+            <img src="/pplog-.png" alt="Pig Project Rwanda" className="h-14 w-auto object-contain" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-[#101827]">
             Operations Workspace
           </h1>
           <p className="mt-1 text-xs text-slate-500">
-            Sign in with your authorized credentials
+            Sign in with your authorized credentials (select role or leave blank for Admin)
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
           {loading && (
             <div className="mb-5 flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-700">
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#064e3b]" />
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#FF8A00]" />
               <span>Verifying credentials and loading workspace...</span>
             </div>
           )}
@@ -184,7 +186,7 @@ function LoginForm() {
                   disabled={loading}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-60"
+                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-[#101827] placeholder:text-slate-400 focus:bg-white focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none transition-all disabled:opacity-60"
                   placeholder="name@example.com or +250 788 000 000"
                 />
               </div>
@@ -193,10 +195,10 @@ function LoginForm() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Staff Role
+                  Staff Role (Optional if Admin)
                 </label>
                 <span className="text-[11px] text-slate-400">
-                  Admin detected automatically
+                  Select your assigned role
                 </span>
               </div>
               <div className="relative">
@@ -207,9 +209,9 @@ function LoginForm() {
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
                   disabled={loading}
-                  className="block w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-60 cursor-pointer"
+                  className="block w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-[#101827] focus:bg-white focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none transition-all disabled:opacity-60 cursor-pointer"
                 >
-                  <option value="">Select staff role (leave blank if Admin)...</option>
+                  <option value="">-- Select Staff Role (Leave blank if Admin) --</option>
                   {STAFF_ROLES.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}
@@ -233,7 +235,7 @@ function LoginForm() {
                   disabled={loading}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-60"
+                  className="block w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-[#101827] placeholder:text-slate-400 focus:bg-white focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none transition-all disabled:opacity-60"
                   placeholder="••••••••"
                 />
                 <button
@@ -250,9 +252,9 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-[#064e3b] hover:bg-[#053d2e] shadow-xs disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer mt-2"
+              className="w-full flex justify-center items-center py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-[#101827] hover:bg-[#1f2937] shadow-xs disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer mt-2"
             >
-              {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+              {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2 text-[#FF8A00]" /> : null}
               {loading ? "Signing in..." : "Sign In to Workspace"}
             </button>
           </form>

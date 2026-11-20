@@ -189,18 +189,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const userInitial = session?.user?.name ? session.user.name.charAt(0).toUpperCase() : "U";
 
   return (
-    <div className="min-h-screen w-full overflow-x-clip bg-[#f8fafc] text-slate-900 antialiased">
-      <div className="flex min-h-screen w-full">
-        {/* Sleek, professional dark-forest sidebar (laptops & large desktops >=1024px) */}
-        <aside className="dashboard-sidebar hidden w-64 shrink-0 border-r border-emerald-950/30 bg-[#072419] text-white lg:flex lg:flex-col shadow-xs">
-          <div className="flex h-16 items-center border-b border-white/10 px-5">
+    <div className="min-h-screen w-full overflow-x-clip bg-[#F5F5F5] text-[#101827] antialiased">
+      <div className="flex h-screen w-full overflow-hidden">
+        {/* Sleek, professional Deep Navy sidebar (laptops & large desktops >=1024px) */}
+        <aside className="dashboard-sidebar hidden w-64 shrink-0 border-r border-[#101827]/10 bg-[#101827] text-white lg:flex lg:flex-col shadow-sm">
+          <div className="flex h-16 items-center border-b border-white/10 px-5 shrink-0">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-sm">
-                P
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FF8A00]/20 text-[#FF8A00] border border-[#FF8A00]/30 font-bold text-sm">
+                <img src="/pplog-.png" alt="Pig Project" className="h-6 w-6 object-contain" />
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/80 leading-none">Pig Project</p>
-                <h1 className="mt-0.5 text-sm font-bold tracking-tight text-white group-hover:text-emerald-200 transition-colors">Rwanda Operations</h1>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#FF8A00] leading-none">Pig Project</p>
+                <h1 className="mt-0.5 text-sm font-bold tracking-tight text-white group-hover:text-[#FF8A00] transition-colors">Rwanda Operations</h1>
               </div>
             </Link>
           </div>
@@ -209,21 +209,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {renderNav(navigation)}
           </nav>
 
-          <div className="border-t border-white/10 bg-[#051c13] px-4 py-3.5">
+          <div className="border-t border-white/10 bg-[#0d141f] px-4 py-3.5 shrink-0">
             <div className="flex items-center justify-between gap-2">
               <Link href="/dashboard/settings" className="flex items-center gap-2.5 min-w-0 group hover:opacity-90 transition">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-700/50 text-white font-bold text-xs border border-white/10">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF8A00] text-[#101827] font-extrabold text-xs border border-white/10">
                   {userInitial}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-white group-hover:underline">{session?.user?.name}</p>
-                  <p className="truncate text-[10px] text-emerald-300/70">{session?.user?.role}</p>
+                  <p className="truncate text-[10px] text-[#FF8A00]">{session?.user?.role}</p>
                 </div>
               </Link>
               <div className="flex items-center gap-1 shrink-0">
                 <Link
                   href="/dashboard/settings"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-emerald-200/70 hover:bg-white/10 hover:text-white transition-colors"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
                   title="Personal Settings"
                   aria-label="Personal Settings"
                 >
@@ -231,7 +231,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-emerald-200/70 hover:bg-white/10 hover:text-white transition-colors"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
                   title="Sign out"
                   aria-label="Sign out"
                 >
@@ -242,7 +242,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto h-screen bg-[#F5F5F5]">
           {/* Mobile & Tablet Header (<1024px) */}
           <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-md lg:hidden">
             <div className="flex items-center justify-between gap-3 px-4 py-2.5">

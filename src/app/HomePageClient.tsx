@@ -106,7 +106,7 @@ export function HomePageClient({
           left: 0,
           right: 0,
           zIndex: 100,
-          background: "rgba(6,78,59,0.30)",
+          background: "rgba(16,24,39,0.85)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           borderBottom: "1px solid rgba(255,255,255,0.10)",
@@ -116,10 +116,9 @@ export function HomePageClient({
           {/* Logo */}
           <Link href="/" aria-label="Pig Project Rwanda home" className="flex shrink-0 items-center">
             <img
-              src="/pig-project-rwanda-logo.svg"
+              src="/pplog-.png"
               alt="Pig Project Rwanda"
-              className="h-8 w-auto sm:h-10"
-              style={{ filter: "brightness(0) invert(1)" }}
+              className="h-10 w-auto object-contain"
             />
           </Link>
 
@@ -174,7 +173,7 @@ export function HomePageClient({
         {mobileOpen && (
           <div
             style={{
-              background: "rgba(4,50,38,0.97)",
+              background: "rgba(16,24,39,0.97)",
               backdropFilter: "blur(16px)",
               WebkitBackdropFilter: "blur(16px)",
               borderTop: "1px solid rgba(255,255,255,0.08)",
@@ -204,7 +203,7 @@ export function HomePageClient({
               <Link
                 href="/signup"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-lg px-4 py-2.5 text-sm font-medium text-emerald-200 hover:text-white hover:bg-white/10 transition-colors"
+                className="rounded-lg px-4 py-2.5 text-sm font-medium text-[#FF8A00] hover:text-white hover:bg-white/10 transition-colors"
               >
                 Create Account
               </Link>
@@ -237,7 +236,7 @@ export function HomePageClient({
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(165deg, rgba(6,78,59,0.75) 0%, rgba(2,20,14,0.82) 100%)",
+              "linear-gradient(165deg, rgba(16,24,39,0.88) 0%, rgba(10,14,23,0.95) 100%)",
             zIndex: 1,
           }}
         />
@@ -245,17 +244,11 @@ export function HomePageClient({
         {/* Hero content — vertically centred */}
         <div className="hero-content-wrap">
           <div className="app-container mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold tracking-wide text-emerald-200 backdrop-blur-sm mb-5 sm:mb-7">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Pig Project Rwanda &bull; Revolving Fund
-            </div>
-
             <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.12]">
               {heroData.title}
             </h1>
 
-            <p className="mt-4 sm:mt-5 max-w-2xl mx-auto text-sm leading-relaxed text-emerald-100/85 sm:text-lg lg:text-xl">
+            <p className="mt-4 sm:mt-5 max-w-2xl mx-auto text-sm leading-relaxed text-slate-200/90 sm:text-lg lg:text-xl">
               {heroData.description}
             </p>
 
@@ -264,7 +257,7 @@ export function HomePageClient({
               <Link
                 href={heroData.primaryButtonLink}
                 onClick={(e) => handleHashLinkClick(e, heroData.primaryButtonLink)}
-                className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 sm:px-7 sm:py-3.5 text-xs sm:text-sm font-bold text-[#064e3b] shadow-md hover:bg-emerald-50 transition-all"
+                className="inline-flex items-center gap-2 rounded-full bg-[#FF8A00] px-6 py-3 sm:px-7 sm:py-3.5 text-xs sm:text-sm font-bold text-[#101827] shadow-md hover:bg-[#e07900] transition-all"
               >
                 <span>{heroData.primaryButtonText}</span>
                 <ArrowRight className="h-4 w-4" />
@@ -279,10 +272,10 @@ export function HomePageClient({
             </div>
 
             {/* Trust indicators */}
-            <div className="mt-7 sm:mt-10 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[10px] sm:text-xs font-semibold text-emerald-200/70 uppercase tracking-widest">
+            <div className="mt-7 sm:mt-10 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[10px] sm:text-xs font-semibold text-slate-300 uppercase tracking-widest">
               {["Community-Led", "Rwanda Operations", "Revolving Mandate"].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#FF8A00]" />
                   {t}
                 </span>
               ))}
@@ -317,7 +310,7 @@ export function HomePageClient({
         <section id="about" className="px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-2 lg:items-center">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
                 About The Fund
               </p>
               <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
@@ -332,7 +325,7 @@ export function HomePageClient({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-200/80 bg-white p-6 shadow-xs hover:border-slate-300 transition-colors">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
                   <User className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 text-lg font-bold text-slate-900">Vulnerable Families</h3>
@@ -341,7 +334,7 @@ export function HomePageClient({
                 </p>
               </div>
               <div className="rounded-xl border border-slate-200/80 bg-white p-6 shadow-xs hover:border-slate-300 transition-colors">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
                   <HandHeart className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 text-lg font-bold text-slate-900">Veterinary Guidance</h3>
@@ -357,7 +350,7 @@ export function HomePageClient({
         <section id="how-it-works" className="border-y border-slate-200/70 bg-slate-50/70 px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="mx-auto max-w-2xl text-center">
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
                 Sustainable Workflow
               </p>
               <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
@@ -377,7 +370,7 @@ export function HomePageClient({
                     className="relative rounded-xl border border-slate-200/80 bg-white p-6 shadow-xs hover:border-slate-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
                         <Icon className="h-5 w-5" />
                       </div>
                       <span className="text-xs font-bold text-slate-300">0{idx + 1}</span>
@@ -393,16 +386,16 @@ export function HomePageClient({
 
         {/* ── Impact ── */}
         <section id="impact" className="px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl rounded-2xl bg-[#064e3b] p-8 text-white sm:p-12 lg:p-14 shadow-sm">
+          <div className="mx-auto max-w-7xl rounded-2xl bg-[#101827] p-8 text-white sm:p-12 lg:p-14 shadow-sm">
             <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
               <div className="lg:col-span-5">
-                <span className="inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-200">
+                <span className="inline-flex rounded-full border border-[#FF8A00]/40 bg-[#FF8A00]/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
                   Real-Time Database Records
                 </span>
                 <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl leading-tight">
                   Transparent community impact measured live.
                 </h2>
-                <p className="mt-3 text-sm leading-relaxed text-emerald-100/80">
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">
                   Every animal recorded, vaccinated, and distributed is tracked directly within our operations ledger.
                 </p>
               </div>
@@ -412,7 +405,7 @@ export function HomePageClient({
                     <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
                       {stat.value}
                     </div>
-                    <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-emerald-200/70">
+                    <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
                       {stat.label}
                     </div>
                   </div>
@@ -427,7 +420,7 @@ export function HomePageClient({
           <div className="mx-auto max-w-7xl">
             <div className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
                   Field Documentation
                 </p>
                 <h2 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
@@ -436,7 +429,7 @@ export function HomePageClient({
               </div>
               <Link
                 href="/gallery"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:text-emerald-900 transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#FF8A00] hover:text-[#101827] transition-colors"
               >
                 <span>View full gallery</span>
                 <ChevronRight className="h-4 w-4" />
@@ -477,7 +470,7 @@ export function HomePageClient({
           <div className="mx-auto max-w-7xl">
             <div className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
                   Dedicated Leadership
                 </p>
                 <h2 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
@@ -486,7 +479,7 @@ export function HomePageClient({
               </div>
               <Link
                 href="/team"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:text-emerald-900 transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#FF8A00] hover:text-[#101827] transition-colors"
               >
                 <span>Meet the entire team</span>
                 <ChevronRight className="h-4 w-4" />
@@ -509,7 +502,7 @@ export function HomePageClient({
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="flex h-full items-center justify-center text-xl font-bold text-emerald-800 bg-emerald-50">
+                        <div className="flex h-full items-center justify-center text-xl font-bold text-[#101827] bg-orange-50">
                           {member.fullName.slice(0, 2).toUpperCase()}
                         </div>
                       )}
@@ -530,7 +523,7 @@ export function HomePageClient({
           <div className="grid gap-10 md:grid-cols-4">
             <div className="md:col-span-2 space-y-3">
               <Link href="/" aria-label="Pig Project Rwanda home" className="inline-flex items-center">
-                <img src="/pig-project-rwanda-logo.svg" alt="Pig Project Rwanda Logo" className="h-10 w-auto" />
+                <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-12 w-auto object-contain" />
               </Link>
               <p className="text-sm font-semibold text-slate-900">
                 One Piglet. One Family. A Fund That Keeps Moving.

@@ -11,9 +11,13 @@ import { getBootstrapStatus, SUPER_ADMIN_BOOTSTRAPPED_KEY } from "@/lib/auth-boo
 
 const validRoles = [
   Role.SUPER_ADMIN,
-  Role.FIELD_OFFICER,
-  Role.VETERINARIAN,
   Role.PROJECT_MANAGER,
+  Role.COOPERATIVE_LEADER,
+  Role.COOPERATIVE_MEMBER,
+  Role.CELL_MANAGER,
+  Role.VETERINARIAN,
+  Role.ACCOUNTANT,
+  Role.FIELD_OFFICER,
   Role.FINANCE_OFFICER,
   Role.TRAINER,
   Role.FUNDER,

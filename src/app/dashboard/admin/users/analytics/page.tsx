@@ -37,8 +37,12 @@ export default async function UserAnalyticsPage() {
   const roleCounts: Record<Role, number> = {
     SUPER_ADMIN: 0,
     PROJECT_MANAGER: 0,
-    FIELD_OFFICER: 0,
+    COOPERATIVE_LEADER: 0,
+    COOPERATIVE_MEMBER: 0,
+    CELL_MANAGER: 0,
     VETERINARIAN: 0,
+    ACCOUNTANT: 0,
+    FIELD_OFFICER: 0,
     FINANCE_OFFICER: 0,
     TRAINER: 0,
     FUNDER: 0,
@@ -52,10 +56,14 @@ export default async function UserAnalyticsPage() {
 
   const roleLabels: Record<Role, { label: string; description: string; color: string }> = {
     SUPER_ADMIN: { label: "Super Administrator", description: "Full administrative system access", color: "bg-purple-600" },
-    PROJECT_MANAGER: { label: "Project Manager", description: "Operations and project monitoring", color: "bg-blue-600" },
-    FIELD_OFFICER: { label: "Field Officer / Employee", description: "Beneficiaries, distributions, and returns", color: "bg-emerald-600" },
-    VETERINARIAN: { label: "Veterinarian", description: "Pig health exams, vaccinations, and treatments", color: "bg-teal-600" },
-    FINANCE_OFFICER: { label: "Finance Officer", description: "Income, expenses, and fund balance", color: "bg-amber-600" },
+    PROJECT_MANAGER: { label: "Project Manager", description: "E-commerce, orders & supplies management", color: "bg-blue-600" },
+    COOPERATIVE_LEADER: { label: "Cooperative Leader", description: "Member reports & supply coordination", color: "bg-orange-600" },
+    COOPERATIVE_MEMBER: { label: "Cooperative Member", description: "Stock management & leader reporting", color: "bg-green-600" },
+    CELL_MANAGER: { label: "Cell Manager", description: "Akagari cooperative management", color: "bg-cyan-600" },
+    VETERINARIAN: { label: "Veterinarian", description: "Pig health verification & inspection reports", color: "bg-teal-600" },
+    ACCOUNTANT: { label: "Accountant", description: "Cell manager transaction verification", color: "bg-amber-600" },
+    FIELD_OFFICER: { label: "Field Officer", description: "Beneficiaries, distributions, and returns", color: "bg-emerald-600" },
+    FINANCE_OFFICER: { label: "Finance Officer", description: "Income, expenses, and fund balance", color: "bg-yellow-600" },
     TRAINER: { label: "Trainer", description: "Beneficiary education and training", color: "bg-indigo-600" },
     FUNDER: { label: "Funder", description: "Project monitoring and executive reports", color: "bg-rose-600" },
   };
