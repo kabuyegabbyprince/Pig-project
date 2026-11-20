@@ -258,13 +258,7 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 border-t border-slate-100 pt-4 text-center space-y-2">
-            <p className="text-xs text-slate-600">
-              Need an account?{" "}
-              <Link href="/signup" className="font-semibold text-[#064e3b] hover:underline">
-                Register here
-              </Link>
-            </p>
+          <div className="mt-6 border-t border-slate-100 pt-4 text-center">
             <p className="text-[11px] text-slate-400">
               Value Protocols Rwanda &bull; Revolving Livestock Platform
             </p>

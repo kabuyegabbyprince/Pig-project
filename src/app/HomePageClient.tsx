@@ -144,12 +144,7 @@ export function HomePageClient({
             >
               Staff Login
             </Link>
-            <Link
-              href="/signup"
-              className="hidden sm:inline-block text-sm font-medium text-emerald-200 hover:text-white px-2.5 py-1.5 transition-colors"
-            >
-              Sign Up
-            </Link>
+
             <Link
               href="/contact"
               className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#064e3b] shadow-sm hover:bg-emerald-50 transition-colors whitespace-nowrap"
@@ -200,13 +195,7 @@ export function HomePageClient({
               >
                 Staff Login
               </Link>
-              <Link
-                href="/signup"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg px-4 py-2.5 text-sm font-medium text-[#FF8A00] hover:text-white hover:bg-white/10 transition-colors"
-              >
-                Create Account
-              </Link>
+
             </nav>
           </div>
         )}
@@ -548,7 +537,7 @@ export function HomePageClient({
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">Operations</h4>
               <ul className="space-y-2 text-xs">
                 <li><Link href="/login"   className="hover:text-slate-900 transition-colors">Staff Login</Link></li>
-                <li><Link href="/signup"  className="hover:text-slate-900 transition-colors">Create Account</Link></li>
+
                 <li><Link href="/contact" className="hover:text-slate-900 transition-colors">Contact Support</Link></li>
                 <li><span className="text-slate-400">Value Protocols, Rwanda</span></li>
               </ul>

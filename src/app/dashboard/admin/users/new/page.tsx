@@ -15,7 +15,7 @@ export default async function NewUserPage({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== 'SUPER_ADMIN') {
+  if (!session || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'CELL_MANAGER' && session.user.role !== 'COOPERATIVE_LEADER')) {
     redirect("/dashboard");
   }
 
@@ -95,13 +95,16 @@ export default async function NewUserPage({
                 className="w-full rounded-md border-[#d9e1d8] shadow-sm focus:border-[#2c5a43] focus:ring-[#2c5a43] sm:text-sm p-2 border bg-white"
               >
                 <option value="">Select a role...</option>
-                <option value="SUPER_ADMIN">Super Administrator (Full System Access)</option>
-                <option value="PROJECT_MANAGER">Project Manager (Operations & Monitoring)</option>
-                <option value="FIELD_OFFICER">Field Officer / Employee (Distributions & Beneficiaries)</option>
-                <option value="VETERINARIAN">Veterinarian (Health Records)</option>
-                <option value="FINANCE_OFFICER">Finance Officer (Income & Expenses)</option>
-                <option value="TRAINER">Trainer (Beneficiary Education)</option>
-                <option value="FUNDER">Funder (Project Monitoring & Reports)</option>
+                <option value="SUPER_ADMIN">Super Administrator</option>
+                <option value="PROJECT_MANAGER">Project Manager</option>
+                <option value="COOPERATIVE_LEADER">Cooperative Leader</option>
+                <option value="COOPERATIVE_MEMBER">Cooperative Member</option>
+                <option value="CELL_MANAGER">Cell Manager</option>
+                <option value="VETERINARIAN">Veterinarian</option>
+                <option value="ACCOUNTANT">Accountant</option>
+                <option value="FINANCE_OFFICER">Finance Officer</option>
+                <option value="TRAINER">Trainer</option>
+                <option value="FUNDER">Funder</option>
               </select>
             </div>
           </div>
