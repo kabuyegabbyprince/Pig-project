@@ -11,7 +11,14 @@ export const dynamic = 'force-dynamic';
 export default async function NewEmployeeReportPage() {
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user.role !== 'FIELD_OFFICER') {
+  const allowedRoles = new Set([
+    "CELL_MANAGER",
+    "COOPERATIVE_LEADER",
+    "COOPERATIVE_MEMBER",
+    "PROJECT_MANAGER",
+    "SUPER_ADMIN",
+  ]);
+  if (!session || !allowedRoles.has(session.user.role || "")) {
     redirect("/dashboard");
   }
 

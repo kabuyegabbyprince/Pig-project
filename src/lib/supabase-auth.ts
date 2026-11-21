@@ -189,7 +189,7 @@ export async function syncSupabaseAuthUser(input: {
           email,
           password: input.password,
           name: input.name || "System User",
-          role: input.role || "FIELD_OFFICER",
+          role: input.role || "COOPERATIVE_MEMBER",
           phone: input.phone ?? null,
           publicUserId: input.publicUserId,
         });

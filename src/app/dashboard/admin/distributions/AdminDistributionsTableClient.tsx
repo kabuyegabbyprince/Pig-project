@@ -125,7 +125,7 @@ export function AdminDistributionsTableClient({ initialRows }: AdminDistribution
                 <button
                   type="button"
                   onClick={() => setDateFilter("")}
-                  className="mt-2 text-xs text-emerald-700 underline font-medium hover:text-emerald-900 cursor-pointer"
+                  className="mt-2 text-xs text-[#FF8A00] underline font-medium hover:text-[#101827] cursor-pointer"
                 >
                   Clear date filter to see all distributions
                 </button>
@@ -173,7 +173,7 @@ export function AdminDistributionsTableClient({ initialRows }: AdminDistribution
                     <td className="px-5 py-3.5 whitespace-nowrap text-center text-xs font-bold text-slate-900">
                       {required}
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap text-center text-xs font-bold text-emerald-700">
+                    <td className="px-5 py-3.5 whitespace-nowrap text-center text-xs font-bold text-[#FF8A00]">
                       {returned}
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap text-center text-xs font-bold text-rose-600">
@@ -183,7 +183,7 @@ export function AdminDistributionsTableClient({ initialRows }: AdminDistribution
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
                           status === "Completed"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                            ? "bg-orange-50 text-[#FF8A00] border-orange-200/80"
                             : status === "Partially Returned"
                             ? "bg-blue-50 text-blue-700 border-blue-200/60"
                             : "bg-rose-50 text-rose-700 border-rose-200/60"
@@ -195,7 +195,7 @@ export function AdminDistributionsTableClient({ initialRows }: AdminDistribution
                     <td className="px-5 py-3.5 whitespace-nowrap text-right text-xs font-medium">
                       <Link
                         href={`/dashboard/admin/beneficiaries/${dist.beneficiary.id}`}
-                        className="text-emerald-700 hover:text-emerald-900 font-semibold transition-colors"
+                        className="text-[#FF8A00] hover:text-[#101827] font-semibold transition-colors"
                       >
                         View Family
                       </Link>

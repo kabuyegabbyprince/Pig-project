@@ -4,13 +4,14 @@ import { ArrowLeft, Activity, PiggyBank, User, Calendar, MapPin, HeartPulse, Fil
 import Link from "next/link";
 import { Role, PigStatus } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
+import { FIELD_OPERATIONS_ROLES } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
 function getStatusBadge(status: PigStatus) {
   switch (status) {
     case PigStatus.ACTIVE:
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Available</span>;
+      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-50 text-[#FF8A00] border border-orange-200">Available</span>;
     case PigStatus.REGISTERED:
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Awaiting Inspection</span>;
     case PigStatus.DISTRIBUTED:
@@ -26,7 +27,12 @@ function getStatusBadge(status: PigStatus) {
 }
 
 export default async function PigDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const activeUser = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER, Role.VETERINARIAN]);
+  const activeUser = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    ...FIELD_OPERATIONS_ROLES,
+    Role.VETERINARIAN,
+  ]);
   if (!activeUser) {
     redirect("/dashboard");
   }

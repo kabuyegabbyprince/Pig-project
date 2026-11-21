@@ -85,7 +85,7 @@ export default async function FinanceDashboard() {
         <h2 className="text-xl font-semibold text-[#1b2d24]">Quick actions</h2>
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {quickActions.map(({ label, href, icon: Icon }) => (
-            <Link key={label} href={href} className="rounded-[20px] border border-[#dfe7df] bg-[#f8faf8] p-4 hover:border-[#173d2e] hover:bg-[#f2f7f3] transition-colors">
+            <Link key={label} href={href} prefetch={false} className="rounded-[20px] border border-[#dfe7df] bg-[#f8faf8] p-4 hover:border-[#173d2e] hover:bg-[#f2f7f3] transition-colors">
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-[#e3efe7] text-[#173d2e]">
                 <Icon className="h-4 w-4" />
               </div>

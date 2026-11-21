@@ -52,13 +52,10 @@ export async function createTask(formData: FormData) {
   redirect("/dashboard/admin/tasks");
 }
 
+import { ALL_ROLE_VALUES } from "@/lib/roles";
+
 export async function completeTask(formData: FormData) {
-  const user = await getActiveUser([
-    Role.SUPER_ADMIN,
-    Role.FIELD_OFFICER,
-    Role.VETERINARIAN,
-    Role.FINANCE_OFFICER,
-  ]);
+  const user = await getActiveUser([...ALL_ROLE_VALUES]);
   if (!user) throw new Error("Unauthorized");
 
   const taskIdValue = formData.get("taskId");

@@ -1,5 +1,6 @@
 import type { GalleryItem, TeamMember, WebsiteContent } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getPublishedGalleryItems } from "@/lib/gallery";
 import { HomePageClient } from "./HomePageClient";
 
 export const dynamic = "force-dynamic";
@@ -38,11 +39,7 @@ export default async function PublicHomePage() {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
         take: 4,
       }),
-      prisma.galleryItem.findMany({
-        where: { isPublished: true },
-        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-        take: 3,
-      }),
+      getPublishedGalleryItems(3),
       prisma.websiteContent.findFirst({
         where: { page: "home", section: "hero" },
       }),

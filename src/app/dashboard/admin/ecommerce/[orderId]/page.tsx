@@ -15,7 +15,7 @@ export default async function AdminEcommerceOrderDetailPage({
 }: {
   params: Promise<{ orderId: string }>;
 }) {
-  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
   if (!actor) redirect("/dashboard");
 
   const { orderId } = await params;
@@ -43,16 +43,16 @@ export default async function AdminEcommerceOrderDetailPage({
       <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-slate-100 pb-6">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#FF8A00]">
               Official Order Receipt
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-900">{order.orderNumber}</h1>
+            <h1 className="mt-1 text-2xl font-bold text-[#101827]">{order.orderNumber}</h1>
             <p className="mt-1 text-xs text-slate-500">
               Placed on {format(new Date(order.createdAt), "MMM d, yyyy 'at' HH:mm")}
             </p>
           </div>
           <div className="text-left sm:text-right">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-[#FF8A00]">
               <ShoppingBag className="h-3.5 w-3.5" />
               {order.status}
             </span>
@@ -122,7 +122,7 @@ export default async function AdminEcommerceOrderDetailPage({
                     </td>
                     <td className="px-3 py-3">
                       {item.product?.sourcePigTag ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-[#FF8A00]">
                           <Tag className="h-3 w-3" />
                           {item.product.sourcePigTag}
                         </span>
@@ -151,7 +151,7 @@ export default async function AdminEcommerceOrderDetailPage({
                 <td colSpan={4} className="px-3 py-3 text-right text-xs font-bold uppercase text-slate-600">
                   Total Order Amount
                 </td>
-                <td className="px-3 py-3 text-right text-base font-bold text-[#064e3b]">
+                <td className="px-3 py-3 text-right text-base font-bold text-[#FF8A00]">
                   {formatRwf(order.totalAmount)}
                 </td>
               </tr>
@@ -162,7 +162,7 @@ export default async function AdminEcommerceOrderDetailPage({
         {/* Finance Reconciliation */}
         <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
-            <Receipt className="h-4 w-4 text-[#064e3b]" />
+            <Receipt className="h-4 w-4 text-[#FF8A00]" />
             <span>Finance Ledger Reconciliation</span>
           </div>
           {financeRows.length === 0 ? (
@@ -184,7 +184,7 @@ export default async function AdminEcommerceOrderDetailPage({
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         tx.type === "INCOME"
-                          ? "bg-emerald-50 text-emerald-700"
+                          ? "bg-orange-50 text-[#FF8A00]"
                           : "bg-rose-50 text-rose-700"
                       }`}
                     >

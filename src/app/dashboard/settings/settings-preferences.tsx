@@ -157,15 +157,15 @@ export function SettingsPreferences({ initialPreferences }: SettingsPreferencesP
     <div className="mt-6 space-y-6">
       {/* Success Notification */}
       {successMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#cfe4d7] bg-[#e7f4ed] p-4 text-sm text-[#064b36] shadow-sm animate-fade-in">
+        <div className="flex items-center justify-between rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-[#101827] shadow-sm animate-fade-in">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-[#2c5a43] shrink-0" />
+            <CheckCircle2 className="h-5 w-5 text-[#FF8A00] shrink-0" />
             <span className="font-medium">{successMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setSuccessMessage(null)}
-            className="text-[#064b36] hover:opacity-75"
+            className="text-[#101827] hover:opacity-75"
           >
             <X className="h-4 w-4" />
           </button>
@@ -208,11 +208,11 @@ export function SettingsPreferences({ initialPreferences }: SettingsPreferencesP
             onClick={() => handleThemeChange("light")}
             className={`flex items-center justify-center gap-2.5 rounded-xl border p-3 text-sm font-medium transition ${
               theme === "light"
-                ? "border-[#173d2e] bg-[#e3efe7] text-[#173d2e] font-semibold ring-2 ring-[#173d2e]/10"
-                : "border-[#dfe7df] bg-[#fcfdfc] text-[#5d6d64] hover:bg-white"
+                ? "border-[#FF8A00] bg-orange-50 text-[#101827] font-semibold ring-2 ring-[#FF8A00]/20"
+                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
             }`}
           >
-            <Sun className="h-4 w-4" />
+            <Sun className="h-4 w-4 text-[#FF8A00]" />
             <span>Light Theme</span>
           </button>
           <button
@@ -220,11 +220,11 @@ export function SettingsPreferences({ initialPreferences }: SettingsPreferencesP
             onClick={() => handleThemeChange("dark")}
             className={`flex items-center justify-center gap-2.5 rounded-xl border p-3 text-sm font-medium transition ${
               theme === "dark"
-                ? "border-[#173d2e] bg-[#173d2e] text-white font-semibold ring-2 ring-[#173d2e]/20"
-                : "border-[#dfe7df] bg-[#fcfdfc] text-[#5d6d64] hover:bg-white"
+                ? "border-[#101827] bg-[#101827] text-white font-semibold ring-2 ring-[#FF8A00]/30"
+                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
             }`}
           >
-            <Moon className="h-4 w-4" />
+            <Moon className="h-4 w-4 text-[#FF8A00]" />
             <span>Dark Theme</span>
           </button>
         </div>
@@ -232,10 +232,10 @@ export function SettingsPreferences({ initialPreferences }: SettingsPreferencesP
 
       {/* Text Size Choice */}
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5d6e64]">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
           Text Size
         </label>
-        <p className="mt-0.5 text-xs text-[#7a8a82]">Adjust typography readability across tables, forms, and cards.</p>
+        <p className="mt-0.5 text-xs text-slate-400">Adjust typography readability across tables, forms, and cards.</p>
         <div className="mt-3 grid grid-cols-3 gap-3 sm:max-w-md">
           {(["small", "default", "large"] as const).map((size) => (
             <button
@@ -244,11 +244,11 @@ export function SettingsPreferences({ initialPreferences }: SettingsPreferencesP
               onClick={() => handleTextSizeChange(size)}
               className={`flex items-center justify-center gap-2 rounded-xl border p-3 text-sm capitalize transition ${
                 textSize === size
-                  ? "border-[#173d2e] bg-[#e3efe7] text-[#173d2e] font-semibold ring-2 ring-[#173d2e]/10"
-                  : "border-[#dfe7df] bg-[#fcfdfc] text-[#5d6d64] hover:bg-white"
+                  ? "border-[#FF8A00] bg-orange-50 text-[#101827] font-semibold ring-2 ring-[#FF8A00]/20"
+                  : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
               }`}
             >
-              <Type className="h-4 w-4" />
+              <Type className="h-4 w-4 text-[#FF8A00]" />
               <span>{size}</span>
             </button>
           ))}
@@ -257,20 +257,20 @@ export function SettingsPreferences({ initialPreferences }: SettingsPreferencesP
 
       {/* Notifications Toggle */}
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5d6e64]">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
           Notification Alerts
         </label>
-        <p className="mt-0.5 text-xs text-[#7a8a82]">Receive alerts for urgent animal health cases and overdue returns.</p>
-        <div className="mt-3 flex items-center justify-between rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4 sm:max-w-md">
+        <p className="mt-0.5 text-xs text-slate-400">Receive alerts for urgent animal health cases and overdue returns.</p>
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 sm:max-w-md">
           <div className="flex items-center gap-3">
-            <Bell className="h-4 w-4 text-[#5d6e64]" />
-            <span className="text-sm font-medium text-[#1b2d24]">In-App System Reminders</span>
+            <Bell className="h-4 w-4 text-[#FF8A00]" />
+            <span className="text-sm font-medium text-[#101827]">In-App System Reminders</span>
           </div>
           <button
             type="button"
             onClick={handleNotifToggle}
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              notifications ? "bg-[#173d2e]" : "bg-gray-200"
+              notifications ? "bg-[#FF8A00]" : "bg-gray-200"
             }`}
             role="switch"
             aria-checked={notifications}
@@ -313,16 +313,16 @@ export function SettingsPreferences({ initialPreferences }: SettingsPreferencesP
             type="button"
             onClick={handleSave}
             disabled={isPending}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#173d2e] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#102a22] transition disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#101827] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#1f2937] transition disabled:opacity-50"
           >
             {isPending ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin text-[#FF8A00]" />
                 <span>Saving...</span>
               </>
             ) : (
               <>
-                <Save className="h-4 w-4" />
+                <Save className="h-4 w-4 text-[#FF8A00]" />
                 <span>Save Preferences</span>
               </>
             )}

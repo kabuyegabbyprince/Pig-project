@@ -767,6 +767,7 @@ function createSupabasePrisma(): PrismaClient {
       headers,
       body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(12000),
     });
 
     if (!res.ok) {

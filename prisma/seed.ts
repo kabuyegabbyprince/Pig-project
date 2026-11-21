@@ -118,7 +118,7 @@ async function main() {
   const defaultUsers = [
     { name: "Super Administrator", email: "admin@pigproject.rw", role: Role.SUPER_ADMIN, password: "Admin2026!" },
     { name: "Project Manager", email: "manager@pigproject.rw", role: Role.PROJECT_MANAGER, password: "Manager2026!" },
-    { name: "Field Officer", email: "field@pigproject.rw", role: Role.FIELD_OFFICER, password: "Field2026!" },
+    { name: "Cell Manager", email: "cell@pigproject.rw", role: Role.CELL_MANAGER, password: "Cell2026!" },
     { name: "Veterinarian Doctor", email: "vet@pigproject.rw", role: Role.VETERINARIAN, password: "Vet2026!" },
     { name: "Finance Officer", email: "finance@pigproject.rw", role: Role.FINANCE_OFFICER, password: "Finance2026!" },
     { name: "Project Trainer", email: "trainer@pigproject.rw", role: Role.TRAINER, password: "Trainer2026!" },

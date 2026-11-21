@@ -35,32 +35,32 @@ export default async function UsersManagementPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold font-serif text-[#1c2b23]">Users &amp; Role Governance</h1>
-          <p className="mt-1 text-sm text-[#5d6e64]">Assign roles, toggle active access, and audit all platform accounts.</p>
+          <h1 className="text-2xl font-bold text-[#101827]">Users &amp; Role Governance</h1>
+          <p className="mt-1 text-sm text-slate-600">Assign roles, toggle active access, and audit all platform accounts.</p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <Link
             href="/dashboard/admin/users/analytics"
-            className="inline-flex items-center gap-2 rounded-lg border border-[#d9e1d8] bg-white px-3.5 py-2 text-xs font-semibold text-[#1c2b23] shadow-xs hover:bg-[#f2f5f0] transition"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] shadow-xs hover:bg-slate-50 transition"
           >
-            <BarChart3 className="h-4 w-4 text-[#2c5a43]" />
+            <BarChart3 className="h-4 w-4 text-[#FF8A00]" />
             <span>Role Analytics</span>
           </Link>
           <Link
             href="/dashboard/admin/users/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#2c5a43] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#1c2b23] transition"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#1f2937] transition"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 text-[#FF8A00]" />
             <span>Add User</span>
           </Link>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-[#d9e1d8] bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-[#d9e1d8] text-left text-sm text-[#1c2b23]">
-            <thead className="bg-[#f5f7f4] text-xs uppercase tracking-wide text-[#5d6e64]">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm text-[#101827]">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email / Telephone</th>
@@ -69,25 +69,25 @@ export default async function UsersManagementPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#edf2ee]">
+            <tbody className="divide-y divide-slate-100">
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-[#5d6e64]">
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                     No users found yet.
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-[#f9faf8]">
+                  <tr key={user.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8f0eb] text-[#2c5a43]">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-50 text-[#FF8A00]">
                           <UserCircle2 className="h-5 w-5" />
                         </span>
                         <span className="font-medium">{user.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[#384b42]">{formatUserContact(user.email, user.phone)}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatUserContact(user.email, user.phone)}</td>
                     <td className="px-4 py-3">
                       <UserRoleActions
                         userId={user.id}
@@ -96,17 +96,17 @@ export default async function UsersManagementPage() {
                         isCurrentUser={user.id === session.user.id}
                       />
                     </td>
-                    <td className="px-4 py-3 text-[#5d6e64]">
+                    <td className="px-4 py-3 text-slate-500">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           href={`/dashboard/history?userId=${user.id}`}
-                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-[#2c5a43] hover:bg-[#e4ede6] hover:text-[#1c2b23] border border-[#cfe0d4] transition"
+                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-[#101827] hover:bg-orange-50 hover:text-[#FF8A00] border border-slate-200 transition"
                           title={`View activity history for ${user.name}`}
                         >
-                          <History className="h-3.5 w-3.5" />
+                          <History className="h-3.5 w-3.5 text-[#FF8A00]" />
                           <span>History</span>
                         </Link>
                         <DeleteUserButton

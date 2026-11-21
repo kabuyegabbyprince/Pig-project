@@ -15,7 +15,12 @@ function maskNationalId(nid: string | null | undefined): string {
 }
 
 export default async function BeneficiariesPage() {
-  const activeUser = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const activeUser = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+  ]);
   if (!activeUser) {
     redirect("/dashboard");
   }
@@ -153,7 +158,7 @@ export default async function BeneficiariesPage() {
                         {new Date(b.registrationDate).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={`/dashboard/admin/beneficiaries/${b.id}`} className="text-[#2c5a43] hover:text-[#1c2b23] font-semibold">
+                        <Link href={`/dashboard/admin/beneficiaries/${b.id}`} prefetch={false} className="text-[#FF8A00] hover:text-[#101827] font-semibold">
                           Profile →
                         </Link>
                       </td>

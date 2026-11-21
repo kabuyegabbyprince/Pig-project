@@ -4,11 +4,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, MapPin, Phone, Calendar, FileText, Activity, PiggyBank, RotateCcw } from "lucide-react";
 import { getActiveUser } from "@/lib/active-user";
+import { FIELD_OPERATIONS_ROLES } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
 export default async function BeneficiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]))) {
+  if (!(await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, ...FIELD_OPERATIONS_ROLES]))) {
     redirect("/dashboard");
   }
 

@@ -9,13 +9,25 @@ import { getActiveUser } from "@/lib/active-user";
 export const dynamic = 'force-dynamic';
 
 export default async function EmployeeReportsPage() {
-  const user = await getActiveUser([Role.FIELD_OFFICER, Role.SUPER_ADMIN]);
+  const user = await getActiveUser([
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.COOPERATIVE_MEMBER,
+    Role.PROJECT_MANAGER,
+    Role.SUPER_ADMIN,
+  ]);
   if (!user) {
     redirect("/dashboard");
   }
 
+  const canViewAllReports =
+    user.role === Role.SUPER_ADMIN ||
+    user.role === Role.PROJECT_MANAGER ||
+    user.role === Role.CELL_MANAGER ||
+    user.role === Role.COOPERATIVE_LEADER;
+
   const reports = await prisma.employeeReport.findMany({
-    where: user.role === Role.FIELD_OFFICER ? { employeeId: user.id } : undefined,
+    where: canViewAllReports ? undefined : { employeeId: user.id },
     orderBy: { date: "desc" },
     include: { employee: { select: { name: true } } },
   });

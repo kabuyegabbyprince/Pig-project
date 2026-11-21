@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 function getStatusBadge(status: PigStatus) {
   switch (status) {
     case PigStatus.ACTIVE:
-      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Available</span>;
+      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-50 text-[#FF8A00] border border-orange-200">Available</span>;
     case PigStatus.REGISTERED:
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Awaiting Inspection</span>;
     case PigStatus.DISTRIBUTED:
@@ -30,7 +30,13 @@ export default async function PigsPage({
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
-  const activeUser = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER, Role.VETERINARIAN]);
+  const activeUser = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.VETERINARIAN,
+  ]);
   if (!activeUser) {
     redirect("/dashboard");
   }
@@ -84,9 +90,9 @@ export default async function PigsPage({
           <div className="text-xs font-semibold text-[#5d6e64] uppercase">Total Herd Registered</div>
           <div className="text-2xl font-bold font-serif text-[#1c2b23] mt-1">{totalCount}</div>
         </Link>
-        <Link href="/dashboard/admin/pigs?status=ACTIVE" className="bg-white p-4 rounded-xl border border-[#d9e1d8] hover:border-emerald-600 transition-colors">
-          <div className="text-xs font-semibold text-emerald-700 uppercase">Available for Distribution</div>
-          <div className="text-2xl font-bold font-serif text-emerald-800 mt-1">{displayAvailable}</div>
+        <Link href="/dashboard/admin/pigs?status=ACTIVE" className="bg-white p-4 rounded-xl border border-[#d9e1d8] hover:border-[#FF8A00] transition-colors">
+          <div className="text-xs font-semibold text-[#FF8A00] uppercase">Available for Distribution</div>
+          <div className="text-2xl font-bold font-serif text-[#101827] mt-1">{displayAvailable}</div>
         </Link>
         <Link href="/dashboard/admin/pigs?status=DISTRIBUTED" className="bg-white p-4 rounded-xl border border-[#d9e1d8] hover:border-blue-600 transition-colors">
           <div className="text-xs font-semibold text-blue-700 uppercase">Distributed with Families</div>
@@ -123,7 +129,7 @@ export default async function PigsPage({
             <Link
               href="/dashboard/admin/pigs?status=ACTIVE"
               className={`px-3 py-1.5 rounded-lg border font-medium ${
-                statusFilter === PigStatus.ACTIVE ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-[#f2f5f0] text-[#5d6e64] border-[#d9e1d8]'
+                statusFilter === PigStatus.ACTIVE ? 'bg-[#FF8A00] text-white border-[#FF8A00]' : 'bg-[#f2f5f0] text-[#5d6e64] border-[#d9e1d8]'
               }`}
             >
               Available ({availableCount})

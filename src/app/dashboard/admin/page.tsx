@@ -149,13 +149,13 @@ export default async function AdminDashboardOverview() {
       title: "Pigs Distributed",
       value: pigsDistributed,
       icon: ArrowDownRight,
-      tone: "bg-emerald-50 text-emerald-700",
+      tone: "bg-orange-50 text-[#FF8A00]",
     },
     {
       title: "Pigs Returned",
       value: pigsReturned,
       icon: RefreshCw,
-      tone: "bg-blue-50 text-blue-700",
+      tone: "bg-slate-100 text-[#101827]",
     },
     {
       title: "Pigs in Stock",
@@ -173,13 +173,13 @@ export default async function AdminDashboardOverview() {
       title: "Fund Balance (RWF)",
       value: totalMoneyBalance,
       icon: Wallet,
-      tone: "bg-emerald-50 text-emerald-700",
+      tone: "bg-orange-50 text-[#FF8A00]",
     },
     {
       title: "Enrolled Families",
       value: totalBeneficiaries,
       icon: Users,
-      tone: "bg-teal-50 text-teal-700",
+      tone: "bg-slate-100 text-[#101827]",
     },
     {
       title: "Active Staff Accounts",
@@ -193,7 +193,7 @@ export default async function AdminDashboardOverview() {
         ? "Phase 2 Setup"
         : `${ecommerceOverview.orders.length} (${formatRwf(ecommerceOverview.totalRevenue)})`,
       icon: ShoppingBag,
-      tone: "bg-emerald-50 text-[#064e3b]",
+      tone: "bg-orange-50 text-[#FF8A00]",
     },
   ];
 
@@ -202,7 +202,7 @@ export default async function AdminDashboardOverview() {
       ? [
           {
             title: "Users & Role Governance",
-            description: "Assign any of the 7 roles, suspend/activate accounts, or add staff.",
+            description: "Assign staff across all system roles, suspend/activate accounts, or add staff.",
             href: "/dashboard/admin/users",
             icon: ShieldCheck,
           },
@@ -289,10 +289,10 @@ export default async function AdminDashboardOverview() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
             {isSuperAdmin ? "Super Admin Master Control Center" : "Project Operations Control"}
           </p>
-          <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[#101827]">
             Unified Operations &amp; E-Commerce Command
           </h1>
           <p className="mt-1 text-xs text-slate-500">
@@ -305,16 +305,16 @@ export default async function AdminDashboardOverview() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/dashboard/admin/users/new"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#064e3b] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#053d2e] transition"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#1f2937] transition"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5 text-[#FF8A00]" />
               <span>Add Staff User</span>
             </Link>
             <Link
               href="/dashboard/admin/ecommerce"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-xs hover:bg-slate-50 transition"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] shadow-xs hover:bg-orange-50 transition"
             >
-              <ShoppingBag className="h-3.5 w-3.5 text-[#064e3b]" />
+              <ShoppingBag className="h-3.5 w-3.5 text-[#FF8A00]" />
               <span>Manage E-Commerce</span>
             </Link>
           </div>
@@ -352,7 +352,8 @@ export default async function AdminDashboardOverview() {
             <Link
               key={item.label}
               href={item.href}
-              className="flex items-center justify-between rounded-xl border border-slate-200/70 bg-slate-50/70 px-3.5 py-2.5 hover:border-emerald-300 hover:bg-emerald-50/40 transition"
+              prefetch={false}
+              className="flex items-center justify-between rounded-xl border border-slate-200/70 bg-slate-50/70 px-3.5 py-2.5 hover:border-[#FF8A00]/50 hover:bg-orange-50/40 transition"
             >
               <span className="text-xs font-medium text-slate-700">{item.label}</span>
               <span
@@ -371,7 +372,7 @@ export default async function AdminDashboardOverview() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Manage All System Modules</h2>
+            <h2 className="text-base font-bold text-[#101827]">Manage All System Modules</h2>
             <p className="text-xs text-slate-500">Direct administrative access across operations, public website, and E-Commerce.</p>
           </div>
         </div>
@@ -380,16 +381,17 @@ export default async function AdminDashboardOverview() {
             <Link
               key={title}
               href={href}
-              className="group flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs hover:border-emerald-400 hover:shadow-sm transition-all"
+              prefetch={false}
+              className="group flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs hover:border-[#FF8A00] hover:shadow-sm transition-all"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-[#064e3b]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
                     <Icon className="h-4 w-4" />
                   </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:translate-x-0.5 group-hover:text-[#064e3b] transition-all" />
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:translate-x-0.5 group-hover:text-[#FF8A00] transition-all" />
                 </div>
-                <h3 className="mt-3 text-sm font-bold text-slate-900">{title}</h3>
+                <h3 className="mt-3 text-sm font-bold text-[#101827]">{title}</h3>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>
               </div>
             </Link>
@@ -402,14 +404,14 @@ export default async function AdminDashboardOverview() {
         <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <h2 className="text-base font-bold text-slate-900">User Accounts &amp; Role Assignment</h2>
+              <h2 className="text-base font-bold text-[#101827]">User Accounts &amp; Role Assignment</h2>
               <p className="text-xs text-slate-500">
-                Promote or reassign staff across all 7 roles or suspend access instantly.
+                Promote or reassign staff across all roles or suspend access instantly.
               </p>
             </div>
             <Link
               href="/dashboard/admin/users"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[#064e3b] hover:underline"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#FF8A00] hover:underline"
             >
               <span>Open Full User Directory</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -465,7 +467,7 @@ export default async function AdminDashboardOverview() {
           </div>
           <Link
             href="/dashboard/history"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-[#064e3b] hover:underline"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[#FF8A00] hover:underline"
           >
             <span>View All History</span>
             <ArrowRight className="h-3.5 w-3.5" />
@@ -479,7 +481,7 @@ export default async function AdminDashboardOverview() {
             {recentLogs.map((log) => (
               <div key={log.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-2.5 text-xs">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded bg-emerald-50 px-2 py-0.5 font-semibold text-[#064e3b]">
+                  <span className="rounded bg-orange-50 px-2 py-0.5 font-semibold text-[#FF8A00]">
                     {formatModule(log.entity)}
                   </span>
                   <span className="font-semibold text-slate-900">

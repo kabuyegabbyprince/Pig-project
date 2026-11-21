@@ -75,9 +75,9 @@ export function PigReturnsTableClient({
         </div>
         <Link 
           href={newRecordHref}
-          className="inline-flex items-center justify-center px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-[#064e3b] hover:bg-[#053d2e] shadow-xs transition-all"
+          className="inline-flex items-center justify-center px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-[#101827] hover:bg-[#1f2937] shadow-xs transition-all"
         >
-          <Plus className="-ml-0.5 mr-1.5 h-3.5 w-3.5" />
+          <Plus className="-ml-0.5 mr-1.5 h-3.5 w-3.5 text-[#FF8A00]" />
           Record Return
         </Link>
       </div>
@@ -87,22 +87,22 @@ export function PigReturnsTableClient({
         <div className="rounded-xl border border-slate-200/80 bg-white p-4.5 shadow-xs hover:border-slate-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Piglets Returned</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <ArrowLeftCircle className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{totalPigletsReturned}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-[#101827]">{totalPigletsReturned}</p>
           <p className="mt-0.5 text-xs text-slate-500">Received from beneficiaries</p>
         </div>
 
         <div className="rounded-xl border border-slate-200/80 bg-white p-4.5 shadow-xs hover:border-slate-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Cumulative Piglets Examined</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">{cumulativeExamined}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-[#FF8A00]">{cumulativeExamined}</p>
           <p className="mt-0.5 text-xs text-slate-500">Clinically inspected & assessed</p>
         </div>
 

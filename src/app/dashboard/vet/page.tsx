@@ -87,11 +87,11 @@ export default async function VetDashboard() {
         <div className="rounded-xl border border-slate-200/80 bg-white p-4.5 shadow-xs hover:border-slate-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Healthy Animals</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">{healthyPigs}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-[#FF8A00]">{healthyPigs}</p>
           <p className="mt-0.5 text-xs text-slate-500">Cleared & distribution-ready</p>
         </div>
 
@@ -126,13 +126,14 @@ export default async function VetDashboard() {
             <Link
               key={label}
               href={href}
-              className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50/50 p-3.5 hover:border-emerald-600/50 hover:bg-white hover:shadow-xs transition-all group"
+              prefetch={false}
+              className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50/50 p-3.5 hover:border-[#FF8A00]/60 hover:bg-white hover:shadow-xs transition-all group"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-orange-50 text-[#FF8A00]">
                   <Icon className="h-4 w-4" />
                 </div>
-                <span className="text-xs font-semibold text-slate-800 group-hover:text-emerald-800">{label}</span>
+                <span className="text-xs font-semibold text-[#101827] group-hover:text-[#FF8A00]">{label}</span>
               </div>
               {typeof count === "number" && count > 0 && (
                 <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-bold text-white">

@@ -8,7 +8,7 @@ import { EcommerceManager } from "@/components/admin/EcommerceManager";
 export const dynamic = "force-dynamic";
 
 export default async function AdminEcommercePage() {
-  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
   if (!actor) {
     redirect("/dashboard");
   }

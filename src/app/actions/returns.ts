@@ -29,7 +29,14 @@ export async function getBeneficiaryReturnOptions() {
 }
 
 export async function recordBatchPigReturn(formData: FormData) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER, Role.VETERINARIAN]);
+  const user = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.COOPERATIVE_MEMBER,
+    Role.VETERINARIAN,
+  ]);
   if (!user) throw new Error("Unauthorized");
 
   const quantityRaw = formData.get("quantity") || formData.get("pigletsReturned");

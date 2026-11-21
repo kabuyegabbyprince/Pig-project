@@ -7,7 +7,7 @@ import { Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
 
 export async function createFieldVisit(formData: FormData) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER]);
   if (!user) throw new Error("Unauthorized");
 
   const beneficiaryId = formData.get("beneficiaryId") as string;

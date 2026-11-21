@@ -4,7 +4,14 @@ import { getActiveUser } from "@/lib/active-user";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.COOPERATIVE_MEMBER,
+    Role.VETERINARIAN,
+  ]);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

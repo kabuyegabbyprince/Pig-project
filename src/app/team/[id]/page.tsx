@@ -14,10 +14,10 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
   if (!member) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
-        <h1 className="text-3xl font-bold font-serif text-[#1c2b23]">Team member not found</h1>
-        <p className="mt-4 text-[#5d6e64]">This profile is not available or has not been published yet.</p>
-        <Link href="/team" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#2c5a43] px-5 py-3 text-white hover:bg-[#1c2b23]">
-          <ArrowLeft className="h-4 w-4" />
+        <h1 className="text-3xl font-bold text-[#101827]">Team member not found</h1>
+        <p className="mt-4 text-slate-500">This profile is not available or has not been published yet.</p>
+        <Link href="/team" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#101827] px-5 py-3 text-white hover:bg-[#1f2937]">
+          <ArrowLeft className="h-4 w-4 text-[#FF8A00]" />
           Back to Team
         </Link>
       </div>
@@ -25,28 +25,30 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
   }
 
   return (
-    <div className="min-h-screen bg-[#f2f5f0] text-[#1c2b23]">
-      <header className="border-b border-[#d9e1d8] bg-white sticky top-0 z-50">
+    <div className="min-h-screen bg-[#F5F5F5] text-[#101827]">
+      <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" aria-label="Pig Project Rwanda home" className="flex items-center shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-11 w-auto object-contain" />
           </Link>
-          <div className="flex items-center gap-4 text-sm text-[#5d6e64]">
-            <Link href="/team" className="hover:text-[#1c2b23]">Back to Team</Link>
-            <Link href="/contact" className="hover:text-[#1c2b23]">Contact Us</Link>
+          <div className="flex items-center gap-4 text-sm text-slate-600">
+            <Link href="/team" className="hover:text-[#FF8A00]">Back to Team</Link>
+            <Link href="/contact" className="hover:text-[#FF8A00]">Contact Us</Link>
           </div>
         </div>
       </header>
 
       <main className="app-container mx-auto max-w-6xl px-4 py-10 sm:py-16 sm:px-6 lg:px-8">
-        <div className="overflow-hidden rounded-3xl border border-[#d9e1d8] bg-white shadow-sm">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="grid gap-8 p-5 sm:p-6 md:grid-cols-[280px_1fr] lg:grid-cols-[320px_1fr] md:p-10">
             <div className="flex items-center justify-center">
-              <div className="aspect-square w-48 max-w-full sm:w-64 lg:w-72 overflow-hidden rounded-full border-4 border-[#e4ede6] bg-[#e4ede6] shadow-sm">
+              <div className="aspect-square w-48 max-w-full sm:w-64 lg:w-72 overflow-hidden rounded-full border-4 border-orange-100 bg-orange-50 shadow-sm">
                 {member.photoUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={member.photoUrl} alt={member.fullName} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-4xl sm:text-5xl font-bold text-[#2c5a43]">
+                  <div className="flex h-full w-full items-center justify-center text-4xl sm:text-5xl font-bold text-[#101827]">
                     {member.fullName.split(" ").map((part) => part[0]).slice(0,2).join("").toUpperCase() || "TM"}
                   </div>
                 )}
@@ -55,42 +57,42 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
 
             <div className="min-w-0 space-y-6">
               <div>
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.18em] text-[#2c5a43]">Team Member</p>
-                <h1 className="mt-3 text-2xl sm:text-4xl font-bold font-serif text-[#1c2b23] break-words">{member.fullName}</h1>
-                <p className="mt-2 text-base sm:text-lg font-semibold text-[#2c5a43]">{member.role}</p>
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.18em] text-[#FF8A00]">Team Member</p>
+                <h1 className="mt-3 text-2xl sm:text-4xl font-bold text-[#101827] break-words">{member.fullName}</h1>
+                <p className="mt-2 text-base sm:text-lg font-semibold text-[#FF8A00]">{member.role}</p>
               </div>
 
               {member.specialization && (
-                <span className="inline-flex rounded-full bg-[#e4ede6] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#2c5a43]">
+                <span className="inline-flex rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#FF8A00]">
                   {member.specialization}
                 </span>
               )}
 
-              {member.bio && <p className="text-sm sm:text-base leading-7 sm:leading-8 text-[#5d6e64]">{member.bio}</p>}
+              {member.bio && <p className="text-sm sm:text-base leading-7 sm:leading-8 text-slate-600">{member.bio}</p>}
 
               {member.responsibilities && (
                 <div>
-                  <h2 className="text-lg font-bold text-[#1c2b23]">Responsibilities</h2>
-                  <p className="mt-2 text-sm sm:text-base leading-7 text-[#5d6e64]">{member.responsibilities}</p>
+                  <h2 className="text-lg font-bold text-[#101827]">Responsibilities</h2>
+                  <p className="mt-2 text-sm sm:text-base leading-7 text-slate-600">{member.responsibilities}</p>
                 </div>
               )}
 
-              <div className="grid gap-3 pt-2 text-sm text-[#5d6e64] sm:grid-cols-2">
+              <div className="grid gap-3 pt-2 text-sm text-slate-600 sm:grid-cols-2">
                 {member.showEmailPublic && member.email && (
-                  <a href={`mailto:${member.email}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-[#d9e1d8] px-3 py-2 hover:bg-[#f2f5f0] break-all">
-                    <Mail className="h-4 w-4 shrink-0" />
+                  <a href={`mailto:${member.email}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:bg-orange-50 hover:text-[#101827] break-all">
+                    <Mail className="h-4 w-4 shrink-0 text-[#FF8A00]" />
                     <span className="truncate">{member.email}</span>
                   </a>
                 )}
                 {member.showPhonePublic && member.phone && (
-                  <a href={`tel:${member.phone}`} className="inline-flex items-center gap-2 rounded-lg border border-[#d9e1d8] px-3 py-2 hover:bg-[#f2f5f0]">
-                    <Phone className="h-4 w-4" />
+                  <a href={`tel:${member.phone}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:bg-orange-50 hover:text-[#101827]">
+                    <Phone className="h-4 w-4 text-[#FF8A00]" />
                     {member.phone}
                   </a>
                 )}
                 {member.showLinkedinPublic && member.linkedinUrl && (
-                  <a href={member.linkedinUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-[#d9e1d8] px-3 py-2 hover:bg-[#f2f5f0]">
-                    <ArrowUpRight className="h-4 w-4" />
+                  <a href={member.linkedinUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:bg-orange-50 hover:text-[#101827]">
+                    <ArrowUpRight className="h-4 w-4 text-[#FF8A00]" />
                     LinkedIn Profile
                   </a>
                 )}
@@ -100,30 +102,31 @@ export default async function TeamMemberDetailPage({ params }: { params: Promise
         </div>
       </main>
 
-      <footer className="border-t border-[#d9e1d8] bg-[#f2f5f0] py-12">
+      <footer className="border-t border-slate-200 bg-white py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             <div>
               <Link href="/" aria-label="Pig Project Rwanda home" className="inline-flex items-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-12 w-auto object-contain" />
               </Link>
-              <p className="mt-3 text-2xl font-serif text-[#1c2b23]">One Piglet. One Family. A Fund That Keeps Moving.</p>
-              <p className="mt-3 text-sm leading-6 text-[#5d6e64]">Supporting vulnerable families in Rwanda through livestock empowerment and a sustainable revolving fund.</p>
+              <p className="mt-3 text-xl font-bold text-[#101827]">One Piglet. One Family. A Fund That Keeps Moving.</p>
+              <p className="mt-3 text-sm leading-6 text-slate-500">Supporting vulnerable families in Rwanda through livestock empowerment and a sustainable revolving fund.</p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#2c5a43]">Navigation</h3>
-              <ul className="mt-4 space-y-2 text-sm text-[#5d6e64]">
-                <li><Link href="/" className="hover:text-[#1c2b23]">About</Link></li>
-                <li><Link href="/#how-it-works" className="hover:text-[#1c2b23]">How It Works</Link></li>
-                <li><Link href="/" className="hover:text-[#1c2b23]">Impact</Link></li>
-                <li><Link href="/gallery" className="hover:text-[#1c2b23]">Gallery</Link></li>
-                <li><Link href="/team" className="hover:text-[#1c2b23]">Our Team</Link></li>
-                <li><Link href="/#stories" className="hover:text-[#1c2b23]">Stories</Link></li>
-                <li><Link href="/contact" className="hover:text-[#1c2b23]">Contact Us</Link></li>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#FF8A00]">Navigation</h3>
+              <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                <li><Link href="/" className="hover:text-[#101827]">About</Link></li>
+                <li><Link href="/#how-it-works" className="hover:text-[#101827]">How It Works</Link></li>
+                <li><Link href="/" className="hover:text-[#101827]">Impact</Link></li>
+                <li><Link href="/gallery" className="hover:text-[#101827]">Gallery</Link></li>
+                <li><Link href="/team" className="hover:text-[#101827]">Our Team</Link></li>
+                <li><Link href="/#stories" className="hover:text-[#101827]">Stories</Link></li>
+                <li><Link href="/contact" className="hover:text-[#101827]">Contact Us</Link></li>
               </ul>
             </div>
           </div>
-          <div className="mt-8 border-t border-[#d9e1d8] pt-5 text-center text-sm text-[#5d6e64]">Managed by Value Protocols. All rights reserved.</div>
+          <div className="mt-8 border-t border-slate-200 pt-5 text-center text-sm text-slate-500">Managed by Value Protocols. All rights reserved.</div>
         </div>
       </footer>
     </div>

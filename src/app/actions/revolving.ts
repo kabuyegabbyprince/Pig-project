@@ -146,7 +146,7 @@ export async function getRevolvingManagementOverview() {
 }
 
 export async function checkOverdueRevolvingCycles() {
-  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.FIELD_OFFICER]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER]);
   if (!actor) return { success: false, error: "Unauthorized" };
 
   const now = new Date();
@@ -181,7 +181,7 @@ export async function checkOverdueRevolvingCycles() {
     where: {
       isActive: true,
       deletedAt: null,
-      role: { in: [Role.SUPER_ADMIN, Role.FIELD_OFFICER] },
+      role: { in: [Role.SUPER_ADMIN, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER] },
     },
     select: { id: true },
   });

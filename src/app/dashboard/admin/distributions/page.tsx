@@ -93,16 +93,16 @@ export default async function AdminDistributionsAndReturnsPage() {
         <div className="flex flex-wrap items-center gap-2.5">
           <Link
             href="/dashboard/admin/revolving"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#173d2e] shadow-xs hover:bg-slate-50 transition"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] shadow-xs hover:bg-orange-50 hover:text-[#FF8A00] transition"
           >
-            <Clock className="h-4 w-4" />
+            <Clock className="h-4 w-4 text-[#FF8A00]" />
             <span>Cycles &amp; Allocation</span>
           </Link>
           <Link
             href="/dashboard/field/distributions/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#064e3b] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#053d2e] transition"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#1f2937] transition"
           >
-            <PlusCircle className="h-4 w-4" />
+            <PlusCircle className="h-4 w-4 text-[#FF8A00]" />
             <span>Record Distribution</span>
           </Link>
           <Link
@@ -120,7 +120,7 @@ export default async function AdminDistributionsAndReturnsPage() {
         <div className="rounded-xl border border-slate-200/80 bg-white p-4.5 shadow-xs hover:border-slate-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Distributions</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <ArrowRightCircle className="h-4 w-4" />
             </div>
           </div>
@@ -131,18 +131,18 @@ export default async function AdminDistributionsAndReturnsPage() {
         <div className="rounded-xl border border-slate-200/80 bg-white p-4.5 shadow-xs hover:border-slate-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Piglets Returned</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <RefreshCw className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">{totalPigletsReturned}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-[#FF8A00]">{totalPigletsReturned}</p>
           <p className="mt-0.5 text-xs text-slate-500">Revolving into the fund</p>
         </div>
 
         <div className="rounded-xl border border-slate-200/80 bg-white p-4.5 shadow-xs hover:border-slate-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Completed</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
@@ -187,7 +187,7 @@ export default async function AdminDistributionsAndReturnsPage() {
           </div>
           <Link
             href="/dashboard/field/returns/new"
-            className="text-xs font-semibold text-[#173d2e] hover:underline"
+            className="text-xs font-semibold text-[#FF8A00] hover:underline"
           >
             + New Return
           </Link>
@@ -225,8 +225,8 @@ export default async function AdminDistributionsAndReturnsPage() {
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         ret.veterinaryVerified
-                          ? "bg-[#e3efe7] text-[#173d2e]"
-                          : "bg-[#fef3c7] text-[#92400e]"
+                          ? "bg-orange-50 text-[#FF8A00]"
+                          : "bg-amber-100 text-amber-800"
                       }`}
                     >
                       {ret.veterinaryVerified ? "Cleared by Vet" : "Awaiting Vet Inspection"}

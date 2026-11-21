@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function TeamManagementPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== "SUPER_ADMIN") {
+  if (!session || (session.user.role !== "SUPER_ADMIN" && session.user.role !== "PROJECT_MANAGER")) {
     redirect("/dashboard");
   }
 
@@ -68,7 +68,7 @@ export default async function TeamManagementPage() {
                       <SubmitButton
                         pendingText="Saving..."
                         className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer ${
-                          member.isPublished ? "bg-green-100 text-green-800" : "bg-[#e4ede6] text-[#5d6e64]"
+                          member.isPublished ? "bg-orange-50 text-[#FF8A00] border border-orange-200" : "bg-slate-100 text-slate-600"
                         }`}
                       >
                         {member.isPublished ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}

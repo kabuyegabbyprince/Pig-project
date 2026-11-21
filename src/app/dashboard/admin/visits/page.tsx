@@ -8,7 +8,12 @@ import { getActiveUser } from "@/lib/active-user";
 export const dynamic = 'force-dynamic';
 
 export default async function VisitsPage() {
-  const activeUser = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const activeUser = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+  ]);
   if (!activeUser) {
     redirect("/dashboard");
   }

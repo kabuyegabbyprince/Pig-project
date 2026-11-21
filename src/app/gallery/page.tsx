@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getPublishedGalleryItems } from "@/lib/gallery";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import GalleryCollection from "@/components/public/gallery-collection";
@@ -9,10 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function GalleryPage() {
   let items: GalleryItem[] = [];
   try {
-    items = await prisma.galleryItem.findMany({
-      where: { isPublished: true },
-      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-    });
+    items = await getPublishedGalleryItems();
   } catch (error) {
     console.error("Failed to load gallery items:", error);
   }
@@ -38,8 +35,8 @@ export default async function GalleryPage() {
 
       <main className="app-container mx-auto max-w-7xl px-4 py-12 sm:py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Visual Documentation</p>
-          <h1 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">Project Field Gallery</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">Visual Documentation</p>
+          <h1 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-[#101827]">Project Field Gallery</h1>
           <p className="mt-3 text-sm text-slate-600">A visual narrative of rural families, livestock assets, veterinary follow-ups, and revolving community impact across Rwanda.</p>
         </div>
 
@@ -63,9 +60,9 @@ export default async function GalleryPage() {
         )}
 
         <div className="mt-12 text-center">
-          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-[#064e3b] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#053d2e] transition-colors shadow-xs">
+          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-[#101827] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#1f2937] transition-colors shadow-xs">
             <span>Back to Home</span>
-            <ArrowRight className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3.5 w-3.5 text-[#FF8A00]" />
           </Link>
         </div>
       </main>

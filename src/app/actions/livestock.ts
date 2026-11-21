@@ -68,7 +68,7 @@ export async function recordMortality(data: {
   pigId: string;
   reportedCause: string;
 }) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER, Role.VETERINARIAN]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER, Role.VETERINARIAN]);
   if (!user) throw new Error("Unauthorized");
 
   const pigId = typeof data?.pigId === "string" ? data.pigId.trim() : "";
@@ -134,7 +134,7 @@ export async function distributePig(data: {
   reason?: string;
   recordedAt?: string;
 }) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER]);
   if (!user) throw new Error("Unauthorized");
 
   const beneficiaryId = data.beneficiaryId ?? data.toBeneficiaryId;
@@ -300,7 +300,7 @@ export async function returnPig(data: {
   pigletsReceived?: boolean | string;
   notes?: string;
 }) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER, Role.COOPERATIVE_MEMBER]);
   if (!user) throw new Error("Unauthorized");
 
   const beneficiaryId = typeof data?.beneficiaryId === "string" ? data.beneficiaryId.trim() : "";

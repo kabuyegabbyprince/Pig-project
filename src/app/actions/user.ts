@@ -12,24 +12,26 @@ import {
   syncSupabaseAuthUser,
 } from "@/lib/supabase-auth";
 
-const assignableRoles = [
-  Role.SUPER_ADMIN,
-  Role.PROJECT_MANAGER,
-  Role.FIELD_OFFICER,
-  Role.VETERINARIAN,
-  Role.FINANCE_OFFICER,
-  Role.TRAINER,
-  Role.FUNDER,
-] as const;
+import {
+  ALL_ROLE_VALUES,
+  ADMIN_STAFF_ROLE_OPTIONS,
+  CELL_MANAGER_COOP_ROLE_OPTIONS,
+} from "@/lib/roles";
 
-type AssignableRole = (typeof assignableRoles)[number];
+const assignableRoles = ALL_ROLE_VALUES;
+
+type AssignableRole = Role;
 
 function isAssignableRole(value: string): value is AssignableRole {
   return assignableRoles.some((role) => role === value);
 }
 
 export async function createUser(formData: FormData) {
-  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  const actor = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+  ]);
   if (!actor) throw new Error("Unauthorized");
 
   const nameValue = formData.get("name");
@@ -37,18 +39,52 @@ export async function createUser(formData: FormData) {
   const phoneValue = formData.get("phone");
   const passwordValue = formData.get("password");
   const roleValue = formData.get("role");
+  const returnToValue = formData.get("returnTo");
   const name = typeof nameValue === "string" ? nameValue.trim() : "";
   const email = typeof emailValue === "string" ? emailValue.trim().toLowerCase() : "";
   const phone = typeof phoneValue === "string" ? phoneValue.trim() : "";
   const password = typeof passwordValue === "string" ? passwordValue : "";
   const requestedRole = typeof roleValue === "string" ? roleValue : "";
 
+  const defaultListPath =
+    actor.role === Role.SUPER_ADMIN
+      ? "/dashboard/admin/users"
+      : "/dashboard/field/cooperative";
+  const safeReturnTo =
+    typeof returnToValue === "string" &&
+    (returnToValue === "/dashboard/admin/users" ||
+      returnToValue === "/dashboard/field/cooperative")
+      ? returnToValue
+      : defaultListPath;
+  const formErrorPath =
+    safeReturnTo === "/dashboard/field/cooperative" && actor.role !== Role.SUPER_ADMIN
+      ? "/dashboard/field/cooperative"
+      : "/dashboard/admin/users/new";
+
   if (!name || !email || !password.trim() || !requestedRole) {
-    redirect("/dashboard/admin/users/new?error=Missing+required+fields");
+    redirect(`${formErrorPath}?error=Missing+required+fields`);
   }
   if (!isAssignableRole(requestedRole)) {
-    redirect("/dashboard/admin/users/new?error=Select+a+valid+user+role");
+    redirect(`${formErrorPath}?error=Select+a+valid+user+role`);
   }
+
+  // Enforce hierarchical role assignment permissions
+  if (actor.role === Role.CELL_MANAGER) {
+    const allowed = CELL_MANAGER_COOP_ROLE_OPTIONS.map((r) => r.value);
+    if (!allowed.includes(requestedRole)) {
+      redirect(`${formErrorPath}?error=Cell+Managers+can+only+register+Cooperative+Leaders+and+Members`);
+    }
+  } else if (actor.role === Role.COOPERATIVE_LEADER) {
+    if (requestedRole !== Role.COOPERATIVE_MEMBER) {
+      redirect(`${formErrorPath}?error=Cooperative+Leaders+can+only+register+Cooperative+Members`);
+    }
+  } else if (actor.role === Role.SUPER_ADMIN) {
+    const staffAllowed = ADMIN_STAFF_ROLE_OPTIONS.map((r) => r.value);
+    if (!staffAllowed.includes(requestedRole) && !CELL_MANAGER_COOP_ROLE_OPTIONS.some((r) => r.value === requestedRole)) {
+      redirect(`${formErrorPath}?error=Select+a+valid+user+role`);
+    }
+  }
+
   const role = requestedRole;
 
   const normalizedPhone = phone ? normalizePhone(phone) : null;
@@ -64,11 +100,11 @@ export async function createUser(formData: FormData) {
 
   if (existingUser) {
     if (existingUser.email === email) {
-      redirect("/dashboard/admin/users/new?error=User+with+this+email+already+exists");
+      redirect(`${formErrorPath}?error=User+with+this+email+already+exists`);
     }
 
     if (normalizedPhone && existingUser.phone === normalizedPhone) {
-      redirect("/dashboard/admin/users/new?error=A+user+with+this+phone+number+already+exists");
+      redirect(`${formErrorPath}?error=A+user+with+this+phone+number+already+exists`);
     }
   }
 
@@ -113,17 +149,18 @@ export async function createUser(formData: FormData) {
 
     revalidatePath("/dashboard/admin");
     revalidatePath("/dashboard/admin/users");
-    redirect("/dashboard/admin/users");
+    revalidatePath("/dashboard/field/cooperative");
+    redirect(safeReturnTo);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const target = Array.isArray(error.meta?.target) ? error.meta.target.join(", ") : "";
 
       if (target.includes("phone")) {
-        redirect("/dashboard/admin/users/new?error=A+user+with+this+phone+number+already+exists");
+        redirect(`${formErrorPath}?error=A+user+with+this+phone+number+already+exists`);
       }
 
       if (target.includes("email")) {
-        redirect("/dashboard/admin/users/new?error=User+with+this+email+already+exists");
+        redirect(`${formErrorPath}?error=User+with+this+email+already+exists`);
       }
     }
 

@@ -7,13 +7,10 @@ import { getActiveUser } from "@/lib/active-user";
 
 export const dynamic = 'force-dynamic';
 
+import { ALL_ROLE_VALUES } from "@/lib/roles";
+
 export default async function NotificationsPage() {
-  const activeUser = await getActiveUser([
-    Role.SUPER_ADMIN,
-    Role.FIELD_OFFICER,
-    Role.VETERINARIAN,
-    Role.FINANCE_OFFICER,
-  ]);
+  const activeUser = await getActiveUser([...ALL_ROLE_VALUES]);
   if (!activeUser) {
     redirect("/dashboard");
   }

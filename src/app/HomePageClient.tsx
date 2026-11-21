@@ -115,11 +115,13 @@ export function HomePageClient({
         <div className="app-container mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3 lg:px-8">
           {/* Logo */}
           <Link href="/" aria-label="Pig Project Rwanda home" className="flex shrink-0 items-center">
-            <img
-              src="/pplog-.png"
-              alt="Pig Project Rwanda"
-              className="h-10 w-auto object-contain"
-            />
+            <span className="inline-flex items-center rounded-xl bg-white px-2.5 py-1 shadow-xs">
+              <img
+                src="/pplog-.png"
+                alt="Pig Project Rwanda"
+                className="h-8 sm:h-9 w-auto object-contain"
+              />
+            </span>
           </Link>
 
           {/* Desktop nav */}
@@ -147,10 +149,10 @@ export function HomePageClient({
 
             <Link
               href="/contact"
-              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#064e3b] shadow-sm hover:bg-emerald-50 transition-colors whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#101827] shadow-sm hover:bg-orange-50 transition-colors whitespace-nowrap"
             >
               <span>Contact Us</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <ArrowRight className="h-3.5 w-3.5 text-[#FF8A00]" />
             </Link>
             {/* Hamburger — mobile & tablet */}
             <button
@@ -283,7 +285,7 @@ export function HomePageClient({
               <p className="text-lg sm:text-[1.375rem] font-extrabold text-white leading-none">
                 {s.value}
               </p>
-              <p className="mt-1 text-[10px] font-semibold text-emerald-200/85 uppercase tracking-wider">
+              <p className="mt-1 text-[10px] font-semibold text-[#FF8A00] uppercase tracking-wider">
                 {s.label}
               </p>
             </div>
@@ -511,8 +513,8 @@ export function HomePageClient({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-10 md:grid-cols-4">
             <div className="md:col-span-2 space-y-3">
-              <Link href="/" aria-label="Pig Project Rwanda home" className="inline-flex items-center">
-                <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-12 w-auto object-contain" />
+              <Link href="/" aria-label="Pig Project Rwanda home" className="inline-flex items-center rounded-xl bg-white px-3 py-1.5 shadow-xs border border-slate-200/70">
+                <img src="/pplog-.png" alt="Pig Project Rwanda Logo" className="h-11 w-auto object-contain" />
               </Link>
               <p className="text-sm font-semibold text-slate-900">
                 One Piglet. One Family. A Fund That Keeps Moving.

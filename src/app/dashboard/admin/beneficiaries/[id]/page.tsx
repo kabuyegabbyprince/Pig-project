@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin, Phone, Calendar, FileText, Activity, PiggyBank, RotateCcw, Shield, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getActiveUser } from "@/lib/active-user";
+import { FIELD_OPERATIONS_ROLES } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,11 @@ function maskNationalId(nid: string | null | undefined): string {
 }
 
 export default async function BeneficiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const activeUser = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const activeUser = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    ...FIELD_OPERATIONS_ROLES,
+  ]);
   if (!activeUser) {
     redirect("/dashboard");
   }

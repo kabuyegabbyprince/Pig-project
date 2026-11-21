@@ -195,9 +195,9 @@ export function PigRegisterManager({
             setCreateQuantity(1);
             setIsCreateOpen(true);
           }}
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-2 border border-transparent rounded-lg shadow-xs text-xs font-semibold text-white bg-[#064e3b] hover:bg-[#053d2e] transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-2 border border-transparent rounded-lg shadow-xs text-xs font-semibold text-white bg-[#101827] hover:bg-[#1f2937] transition-colors cursor-pointer"
         >
-          <Plus className="h-3.5 w-3.5" />
+          <Plus className="h-3.5 w-3.5 text-[#FF8A00]" />
           Register Pig / Save Pig
         </button>
       </div>

@@ -13,8 +13,10 @@ function toOptions<T extends { id: string; name: string; code: string | null }>(
   return rows.map(({ id, name, code }) => ({ id, name, code }));
 }
 
+import { ALL_ROLE_VALUES } from "@/lib/roles";
+
 async function requireSession() {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([...ALL_ROLE_VALUES]);
   if (!user) throw new Error("Unauthorized");
   return user;
 }

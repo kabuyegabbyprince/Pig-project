@@ -34,8 +34,8 @@ export default async function TeamPage() {
 
       <main className="app-container mx-auto max-w-7xl px-4 py-12 sm:py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Project Leadership</p>
-          <h1 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">Our Dedicated Team</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">Project Leadership</p>
+          <h1 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-[#101827]">Our Dedicated Team</h1>
           <p className="mt-3 text-sm text-slate-600">Working together on sustainable livestock empowerment, veterinary health, and community revolving funds across Rwanda.</p>
         </div>
 
@@ -52,7 +52,7 @@ export default async function TeamPage() {
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={member.photoUrl} alt={member.fullName} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-emerald-50 text-3xl font-bold text-emerald-800">
+                    <div className="flex h-full w-full items-center justify-center bg-orange-50 text-3xl font-bold text-[#101827]">
                       {member.fullName.split(" ").map((part: string) => part[0]).slice(0, 2).join("").toUpperCase() || "TM"}
                     </div>
                   )}
@@ -60,8 +60,8 @@ export default async function TeamPage() {
 
                 <div className="space-y-3 p-5">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900">{member.fullName}</h2>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">{member.role}</p>
+                    <h2 className="text-lg font-bold text-[#101827]">{member.fullName}</h2>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">{member.role}</p>
                   </div>
 
                   {member.specialization && (
@@ -73,12 +73,12 @@ export default async function TeamPage() {
                   {member.bio ? <p className="text-xs leading-relaxed text-slate-600 line-clamp-3">{member.bio}</p> : null}
 
                   <div className="flex flex-wrap gap-3 text-xs text-slate-500 pt-2 border-t border-slate-100">
-                    {member.showEmailPublic && member.email ? <a href={`mailto:${member.email}`} className="hover:text-emerald-700 transition-colors">Email</a> : null}
-                    {member.showPhonePublic && member.phone ? <a href={`tel:${member.phone}`} className="hover:text-emerald-700 transition-colors">Call</a> : null}
-                    {member.showLinkedinPublic && member.linkedinUrl ? <a href={member.linkedinUrl} target="_blank" rel="noreferrer" className="hover:text-emerald-700 transition-colors">LinkedIn</a> : null}
+                    {member.showEmailPublic && member.email ? <a href={`mailto:${member.email}`} className="hover:text-[#FF8A00] transition-colors">Email</a> : null}
+                    {member.showPhonePublic && member.phone ? <a href={`tel:${member.phone}`} className="hover:text-[#FF8A00] transition-colors">Call</a> : null}
+                    {member.showLinkedinPublic && member.linkedinUrl ? <a href={member.linkedinUrl} target="_blank" rel="noreferrer" className="hover:text-[#FF8A00] transition-colors">LinkedIn</a> : null}
                   </div>
 
-                  <Link href={`/team/${member.id}`} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors">
+                  <Link href={`/team/${member.id}`} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#FF8A00] hover:text-[#101827] transition-colors">
                     <span>View Profile</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
@@ -89,9 +89,9 @@ export default async function TeamPage() {
         )}
 
         <div className="mt-12 text-center">
-          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-[#064e3b] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#053d2e] transition-colors shadow-xs">
+          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-[#101827] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#1f2937] transition-colors shadow-xs">
             <span>Back to Home</span>
-            <ArrowRight className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3.5 w-3.5 text-[#FF8A00]" />
           </Link>
         </div>
       </main>

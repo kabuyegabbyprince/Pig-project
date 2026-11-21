@@ -4,19 +4,26 @@ export function formatRole(role?: string | null): string {
   switch (r) {
     case "SUPER_ADMIN":
     case "ADMIN":
-      return "Admin";
+      return "Super Administrator";
+    case "PROJECT_MANAGER":
+      return "Project Manager";
+    case "CELL_MANAGER":
     case "FIELD_OFFICER":
     case "EMPLOYEE":
     case "REGISTRAR":
-      return "Employee / Registrar";
+      return "Cell Manager";
+    case "COOPERATIVE_LEADER":
+      return "Cooperative Leader";
+    case "COOPERATIVE_MEMBER":
+      return "Cooperative Member";
     case "VETERINARIAN":
     case "VET":
-      return "Veterinary";
+      return "Veterinarian";
+    case "ACCOUNTANT":
+      return "Accountant";
     case "FINANCE_OFFICER":
     case "FINANCE":
-      return "Finance";
-    case "PROJECT_MANAGER":
-      return "Project Manager";
+      return "Finance Officer";
     case "TRAINER":
       return "Trainer";
     case "FUNDER":

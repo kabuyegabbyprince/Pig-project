@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function NewGalleryItemPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== "SUPER_ADMIN") {
+  if (!session || (session.user.role !== "SUPER_ADMIN" && session.user.role !== "PROJECT_MANAGER")) {
     redirect("/dashboard");
   }
 

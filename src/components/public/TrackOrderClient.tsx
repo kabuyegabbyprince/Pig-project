@@ -64,25 +64,29 @@ export function TrackOrderClient({
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f5f1] text-[#1b2d24] px-4 py-10">
+    <div className="min-h-screen bg-[#F5F5F5] text-[#101827] px-4 py-10">
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="flex items-center justify-between">
+          <Link href="/" aria-label="Pig Project Rwanda home" className="inline-flex items-center rounded-xl bg-white px-3 py-1.5 border border-slate-200 shadow-xs">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/pplog-.png" alt="Pig Project Rwanda" className="h-8 w-auto object-contain" />
+          </Link>
           <Link
             href="/store"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#dfe7df] bg-white px-3.5 py-2 text-xs font-semibold text-[#173d2e] hover:bg-[#eef3da]"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] hover:bg-orange-50"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
+            <ArrowLeft className="h-3.5 w-3.5 text-[#FF8A00]" />
             <span>Back to Marketplace</span>
           </Link>
         </div>
 
-        <div className="rounded-2xl border border-[#dfe7df] bg-white p-6 sm:p-8 shadow-sm space-y-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm space-y-5">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#5d6e64]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#FF8A00]">
               Buyer Order Tracking
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-[#173d2e]">Track Your Order</h1>
-            <p className="mt-1 text-xs text-[#5d6e64]">
+            <h1 className="mt-1 text-2xl font-bold text-[#101827]">Track Your Order</h1>
+            <p className="mt-1 text-xs text-slate-600">
               Enter your Order Number (e.g. ORD-2026-1234AB) to view live payment, processing, and dispatch status.
             </p>
           </div>
@@ -93,20 +97,20 @@ export function TrackOrderClient({
               value={orderNumber}
               onChange={(e) => setOrderNumber(e.target.value)}
               placeholder="Order # (ORD-2026-...)"
-              className="rounded-xl border border-[#dfe7df] px-3 py-2.5 text-xs focus:border-[#173d2e] focus:outline-none"
+              className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs focus:border-[#FF8A00] focus:outline-none"
             />
             <input
               value={contact}
               onChange={(e) => setContact(e.target.value)}
               placeholder="Phone or Email (optional)"
-              className="rounded-xl border border-[#dfe7df] px-3 py-2.5 text-xs focus:border-[#173d2e] focus:outline-none"
+              className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs focus:border-[#FF8A00] focus:outline-none"
             />
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#173d2e] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#102a22] disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#101827] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#1f2937] disabled:opacity-50"
             >
-              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#FF8A00]" /> : <Search className="h-3.5 w-3.5 text-[#FF8A00]" />}
               <span>Check Status</span>
             </button>
           </form>
@@ -118,16 +122,16 @@ export function TrackOrderClient({
           )}
 
           {order && (
-            <div className="rounded-2xl border border-[#dfe7df] bg-[#fcfdfc] p-5 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#dfe7df] pb-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
                 <div className="flex items-center gap-2">
-                  <PackageCheck className="h-5 w-5 text-[#173d2e]" />
+                  <PackageCheck className="h-5 w-5 text-[#FF8A00]" />
                   <div>
-                    <p className="text-sm font-bold text-[#1b2d24]">{order.orderNumber}</p>
-                    <p className="text-[11px] text-[#5d6e64]">Buyer: {order.customerName}</p>
+                    <p className="text-sm font-bold text-[#101827]">{order.orderNumber}</p>
+                    <p className="text-[11px] text-slate-500">Buyer: {order.customerName}</p>
                   </div>
                 </div>
-                <span className="rounded-full bg-[#e3efe7] px-3 py-1 text-xs font-bold text-[#173d2e]">
+                <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-[#FF8A00]">
                   {order.status}
                 </span>
               </div>
@@ -146,9 +150,9 @@ export function TrackOrderClient({
                 ))}
               </div>
 
-              <div className="flex items-center justify-between border-t border-[#dfe7df] pt-3 text-sm font-bold">
+              <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-sm font-bold">
                 <span>Total ({order.paymentMethod || "Mobile Money"})</span>
-                <span className="text-[#173d2e]">{formatRwf(order.totalAmount)}</span>
+                <span className="text-[#FF8A00]">{formatRwf(order.totalAmount)}</span>
               </div>
             </div>
           )}

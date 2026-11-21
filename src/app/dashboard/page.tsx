@@ -1,12 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-
-const normalizeRole = (role?: string | null) => {
-  if (!role) return "";
-  const value = role.replace(/^ROLE_/, "");
-  return value === "ADMIN" ? "SUPER_ADMIN" : value;
-};
+import { normalizeRoleValue } from "@/lib/roles";
 
 export default async function DashboardRedirect() {
   const session = await getServerSession(authOptions);
@@ -16,17 +11,20 @@ export default async function DashboardRedirect() {
   }
 
   const user = session.user as { role?: string };
-  const role = normalizeRole(user.role);
+  const role = normalizeRoleValue(user.role);
 
   switch (role) {
     case "SUPER_ADMIN":
     case "PROJECT_MANAGER":
       redirect("/dashboard/admin");
-    case "FIELD_OFFICER":
+    case "CELL_MANAGER":
+    case "COOPERATIVE_LEADER":
+    case "COOPERATIVE_MEMBER":
     case "TRAINER":
       redirect("/dashboard/field");
     case "VETERINARIAN":
       redirect("/dashboard/vet");
+    case "ACCOUNTANT":
     case "FINANCE_OFFICER":
       redirect("/dashboard/finance");
     case "FUNDER":

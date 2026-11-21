@@ -39,7 +39,7 @@ async function generatePigId(offset = 0) {
 }
 
 export async function createPig(formData: FormData) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER, Role.COOPERATIVE_MEMBER]);
   if (!user) throw new Error("Unauthorized");
 
   const quantityRaw = formData.get("quantity") || formData.get("pigsReceivedToday");
@@ -165,7 +165,7 @@ export async function registerPigBatch(data: {
   dateReceived?: string;
   quantity: number;
 }) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER, Role.COOPERATIVE_MEMBER]);
   if (!user) throw new Error("Unauthorized");
 
   const quantity = Math.max(1, parseInt(String(data.quantity || 1), 10) || 1);
@@ -328,7 +328,7 @@ export async function getTotalPigsAvailable(): Promise<number> {
 }
 
 export async function deletePigBatch(tags: string[]) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER, Role.COOPERATIVE_MEMBER]);
   if (!user) throw new Error("Unauthorized");
 
   if (!tags || tags.length === 0) throw new Error("No pigs specified for deletion.");
@@ -394,7 +394,7 @@ export async function updatePigBatch(data: {
   newDateReceived: string;
   newQuantity: number;
 }) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER, Role.CELL_MANAGER, Role.COOPERATIVE_LEADER, Role.COOPERATIVE_MEMBER]);
   if (!user) throw new Error("Unauthorized");
 
   const { currentTags, newDateReceived, newQuantity } = data;

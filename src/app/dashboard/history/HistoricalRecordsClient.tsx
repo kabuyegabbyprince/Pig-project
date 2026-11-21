@@ -170,7 +170,7 @@ export function HistoricalRecordsClient({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <History className="h-5 w-5 text-emerald-700" /> Historical Records
+            <History className="h-5 w-5 text-[#FF8A00]" /> Historical Records
           </h1>
           <p className="mt-1 text-xs text-slate-500">
             {isAdmin
@@ -180,7 +180,7 @@ export function HistoricalRecordsClient({
         </div>
 
         <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-          <Shield className="h-3.5 w-3.5 text-emerald-700" />
+          <Shield className="h-3.5 w-3.5 text-[#FF8A00]" />
           <span>Immutable System Audit Trail</span>
         </div>
       </div>

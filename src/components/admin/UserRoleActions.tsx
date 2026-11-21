@@ -3,16 +3,7 @@
 import { useState, useTransition } from "react";
 import { Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toggleUserActive, updateUserRole } from "@/app/actions/user";
-
-const ROLES = [
-  "SUPER_ADMIN",
-  "PROJECT_MANAGER",
-  "FIELD_OFFICER",
-  "VETERINARIAN",
-  "FINANCE_OFFICER",
-  "TRAINER",
-  "FUNDER",
-] as const;
+import { ROLE_OPTIONS, normalizeRoleValue } from "@/lib/roles";
 
 export function UserRoleActions({
   userId,
@@ -25,7 +16,7 @@ export function UserRoleActions({
   isActive: boolean;
   isCurrentUser: boolean;
 }) {
-  const [role, setRole] = useState(currentRole);
+  const [role, setRole] = useState<string>(() => normalizeRoleValue(currentRole) || currentRole);
   const [active, setActive] = useState(isActive);
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -65,11 +56,11 @@ export function UserRoleActions({
         disabled={isCurrentUser || isPending}
         onChange={(e) => handleRoleChange(e.target.value)}
         aria-label="User role"
-        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+        className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-[#101827] focus:border-[#FF8A00] focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 cursor-pointer"
       >
-        {ROLES.map((r) => (
-          <option key={r} value={r}>
-            {r}
+        {ROLE_OPTIONS.map((r) => (
+          <option key={r.value} value={r.value}>
+            {r.label}
           </option>
         ))}
       </select>
@@ -81,14 +72,14 @@ export function UserRoleActions({
         title={isCurrentUser ? "Current user status cannot be changed" : active ? "Suspend account" : "Activate account"}
         className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
           active
-            ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+            ? "border-orange-200 bg-orange-50 text-[#101827] hover:bg-orange-100"
             : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
         }`}
       >
         {isPending ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="h-3 w-3 animate-spin text-[#FF8A00]" />
         ) : active ? (
-          <ShieldCheck className="h-3 w-3" />
+          <ShieldCheck className="h-3 w-3 text-[#FF8A00]" />
         ) : (
           <ShieldAlert className="h-3 w-3" />
         )}
@@ -97,7 +88,7 @@ export function UserRoleActions({
 
       {isPending && (
         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600">
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="h-3 w-3 animate-spin text-[#FF8A00]" />
           Updating...
         </span>
       )}
@@ -105,7 +96,7 @@ export function UserRoleActions({
       {!isPending && feedback && (
         <span
           className={`text-[11px] font-medium ${
-            feedback.type === "ok" ? "text-emerald-700" : "text-rose-600"
+            feedback.type === "ok" ? "text-[#FF8A00]" : "text-rose-600"
           }`}
         >
           {feedback.text}

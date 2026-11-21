@@ -151,13 +151,13 @@ export function EcommerceManager({
                 <button
                   type="button"
                   onClick={handleCopySql}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#064e3b] px-4 py-2 text-xs font-semibold text-white hover:bg-[#053d2e] transition"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#101827] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] transition"
                 >
-                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? <Check className="h-3.5 w-3.5 text-[#FF8A00]" /> : <Copy className="h-3.5 w-3.5 text-[#FF8A00]" />}
                   <span>{copied ? "SQL Copied" : "Copy Supabase SQL Migration"}</span>
                 </button>
               </div>
-              <pre className="mt-4 max-h-80 overflow-x-auto rounded-xl border border-amber-200/80 bg-slate-950 p-4 text-xs leading-relaxed text-emerald-100">
+              <pre className="mt-4 max-h-80 overflow-x-auto rounded-xl border border-amber-200/80 bg-slate-950 p-4 text-xs leading-relaxed text-orange-100">
                 {sqlMigration}
               </pre>
             </div>
@@ -173,7 +173,7 @@ export function EcommerceManager({
         <div
           className={`rounded-xl border px-4 py-3 text-xs font-medium ${
             message.type === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              ? "border-orange-200 bg-orange-50 text-[#101827]"
               : "border-rose-200 bg-rose-50 text-rose-800"
           }`}
         >
@@ -185,7 +185,7 @@ export function EcommerceManager({
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
           <p className="text-xs font-medium text-slate-500">Catalog Products</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{initialData.products.length}</p>
+          <p className="mt-1 text-2xl font-bold text-[#101827]">{initialData.products.length}</p>
         </div>
         <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
           <p className="text-xs font-medium text-slate-500">Orders Needing Fulfillment</p>
@@ -193,7 +193,7 @@ export function EcommerceManager({
         </div>
         <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
           <p className="text-xs font-medium text-slate-500">Verified Store Revenue</p>
-          <p className="mt-1 text-2xl font-bold text-[#064e3b]">{formatRwf(initialData.totalRevenue)}</p>
+          <p className="mt-1 text-2xl font-bold text-[#FF8A00]">{formatRwf(initialData.totalRevenue)}</p>
         </div>
       </div>
 
@@ -201,11 +201,11 @@ export function EcommerceManager({
       <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-[#064e3b]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <Package className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Store Product Catalog</h2>
+              <h2 className="text-base font-bold text-[#101827]">Store Product Catalog</h2>
               <p className="text-xs text-slate-500">
                 Create and control livestock &amp; farm products synced with the E-Commerce storefront.
               </p>
@@ -216,15 +216,15 @@ export function EcommerceManager({
               href="/store"
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink className="h-3.5 w-3.5 text-[#FF8A00]" />
               <span>Preview Storefront</span>
             </Link>
             <button
               type="button"
               onClick={() => setShowAddForm((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#064e3b] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#053d2e] transition"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] transition"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5 text-[#FF8A00]" />
               <span>{showAddForm ? "Close Form" : "Add Product"}</span>
             </button>
           </div>
@@ -240,7 +240,7 @@ export function EcommerceManager({
                 name="name"
                 required
                 placeholder="e.g. Healthy Weaned Piglet"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#FF8A00] focus:outline-none"
               />
             </div>
             <div>
@@ -254,7 +254,7 @@ export function EcommerceManager({
                 min="1"
                 required
                 placeholder="45000"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#FF8A00] focus:outline-none"
               />
             </div>
             <div>
@@ -267,7 +267,7 @@ export function EcommerceManager({
                 min="0"
                 defaultValue="1"
                 required
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#FF8A00] focus:outline-none"
               />
             </div>
             <div>
@@ -277,7 +277,7 @@ export function EcommerceManager({
               <input
                 name="category"
                 placeholder="Livestock / Pork / Feed / Training Guides"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#FF8A00] focus:outline-none"
               />
             </div>
             <div>
@@ -287,7 +287,7 @@ export function EcommerceManager({
               <select
                 name="pigId"
                 defaultValue=""
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#FF8A00] focus:outline-none"
               >
                 <option value="">-- Non-tracked / General SKU --</option>
                 {initialData.clearedPigs.map((pig) => (
@@ -304,7 +304,7 @@ export function EcommerceManager({
               <input
                 name="imageUrl"
                 placeholder="https://..."
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#FF8A00] focus:outline-none"
               />
             </div>
             <div className="sm:col-span-2 lg:col-span-3">
@@ -314,16 +314,16 @@ export function EcommerceManager({
               <input
                 name="description"
                 placeholder="Short product description visible to buyers"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#FF8A00] focus:outline-none"
               />
             </div>
             <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
               <button
                 type="submit"
                 disabled={isPending}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#064e3b] px-4 py-2 text-xs font-semibold text-white hover:bg-[#053d2e] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#101827] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] disabled:opacity-50"
               >
-                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#FF8A00]" /> : null}
                 <span>Save Product</span>
               </button>
             </div>
@@ -361,7 +361,7 @@ export function EcommerceManager({
                     <td className="px-3 py-2.5 text-slate-600">{product.category || "General"}</td>
                     <td className="px-3 py-2.5">
                       {product.sourcePigTag ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-[#FF8A00]">
                           <Tag className="h-3 w-3" />
                           {product.sourcePigTag}
                         </span>
@@ -398,7 +398,7 @@ export function EcommerceManager({
                         onClick={() => handleToggleProduct(product.id)}
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                           product.isAvailable
-                            ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                            ? "bg-orange-50 text-[#FF8A00] hover:bg-orange-100"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}
                       >
@@ -457,7 +457,7 @@ export function EcommerceManager({
                     <td className="px-3 py-2.5">
                       <Link
                         href={`/dashboard/admin/ecommerce/${order.id}`}
-                        className="font-semibold text-[#064e3b] hover:underline"
+                        className="font-semibold text-[#FF8A00] hover:underline"
                       >
                         {order.orderNumber}
                       </Link>
@@ -478,7 +478,7 @@ export function EcommerceManager({
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                             order.syncedToFinance
-                              ? "bg-emerald-50 text-emerald-700"
+                              ? "bg-orange-50 text-[#FF8A00]"
                               : "bg-slate-100 text-slate-600"
                           }`}
                         >
@@ -491,7 +491,7 @@ export function EcommerceManager({
                         value={order.status}
                         disabled={isPending}
                         onChange={(e) => handleOrderStatus(order.id, e.target.value)}
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:border-emerald-600 focus:outline-none"
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:border-[#FF8A00] focus:outline-none"
                       >
                         {ORDER_STATUSES.map((st) => (
                           <option key={st} value={st}>

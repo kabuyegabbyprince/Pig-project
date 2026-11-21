@@ -4,18 +4,27 @@ import { getNextAuthSecret } from "@/lib/auth-secret";
 
 const normalizeRole = (role?: string | null) => {
   if (!role) return "";
-  const value = role.replace(/^ROLE_/, "");
-  return value === "ADMIN" ? "SUPER_ADMIN" : value;
+  const value = role.replace(/^ROLE_/, "").trim().toUpperCase();
+  if (value === "ADMIN") return "SUPER_ADMIN";
+  if (value === "FIELD_OFFICER") return "CELL_MANAGER";
+  return value;
 };
 
 const SUPER_ADMIN_ONLY_PREFIXES = [
-  "/dashboard/admin/users",
   "/dashboard/admin/settings",
   "/dashboard/admin/website",
-  "/dashboard/admin/ecommerce",
   "/dashboard/admin/audit",
   "/dashboard/admin/security",
 ];
+
+const FIELD_ROLES = new Set([
+  "CELL_MANAGER",
+  "COOPERATIVE_LEADER",
+  "COOPERATIVE_MEMBER",
+  "TRAINER",
+]);
+
+const FINANCE_ROLES = new Set(["ACCOUNTANT", "FINANCE_OFFICER"]);
 
 export default withAuth(
   function middleware(req) {
@@ -34,14 +43,23 @@ export default withAuth(
       if (role === "VETERINARIAN") {
         return NextResponse.redirect(new URL("/dashboard/vet", req.url));
       }
-      if (role === "FIELD_OFFICER" || role === "TRAINER") {
+      if (FIELD_ROLES.has(role)) {
         return NextResponse.redirect(new URL("/dashboard/field", req.url));
       }
-      if (role === "FINANCE_OFFICER") {
+      if (FINANCE_ROLES.has(role)) {
         return NextResponse.redirect(new URL("/dashboard/finance", req.url));
       }
       if (role === "FUNDER") {
         return NextResponse.redirect(new URL("/dashboard/admin/reports", req.url));
+      }
+    }
+
+    if (path.startsWith("/dashboard/admin/users")) {
+      const canCreateCoopUser =
+        path === "/dashboard/admin/users/new" &&
+        (role === "CELL_MANAGER" || role === "COOPERATIVE_LEADER");
+      if (role !== "SUPER_ADMIN" && !canCreateCoopUser) {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
 
@@ -50,10 +68,18 @@ export default withAuth(
     }
 
     if (path.startsWith("/dashboard/admin/reports")) {
-      if (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER" && role !== "FUNDER") {
+      if (
+        role !== "SUPER_ADMIN" &&
+        role !== "PROJECT_MANAGER" &&
+        role !== "ACCOUNTANT" &&
+        role !== "FUNDER"
+      ) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
-    } else if (path.startsWith("/dashboard/admin")) {
+    } else if (
+      path.startsWith("/dashboard/admin") &&
+      !path.startsWith("/dashboard/admin/users")
+    ) {
       if (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER") {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
@@ -69,8 +95,7 @@ export default withAuth(
 
     if (
       path.startsWith("/dashboard/field") &&
-      role !== "FIELD_OFFICER" &&
-      role !== "TRAINER" &&
+      !FIELD_ROLES.has(role) &&
       role !== "SUPER_ADMIN" &&
       role !== "PROJECT_MANAGER"
     ) {
@@ -79,7 +104,7 @@ export default withAuth(
 
     if (
       path.startsWith("/dashboard/finance") &&
-      role !== "FINANCE_OFFICER" &&
+      !FINANCE_ROLES.has(role) &&
       role !== "SUPER_ADMIN" &&
       role !== "PROJECT_MANAGER"
     ) {

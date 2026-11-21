@@ -15,15 +15,9 @@ import {
 
 export type { SystemSettingItem, UserPreferences };
 
-const ALL_ROLES = [
-  Role.SUPER_ADMIN,
-  Role.PROJECT_MANAGER,
-  Role.FIELD_OFFICER,
-  Role.VETERINARIAN,
-  Role.FINANCE_OFFICER,
-  Role.TRAINER,
-  Role.FUNDER,
-] as const;
+import { ALL_ROLE_VALUES } from "@/lib/roles";
+
+const ALL_ROLES = ALL_ROLE_VALUES;
 
 async function requireAdmin() {
   const user = await getActiveUser([Role.SUPER_ADMIN]);

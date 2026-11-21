@@ -188,7 +188,7 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
 }
 
 export async function createStoreProduct(formData: FormData) {
-  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
   if (!actor) return { success: false, error: "Unauthorized" };
 
   const name = String(formData.get("name") || "").trim();
@@ -273,7 +273,7 @@ export async function createStoreProduct(formData: FormData) {
 }
 
 export async function toggleProductAvailability(productId: string) {
-  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
   if (!actor) return { success: false, error: "Unauthorized" };
 
   try {
@@ -320,7 +320,7 @@ export async function toggleProductAvailability(productId: string) {
 }
 
 export async function updateProductStock(productId: string, stock: number) {
-  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
   if (!actor) return { success: false, error: "Unauthorized" };
   if (!Number.isInteger(stock) || stock < 0) {
     return { success: false, error: "Stock must be a non-negative integer." };
@@ -359,7 +359,7 @@ export async function updateProductStock(productId: string, stock: number) {
 const VALID_ORDER_STATUSES = new Set<string>(Object.values(OrderStatus));
 
 export async function updateStoreOrderStatus(orderId: string, nextStatus: string) {
-  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
   if (!actor) return { success: false, error: "Unauthorized" };
 
   if (!VALID_ORDER_STATUSES.has(nextStatus)) {

@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     }
 
     const { isFirstSuperAdminAvailable } = await getBootstrapStatus();
-    const assignedRole = isFirstSuperAdminAvailable ? Role.SUPER_ADMIN : Role.FIELD_OFFICER;
+    const assignedRole = isFirstSuperAdminAvailable ? Role.SUPER_ADMIN : Role.COOPERATIVE_MEMBER;
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let createdUser: {
@@ -207,7 +207,7 @@ export async function POST(request: Request) {
             data: {
               userId: admin.id,
               title: "New User Registered",
-              message: `${createdUser.name} (${phone || email}) signed up and was assigned default role FIELD_OFFICER. Review or promote from User Management.`,
+              message: `${createdUser.name} (${phone || email}) signed up and was assigned default role COOPERATIVE_MEMBER. Review or promote from User Management.`,
               type: NotificationType.INFO,
               relatedEntity: "USER",
               relatedEntityId: createdUser.id,

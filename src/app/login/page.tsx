@@ -16,15 +16,7 @@ import {
   Mail,
 } from "lucide-react";
 
-const STAFF_ROLES = [
-  { value: "PROJECT_MANAGER", label: "Project Manager" },
-  { value: "COOPERATIVE_LEADER", label: "Cooperative Leader" },
-  { value: "COOPERATIVE_MEMBER", label: "Cooperative Member" },
-  { value: "CELL_MANAGER", label: "Cell Manager" },
-  { value: "VETERINARIAN", label: "Veterinarian" },
-  { value: "ACCOUNTANT", label: "Accountant" },
-  { value: "FINANCE_OFFICER", label: "Finance Officer" },
-];
+import { SIGN_IN_ROLE_OPTIONS, normalizeRoleValue } from "@/lib/roles";
 
 function LoginForm() {
   const router = useRouter();
@@ -95,16 +87,21 @@ function LoginForm() {
         try {
           const sessionRes = await fetch("/api/auth/session");
           const sessionData = await sessionRes.json();
-          const userRole = sessionData?.user?.role;
+          const userRole = normalizeRoleValue(sessionData?.user?.role);
 
           let target = "/dashboard";
           if (userRole === "SUPER_ADMIN" || userRole === "PROJECT_MANAGER") {
             target = "/dashboard/admin";
-          } else if (userRole === "FIELD_OFFICER" || userRole === "TRAINER" || userRole === "COOPERATIVE_MEMBER" || userRole === "CELL_MANAGER") {
+          } else if (
+            userRole === "CELL_MANAGER" ||
+            userRole === "COOPERATIVE_LEADER" ||
+            userRole === "COOPERATIVE_MEMBER" ||
+            userRole === "TRAINER"
+          ) {
             target = "/dashboard/field";
           } else if (userRole === "VETERINARIAN") {
             target = "/dashboard/vet";
-          } else if (userRole === "FINANCE_OFFICER" || userRole === "ACCOUNTANT") {
+          } else if (userRole === "ACCOUNTANT" || userRole === "FINANCE_OFFICER") {
             target = "/dashboard/finance";
           } else if (userRole === "FUNDER") {
             target = "/dashboard/admin/reports";
@@ -138,7 +135,9 @@ function LoginForm() {
             <span>Back to public website</span>
           </Link>
           <div className="flex justify-center">
-            <img src="/pplog-.png" alt="Pig Project Rwanda" className="h-14 w-auto object-contain" />
+            <div className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2.5 shadow-xs border border-slate-200/80">
+              <img src="/pplog-.png" alt="Pig Project Rwanda" className="h-14 w-auto object-contain" />
+            </div>
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-[#101827]">
             Operations Workspace
@@ -157,8 +156,8 @@ function LoginForm() {
           )}
 
           {successMessage && !loading && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700 mt-0.5" />
+            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs font-medium text-[#101827]">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-[#FF8A00] mt-0.5" />
               <span>{successMessage}</span>
             </div>
           )}
@@ -211,7 +210,7 @@ function LoginForm() {
                   className="block w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50/50 text-[#101827] focus:bg-white focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none transition-all disabled:opacity-60 cursor-pointer"
                 >
                   <option value="">-- Select Staff Role --</option>
-                  {STAFF_ROLES.map((r) => (
+                  {SIGN_IN_ROLE_OPTIONS.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}
                     </option>
@@ -273,8 +272,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-600">
-          <Loader2 className="h-5 w-5 animate-spin mr-2 text-[#064e3b]" />
+        <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5] text-sm text-slate-600">
+          <Loader2 className="h-5 w-5 animate-spin mr-2 text-[#FF8A00]" />
           Loading sign in...
         </div>
       }

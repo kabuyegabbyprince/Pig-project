@@ -7,7 +7,13 @@ import { Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
 
 export async function createEmployeeReport(formData: FormData) {
-  const user = await getActiveUser([Role.FIELD_OFFICER, Role.SUPER_ADMIN]);
+  const user = await getActiveUser([
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.COOPERATIVE_MEMBER,
+    Role.PROJECT_MANAGER,
+    Role.SUPER_ADMIN,
+  ]);
   if (!user) {
     throw new Error("Unauthorized");
   }

@@ -7,7 +7,12 @@ import { Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
 
 export async function createBeneficiary(formData: FormData) {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.FIELD_OFFICER]);
+  const user = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+  ]);
   if (!user) {
     throw new Error("Unauthorized");
   }
@@ -126,7 +131,10 @@ export async function createBeneficiary(formData: FormData) {
   revalidatePath("/dashboard/field/beneficiaries");
   revalidatePath("/");
   redirect(
-    user.role === Role.FIELD_OFFICER
+    user.role === Role.CELL_MANAGER ||
+      user.role === Role.COOPERATIVE_LEADER ||
+      user.role === Role.COOPERATIVE_MEMBER ||
+      user.role === Role.TRAINER
       ? "/dashboard/field/beneficiaries"
       : "/dashboard/admin/beneficiaries"
   );

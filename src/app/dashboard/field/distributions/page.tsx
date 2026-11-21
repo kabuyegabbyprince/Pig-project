@@ -11,12 +11,21 @@ export const dynamic = "force-dynamic";
 export default async function FieldDistributionsPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== "FIELD_OFFICER") {
+  const allowedRoles = new Set([
+    "CELL_MANAGER",
+    "COOPERATIVE_LEADER",
+    "PROJECT_MANAGER",
+    "SUPER_ADMIN",
+  ]);
+  if (!session || !allowedRoles.has(session.user.role || "")) {
     redirect("/dashboard");
   }
 
+  const isGlobalManager =
+    session.user.role === "SUPER_ADMIN" || session.user.role === "PROJECT_MANAGER";
+
   const distributions = await prisma.pigDistribution.findMany({
-    where: { distributedById: session.user.id },
+    where: isGlobalManager ? undefined : { distributedById: session.user.id },
     orderBy: { distributionDate: "desc" },
     include: {
       pig: true,

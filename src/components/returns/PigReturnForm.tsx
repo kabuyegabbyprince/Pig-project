@@ -111,11 +111,11 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
 
       {/* Success Notification */}
       {successMessage && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-xs flex items-start gap-3">
-          <CheckCircle2 className="h-5 w-5 text-emerald-700 shrink-0 mt-0.5" />
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-xs flex items-start gap-3">
+          <CheckCircle2 className="h-5 w-5 text-[#FF8A00] shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-xs font-bold text-emerald-800">Saved Successfully</h4>
-            <p className="text-xs text-emerald-700 mt-0.5">{successMessage}</p>
+            <h4 className="text-xs font-bold text-[#101827]">Saved Successfully</h4>
+            <p className="text-xs text-[#FF8A00] mt-0.5">{successMessage}</p>
           </div>
         </div>
       )}
@@ -240,8 +240,8 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
 
             {/* 4. Number of Healthy Piglets (Automatically calculated) */}
             <div>
-              <label htmlFor="healthyPiglets" className="block text-sm font-semibold text-[#1c2b23]">
-                Number of Healthy Piglets <span className="text-xs font-normal text-[#5d6e64]">(Auto-calculated)</span>
+              <label htmlFor="healthyPiglets" className="block text-sm font-semibold text-[#101827]">
+                Number of Healthy Piglets <span className="text-xs font-normal text-slate-500">(Auto-calculated)</span>
               </label>
               <div className="relative mt-2">
                 <input
@@ -250,14 +250,14 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
                   name="healthyPiglets"
                   readOnly
                   value={numHealthy}
-                  className="block w-full rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3.5 py-2.5 text-[#166534] font-bold shadow-sm sm:text-sm cursor-not-allowed"
+                  className="block w-full rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-2.5 text-[#101827] font-bold shadow-sm sm:text-sm cursor-not-allowed"
                 />
-                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-[#16a34a]">
+                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-[#FF8A00]">
                   <ShieldCheck className="h-5 w-5" />
                 </div>
               </div>
-              <p className="mt-1.5 text-xs text-[#5d6e64]">
-                Automatically calculated as: <span className="font-semibold text-[#166534]">Total Returned ({numTotal}) − Sick Piglets ({numSick})</span>.
+              <p className="mt-1.5 text-xs text-slate-500">
+                Automatically calculated as: <span className="font-semibold text-[#FF8A00]">Total Returned ({numTotal}) − Sick Piglets ({numSick})</span>.
               </p>
             </div>
 
@@ -352,17 +352,17 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
               </div>
 
               {/* Total Healthy Piglets */}
-              <div className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] p-5 shadow-sm">
+              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[#15803d]">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
                     Total Healthy Piglets
                   </span>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#dcfce7] text-[#16a34a]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#FF8A00]">
                     <CheckCircle2 className="h-4 w-4" />
                   </div>
                 </div>
-                <p className="mt-3 text-3xl font-bold text-[#15803d]">{numHealthy}</p>
-                <p className="mt-1 text-xs text-[#166534]">Distribution-ready</p>
+                <p className="mt-3 text-3xl font-bold text-[#101827]">{numHealthy}</p>
+                <p className="mt-1 text-xs text-slate-600">Distribution-ready</p>
               </div>
             </div>
           </div>

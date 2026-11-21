@@ -8,27 +8,9 @@ import { getPhoneLookupCandidates } from "@/lib/phone-utils";
 import { getNextAuthSecret } from "@/lib/auth-secret";
 import { verifySupabaseAuthPassword } from "@/lib/supabase-auth";
 import { getBootstrapStatus, SUPER_ADMIN_BOOTSTRAPPED_KEY } from "@/lib/auth-bootstrap";
+import { normalizeRoleValue } from "@/lib/roles";
 
-const validRoles = [
-  Role.SUPER_ADMIN,
-  Role.PROJECT_MANAGER,
-  Role.COOPERATIVE_LEADER,
-  Role.COOPERATIVE_MEMBER,
-  Role.CELL_MANAGER,
-  Role.VETERINARIAN,
-  Role.ACCOUNTANT,
-  Role.FIELD_OFFICER,
-  Role.FINANCE_OFFICER,
-  Role.TRAINER,
-  Role.FUNDER,
-];
-
-const normalizeRole = (role?: string | null): Role | "" => {
-  if (!role) return "";
-  const cleanRole = role.replace(/^ROLE_/, "");
-  if (cleanRole === "ADMIN") return Role.SUPER_ADMIN;
-  return validRoles.includes(cleanRole as Role) ? (cleanRole as Role) : "";
-};
+const normalizeRole = (role?: string | null): Role | "" => normalizeRoleValue(role);
 
 type BackendLoginResponse = {
   success?: boolean;
@@ -191,7 +173,7 @@ export const authOptions: NextAuthOptions = {
                   : undefined
             );
             const assignedRole =
-              metaRole || (isFirstSuperAdminAvailable ? Role.SUPER_ADMIN : Role.FIELD_OFFICER);
+              metaRole || (isFirstSuperAdminAvailable ? Role.SUPER_ADMIN : Role.CELL_MANAGER);
             const fullName =
               typeof meta.full_name === "string" && meta.full_name.trim()
                 ? meta.full_name.trim()
@@ -285,7 +267,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           const email = String(user.email || cleanEmail).trim().toLowerCase();
-          const role = normalizeRole(user.role) || Role.FIELD_OFFICER;
+          const role = normalizeRole(user.role) || Role.CELL_MANAGER;
           const mappedUser = await prisma.user.upsert({
             where: { email },
             update: {

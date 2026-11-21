@@ -5,10 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
-import { existsSync } from "node:fs";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
-import { join } from "node:path";
+import { deleteFromGalleryBucket, uploadToGalleryBucket } from "@/lib/gallery";
 
 const fileIsAllowed = (file: File | null) => {
   if (!file || file.size === 0) return true;
@@ -25,23 +22,12 @@ const saveGalleryImage = async (file: File | null, existingImageUrl?: string | n
     throw new Error("Only JPG, PNG, and WebP images up to 5 MB are allowed.");
   }
 
-  const uploadDir = join(process.cwd(), "public", "uploads", "gallery");
-  await mkdir(uploadDir, { recursive: true });
-
-  const extension = file.name.includes(".") ? file.name.split(".").pop() || "jpg" : "jpg";
-  const fileName = `${randomUUID()}.${extension}`;
-  const filePath = join(uploadDir, fileName);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
-
-  if (existingImageUrl && existingImageUrl.startsWith("/uploads/gallery/")) {
-    const oldPath = join(process.cwd(), "public", existingImageUrl);
-    if (existsSync(oldPath)) {
-      await unlink(oldPath);
-    }
+  const publicUrl = await uploadToGalleryBucket(file);
+  if (existingImageUrl && existingImageUrl !== publicUrl) {
+    await deleteFromGalleryBucket(existingImageUrl);
   }
 
-  return `/uploads/gallery/${fileName}`;
+  return publicUrl;
 };
 
 const ensureAdminOrProjectManager = async () => {
@@ -159,12 +145,7 @@ export async function deleteGalleryItem(id: string) {
   const item = await prisma.galleryItem.findUnique({ where: { id } });
   if (!item) throw new Error("Gallery item not found.");
 
-  if (item.imageUrl && item.imageUrl.startsWith("/uploads/gallery/")) {
-    const filePath = join(process.cwd(), "public", item.imageUrl);
-    if (existsSync(filePath)) {
-      await unlink(filePath);
-    }
-  }
+  await deleteFromGalleryBucket(item.imageUrl);
 
   await prisma.galleryItem.delete({ where: { id } });
   await prisma.auditLog.create({

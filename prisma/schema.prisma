@@ -100,7 +100,7 @@ model User {
   email       String    @unique
   phone       String?   @unique
   password    String
-  role        Role      @default(FIELD_OFFICER)
+  role        Role      @default(COOPERATIVE_MEMBER)
   isActive    Boolean   @default(true) @map("active")
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())

@@ -18,7 +18,7 @@ export default async function AdminReportsPage({
 }) {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  if (!session || (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER" && role !== "FUNDER")) {
+  if (!session || (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER" && role !== "FUNDER" && role !== "ACCOUNTANT")) {
     redirect("/dashboard");
   }
 
@@ -162,9 +162,9 @@ export default async function AdminReportsPage({
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5d6d64]">Executive Reporting</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#1b2d24]">Project Summary Reports</h1>
-          <p className="mt-1 text-sm text-[#5d6e64]">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FF8A00]">Executive Reporting</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#101827]">Project Summary Reports</h1>
+          <p className="mt-1 text-sm text-slate-600">
             Official operational and financial summaries computed dynamically from primary database records.
           </p>
         </div>
@@ -175,7 +175,7 @@ export default async function AdminReportsPage({
             <select
               name="period"
               defaultValue={period}
-              className="border border-[#dfe7df] rounded-xl px-3 py-2 text-sm bg-white text-[#1b2d24] font-medium focus:outline-none focus:ring-1 focus:ring-[#173d2e]"
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-[#101827] font-medium focus:outline-none focus:ring-1 focus:ring-[#FF8A00]"
             >
               <option value="today">Today</option>
               <option value="month">This Month</option>
@@ -184,7 +184,7 @@ export default async function AdminReportsPage({
             </select>
             <button
               type="submit"
-              className="bg-[#173d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#102a22] transition"
+              className="bg-[#101827] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#1f2937] transition"
             >
               Update Report
             </button>
@@ -193,9 +193,9 @@ export default async function AdminReportsPage({
           <a
             href="/api/finance/export"
             download
-            className="inline-flex items-center gap-1.5 border border-[#dfe7df] bg-white text-[#173d2e] px-4 py-2 rounded-xl text-sm font-semibold shadow-sm hover:bg-[#f3f5f1] transition"
+            className="inline-flex items-center gap-1.5 border border-slate-200 bg-white text-[#101827] px-4 py-2 rounded-xl text-sm font-semibold shadow-sm hover:bg-orange-50 transition"
           >
-            <Download className="w-4 h-4" /> Export Financials
+            <Download className="w-4 h-4 text-[#FF8A00]" /> Export Financials
           </a>
         </div>
       </div>
@@ -203,55 +203,55 @@ export default async function AdminReportsPage({
       {/* 5-Pillar Comprehensive Summary */}
       <div className="space-y-6">
         {/* Pillar 1: Livestock */}
-        <div className="rounded-[24px] border border-[#dfe7df] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3 border-b border-[#dfe7df] pb-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef3da] text-[#536334]">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-[#FF8A00]">
               <PiggyBank className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-[#1b2d24]">Livestock Dynamics</h2>
-              <p className="text-xs text-[#5d6e64]">Registry influx, distribution execution, and currently available herd.</p>
+              <h2 className="text-lg font-bold text-[#101827]">Livestock Dynamics</h2>
+              <p className="text-xs text-slate-500">Registry influx, distribution execution, and currently available herd.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4">
-              <span className="text-xs font-semibold uppercase text-[#5d6d64]">Pigs Received in Period</span>
-              <p className="mt-2 text-2xl font-bold text-[#1b2d24]">{pigsReceived}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">Pigs Received in Period</span>
+              <p className="mt-2 text-2xl font-bold text-[#101827]">{pigsReceived}</p>
             </div>
-            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4">
-              <span className="text-xs font-semibold uppercase text-[#5d6d64]">Pigs Distributed to Families</span>
-              <p className="mt-2 text-2xl font-bold text-[#173d2e]">{pigsDistributed}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">Pigs Distributed to Families</span>
+              <p className="mt-2 text-2xl font-bold text-[#FF8A00]">{pigsDistributed}</p>
             </div>
-            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4">
-              <span className="text-xs font-semibold uppercase text-[#5d6d64]">Available Healthy Herd</span>
-              <p className="mt-2 text-2xl font-bold text-[#536334]">{pigsAvailable}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">Available Healthy Herd</span>
+              <p className="mt-2 text-2xl font-bold text-[#101827]">{pigsAvailable}</p>
             </div>
           </div>
         </div>
 
         {/* Pillar 2: Beneficiaries */}
-        <div className="rounded-[24px] border border-[#dfe7df] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3 border-b border-[#dfe7df] pb-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e3efe7] text-[#173d2e]">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-[#FF8A00]">
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-[#1b2d24]">Beneficiary Outreach</h2>
-              <p className="text-xs text-[#5d6e64]">Vulnerable households enrolled in the livestock fund programme.</p>
+              <h2 className="text-lg font-bold text-[#101827]">Beneficiary Outreach</h2>
+              <p className="text-xs text-slate-500">Vulnerable households enrolled in the livestock fund programme.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4">
-              <span className="text-xs font-semibold uppercase text-[#5d6d64]">New Registrations</span>
-              <p className="mt-2 text-2xl font-bold text-[#1b2d24]">{beneficiariesRegistered}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">New Registrations</span>
+              <p className="mt-2 text-2xl font-bold text-[#101827]">{beneficiariesRegistered}</p>
             </div>
-            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4">
-              <span className="text-xs font-semibold uppercase text-[#5d6d64]">Total Families Enrolled</span>
-              <p className="mt-2 text-2xl font-bold text-[#173d2e]">{totalBeneficiaries}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">Total Families Enrolled</span>
+              <p className="mt-2 text-2xl font-bold text-[#FF8A00]">{totalBeneficiaries}</p>
             </div>
-            <div className="rounded-xl border border-[#dfe7df] bg-[#fcfdfc] p-4">
-              <span className="text-xs font-semibold uppercase text-[#5d6d64]">Families Supported with Pigs</span>
-              <p className="mt-2 text-2xl font-bold text-[#2c5a43]">{totalDistributionsCount}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">Families Supported with Pigs</span>
+              <p className="mt-2 text-2xl font-bold text-[#101827]">{totalDistributionsCount}</p>
             </div>
           </div>
         </div>

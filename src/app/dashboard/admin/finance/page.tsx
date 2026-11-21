@@ -63,13 +63,13 @@ export default async function FinancePage() {
         </div>
         <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-[#d9e1d8] p-5">
           <div className="flex items-center">
-            <div className="flex-shrink-0 bg-green-50 rounded-md p-3">
-              <ArrowUpRight className="h-6 w-6 text-green-600" />
+            <div className="flex-shrink-0 bg-orange-50 rounded-md p-3">
+              <ArrowUpRight className="h-6 w-6 text-[#FF8A00]" />
             </div>
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-[#5d6e64] truncate">Total Income</dt>
-                <dd className="text-xl font-semibold font-serif text-green-600">{formatRwf(totals.income)}</dd>
+                <dd className="text-xl font-semibold font-serif text-[#FF8A00]">{formatRwf(totals.income)}</dd>
               </dl>
             </div>
           </div>
@@ -114,7 +114,7 @@ export default async function FinancePage() {
                       <div className="text-xs text-[#5d6e64] truncate max-w-xs">{t.description}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`text-sm font-bold ${t.type === 'INCOME' ? 'text-[#FF8A00]' : 'text-red-600'}`}>
                         {t.type === 'INCOME' ? '+' : '-'}{formatRwf(t.amount)}
                       </span>
                     </td>
