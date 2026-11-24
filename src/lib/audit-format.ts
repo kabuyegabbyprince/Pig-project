@@ -77,6 +77,14 @@ export function formatModule(entity: string): string {
     case "CELL":
     case "VILLAGE":
       return "Locations";
+    case "STORE_PRODUCT":
+      return "Gebyian Stock";
+    case "STORE_ORDER":
+      return "Gebyian Orders";
+    case "COOPERATIVE_STOCK_REPORT":
+      return "Coop Stock Reports";
+    case "CELL_FEED_SALE":
+      return "Animal Food Sales";
     default:
       return entity.replace(/_/g, " ");
   }
@@ -114,6 +122,25 @@ export function formatActivity(action: string, entity: string): string {
     return a === "CREATED" ? "System Setting Created" : "System Setting Updated";
   }
 
+  if (e === "STORE_PRODUCT") {
+    if (a === "CREATED") return "Stock Product Added";
+    if (a === "UPDATED") return "Stock Product Updated";
+    if (a === "PRICING_AND_DISCOUNT_UPDATED") return "Stock Price & Discount Updated";
+    if (a === "STOCK_UPDATED") return "Stock Quantity Updated";
+    if (a === "PUBLISHED") return "Stock Product Published";
+    if (a === "UNPUBLISHED") return "Stock Product Hidden";
+    if (a === "DELETED") return "Stock Product Deleted";
+  }
+  if (e === "STORE_ORDER") {
+    if (a === "ORDER_PLACED") return "New Gebyian Order Placed";
+    return "Order Status Updated";
+  }
+  if (e === "CELL_FEED_SALE") {
+    if (a === "CELL_FEED_SALE_RECORDED") return "Animal Food Sale Recorded";
+    if (a === "CELL_FEED_SALE_VERIFIED") return "Animal Food Sale Verified";
+    if (a === "CELL_FEED_SALE_REJECTED") return "Animal Food Sale Rejected";
+  }
+
   return `${a.charAt(0) + a.slice(1).toLowerCase()} ${formatModule(entity)}`;
 }
 
@@ -130,6 +157,8 @@ export function getRecordReference(log: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pv = log.previousValue as Record<string, any> | null;
 
+  if (nv?.orderNumber) return nv.orderNumber;
+  if (nv?.saleNumber) return nv.saleNumber;
   if (nv?.tagNumber) return nv.tagNumber;
   if (nv?.beneficiaryNumber) return nv.beneficiaryNumber;
   if (nv?.transactionId) return nv.transactionId;
@@ -138,6 +167,7 @@ export function getRecordReference(log: {
   if (nv?.tags && Array.isArray(nv.tags) && nv.tags.length > 0) {
     return nv.tags[0];
   }
+  if (pv?.name) return pv.name;
   if (pv?.email) return pv.email;
   if (pv?.tagNumber) return pv.tagNumber;
 
@@ -228,6 +258,25 @@ export function formatChangeDescription(log: {
   if (entity.includes("SETTING")) {
     if (action === "RESET") return `Restored system setting '${log.entityId}' to factory default value`;
     return `Configured system setting '${log.entityId}' to value '${nv?.value ?? ""}'`;
+  }
+
+  if (entity === "STORE_PRODUCT") {
+    const prodName = nv?.name || pv?.name || log.entityId;
+    if (action === "CREATED") {
+      return `Added stock product "${prodName}" (${nv?.stock ?? 0} units at ${Number(nv?.price || 0).toLocaleString()} RWF)`;
+    }
+    if (action === "UPDATED" || action === "PRICING_AND_DISCOUNT_UPDATED") {
+      return `Updated "${prodName}" — stock: ${nv?.stock ?? "unchanged"}, price: ${Number(nv?.price || 0).toLocaleString()} RWF`;
+    }
+    if (action === "STOCK_UPDATED") {
+      return `Adjusted stock for "${prodName}" from ${pv?.stock ?? "?"} to ${nv?.stock ?? "?"} units`;
+    }
+    if (action === "PUBLISHED" || action === "UNPUBLISHED") {
+      return `${action === "PUBLISHED" ? "Published" : "Hidden"} "${prodName}" on Gebyian Website`;
+    }
+    if (action === "DELETED") {
+      return `Deleted stock product "${prodName}" (had ${pv?.stock ?? 0} units at ${Number(pv?.price || 0).toLocaleString()} RWF)`;
+    }
   }
 
   // Fallback

@@ -8,14 +8,11 @@ import {
   ArrowRight,
   Bell,
   ClipboardList,
-  ExternalLink,
   Package,
   Percent,
   PiggyBank,
   ShoppingBag,
-  Tag,
   Wallet,
-  Wheat,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
@@ -29,7 +26,7 @@ export default async function GebyianManagerDashboard() {
   }
 
   const [overview, unreadAlertsCount, recentAlerts] = await Promise.all([
-    getEcommerceOverview(),
+    getEcommerceOverview({ includeClearedPigs: false }),
     prisma.notification.count({ where: { userId: actor.id, isRead: false } }),
     prisma.notification.findMany({
       where: { userId: actor.id },
@@ -68,7 +65,7 @@ export default async function GebyianManagerDashboard() {
       title: "Animal Food SKUs",
       value: feedProducts.filter((p) => p.isAvailable && p.stock > 0).length,
       sub: `${feedProducts.length} total feed SKUs`,
-      icon: Wheat,
+      icon: Package,
       tone: "bg-slate-100 text-[#101827]",
     },
     {
@@ -115,35 +112,6 @@ export default async function GebyianManagerDashboard() {
     },
   ];
 
-  const gebyianModules = [
-    {
-      title: "Cooperative Stock Intake",
-      description: "Review pigs reported by Cell Managers and set official stock, price & discounts.",
-      href: "/dashboard/admin/ecommerce#coop-reports",
-      icon: ClipboardList,
-      badge: pendingReports.length > 0 ? `${pendingReports.length} pending` : undefined,
-    },
-    {
-      title: "Animals & Food Catalog",
-      description: "Create, stock, price, and apply time-limited discounts on Animals & Animal Food.",
-      href: "/dashboard/admin/ecommerce#catalog",
-      icon: Tag,
-    },
-    {
-      title: "Customer Orders & Dispatch",
-      description: "Confirm MoMo/Bank payments, print receipts, and update delivery status.",
-      href: "/dashboard/admin/ecommerce#orders",
-      icon: ShoppingBag,
-      badge: overview.pendingOrdersCount > 0 ? `${overview.pendingOrdersCount} active` : undefined,
-    },
-    {
-      title: "Cell Feed Sales Monitor",
-      description: "Monitor Animal Food sold by Cell Managers and Finance Officer verification.",
-      href: "/dashboard/admin/ecommerce#feed-sales",
-      icon: Wheat,
-    },
-  ];
-
   return (
     <div className="space-y-8 pb-12">
       {/* Header */}
@@ -163,19 +131,18 @@ export default async function GebyianManagerDashboard() {
 
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href="/dashboard/admin/ecommerce"
+            href="/dashboard/admin/ecommerce/animals"
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#1f2937] transition"
           >
             <ShoppingBag className="h-3.5 w-3.5 text-[#FF8A00]" />
-            <span>Open Gebyian Network Control</span>
+            <span>Manage Animal Stock</span>
           </Link>
           <Link
-            href="/store"
-            target="_blank"
+            href="/dashboard/admin/ecommerce/animal-food"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] shadow-xs hover:border-[#FF8A00] hover:bg-orange-50/40 transition"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-[#FF8A00]" />
-            <span>Live Storefront</span>
+            <Package className="h-3.5 w-3.5 text-[#FF8A00]" />
+            <span>Manage Animal Food Stock</span>
           </Link>
         </div>
       </div>
@@ -187,12 +154,12 @@ export default async function GebyianManagerDashboard() {
             <div>
               <p className="font-bold">Gebyian Network Tables Not Provisioned Yet</p>
               <p className="text-xs text-amber-900/90 mt-0.5">
-                Open Gebyian Network Control to copy the SQL migration script and run it in Supabase SQL Editor.
+                Open Gebyian Stock to copy the SQL migration script and run it in Supabase SQL Editor.
               </p>
             </div>
           </div>
           <Link
-            href="/dashboard/admin/ecommerce"
+            href="/dashboard/admin/ecommerce/animals"
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white shrink-0"
           >
             <span>Open Setup SQL</span>
@@ -222,44 +189,6 @@ export default async function GebyianManagerDashboard() {
         ))}
       </div>
 
-      {/* Gebyian Modules */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-bold text-[#101827]">Gebyian Network Management</h2>
-          <p className="text-xs text-slate-500">
-            Part 1 (Animals Marketplace) &amp; Part 2 (Animal Food &amp; Feed Supplies)
-          </p>
-        </div>
-        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-          {gebyianModules.map(({ title, description, href, icon: Icon, badge }) => (
-            <Link
-              key={title}
-              href={href}
-              prefetch={false}
-              className="group flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs hover:border-[#FF8A00] hover:shadow-sm transition-all"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {badge && (
-                      <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-[#FF8A00]">
-                        {badge}
-                      </span>
-                    )}
-                    <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:translate-x-0.5 group-hover:text-[#FF8A00] transition-all" />
-                  </div>
-                </div>
-                <h3 className="mt-3 text-sm font-bold text-[#101827]">{title}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
       {/* Queues: Pending Cooperative Stock Reports & Active Buyer Orders */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Pending Cooperative Stock Reports */}
@@ -272,7 +201,7 @@ export default async function GebyianManagerDashboard() {
               </h2>
             </div>
             <Link
-              href="/dashboard/admin/ecommerce#coop-reports"
+              href="/dashboard/admin/ecommerce/animals#coop-reports"
               className="text-xs font-semibold text-[#FF8A00] hover:underline"
             >
               Manage All
@@ -295,7 +224,7 @@ export default async function GebyianManagerDashboard() {
                     </p>
                   </div>
                   <Link
-                    href="/dashboard/admin/ecommerce#coop-reports"
+                    href="/dashboard/admin/ecommerce/animals#coop-reports"
                     className="shrink-0 rounded-lg bg-[#101827] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#1f2937]"
                   >
                     Set Price &amp; List
@@ -316,7 +245,7 @@ export default async function GebyianManagerDashboard() {
               </h2>
             </div>
             <Link
-              href="/dashboard/admin/ecommerce#orders"
+              href="/dashboard/admin/ecommerce/animals-orders#orders"
               className="text-xs font-semibold text-[#FF8A00] hover:underline"
             >
               All Orders
@@ -370,7 +299,7 @@ export default async function GebyianManagerDashboard() {
               </h2>
             </div>
             <Link
-              href="/dashboard/admin/ecommerce#catalog"
+              href="/dashboard/admin/ecommerce/animals-orders#stock-alerts"
               className="text-xs font-semibold text-[#FF8A00] hover:underline"
             >
               Adjust Stock
@@ -397,7 +326,7 @@ export default async function GebyianManagerDashboard() {
                       p.stock <= 0 ? "bg-rose-50 text-rose-700" : "bg-orange-50 text-[#FF8A00]"
                     }`}
                   >
-                    {p.stock <= 0 ? "Out of stock" : `${p.stock} left`}
+                    {p.stock <= 0 ? "STOCKED OUT" : `${p.stock} left`}
                   </span>
                 </div>
               ))}
@@ -414,7 +343,7 @@ export default async function GebyianManagerDashboard() {
               </h2>
             </div>
             <Link
-              href="/dashboard/admin/notifications"
+              href="/dashboard/admin/ecommerce/animals-orders#alerts"
               className="text-xs font-semibold text-[#FF8A00] hover:underline"
             >
               View All

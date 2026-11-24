@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import type { GalleryItem, TeamMember } from "@prisma/client";
+import { GEBYIAN_WEBSITE_URL } from "@/lib/config";
 
 type HeroData = {
   title: string;
@@ -36,12 +37,13 @@ interface HomePageClientProps {
 }
 
 const NAV_LINKS = [
-  { href: "#about",       label: "About" },
-  { href: "#how-it-works",label: "How It Works" },
-  { href: "#impact",      label: "Impact" },
-  { href: "/gallery",     label: "Gallery" },
-  { href: "/team",        label: "Our Team" },
-  { href: "#stories",     label: "Stories" },
+  { href: "#about",             label: "About" },
+  { href: "#how-it-works",      label: "How It Works" },
+  { href: "#impact",            label: "Impact" },
+  { href: GEBYIAN_WEBSITE_URL,  label: "Gebyian Website" },
+  { href: "/gallery",           label: "Gallery" },
+  { href: "/team",              label: "Our Team" },
+  { href: "#stories",           label: "Stories" },
 ];
 
 export function HomePageClient({
@@ -126,16 +128,21 @@ export function HomePageClient({
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-0.5">
-            {NAV_LINKS.map(({ href, label }) => (
-              <Link
-                key={label}
-                href={href}
-                onClick={(e) => handleHashLinkClick(e, href)}
-                className="rounded-full px-3.5 py-1.5 text-sm font-medium text-white/85 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                {label}
-              </Link>
-            ))}
+            {NAV_LINKS.map(({ href, label }) => {
+              const isExternal = href.startsWith("http");
+              return (
+                <Link
+                  key={label}
+                  href={href}
+                  target={isExternal ? "_blank" : undefined}
+                  rel={isExternal ? "noopener noreferrer" : undefined}
+                  onClick={(e) => handleHashLinkClick(e, href)}
+                  className="rounded-full px-3.5 py-1.5 text-sm font-medium text-white/85 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Right actions */}
@@ -177,19 +184,24 @@ export function HomePageClient({
             }}
           >
             <nav className="mx-auto max-w-7xl flex flex-col gap-1 px-4 py-4">
-              {NAV_LINKS.map(({ href, label }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  onClick={(e) => {
-                    handleHashLinkClick(e, href);
-                    setMobileOpen(false);
-                  }}
-                  className="rounded-lg px-4 py-2.5 text-sm font-medium text-white/85 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  {label}
-                </Link>
-              ))}
+              {NAV_LINKS.map(({ href, label }) => {
+                const isExternal = href.startsWith("http");
+                return (
+                  <Link
+                    key={label}
+                    href={href}
+                    target={isExternal ? "_blank" : undefined}
+                    rel={isExternal ? "noopener noreferrer" : undefined}
+                    onClick={(e) => {
+                      handleHashLinkClick(e, href);
+                      setMobileOpen(false);
+                    }}
+                    className="rounded-lg px-4 py-2.5 text-sm font-medium text-white/85 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
               <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}

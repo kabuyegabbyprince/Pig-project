@@ -1,10 +1,10 @@
-Build a production-grade, mobile-responsive E-Commerce Storefront web application for "Gebyian Network" (Pig Project Rwanda Marketplace) using Next.js (App Router), TypeScript, and Tailwind CSS that connects directly to and stays synchronized with the Pig Project Control Panel managed by Project Manager (Gebyian).
+Build a production-grade, mobile-responsive E-Commerce Storefront web application for "Gebyian Network" (Pig Project Rwanda Website & Marketplace) using Next.js (App Router), TypeScript, and Tailwind CSS that connects directly to and stays synchronized with the Pig Project Control Panel managed by Project Manager (Gebyian).
 
 ======================================================================
 1. BRANDING & VISUAL DESIGN SYSTEM
 ======================================================================
 Match the Pig Project Control Panel color palette:
-- Platform Name: Gebyian Network
+- Platform Name: Gebyian Network (E-Commerce Website)
 - Managing Role: Project Manager (Gebyian) (`PROJECT_MANAGER`) & Super Administrator (`SUPER_ADMIN`)
 - Deep Navy (#101827): Primary headings, primary buttons, navbar accents, dark cards/footer.
 - Amazon Orange (#FF8A00): Brand highlights, discount badges, active category tabs, CTAs, price accents.
@@ -27,18 +27,25 @@ Only the 7 active system roles operate across the Control Panel and Gebyian Netw
 
 Gebyian Network is divided into TWO clear operational parts sharing the same Supabase database:
 
-PART A — ANIMALS MARKETPLACE (`store_section = 'ANIMALS'`, Live Pigs & Livestock Sold to Public Buyers):
-1. Cooperative Stock Reporting by Cell Manager (`CELL_MANAGER`):
-   - Whenever a `COOPERATIVE_LEADER` or `COOPERATIVE_MEMBER` has pigs ready to sell, the `CELL_MANAGER` submits a Cooperative Animal Stock Report (`cooperative_stock_reports`) from the Control Panel.
-2. Pricing, Discounts & Stock Control by `Project Manager (Gebyian)` (`PROJECT_MANAGER`):
-   - `Project Manager (Gebyian)` (with `SUPER_ADMIN` oversight) reviews cooperative stock reports, sets the official stock quantity, base RWF price, and active product discount (`discount_percent`, `discount_price`, `discount_label`, `discount_starts_at`, `discount_ends_at`), and publishes animals into `store_products` with `store_section = 'ANIMALS'`.
+PART A — ANIMALS MARKETPLACE (`store_section = 'ANIMALS'`, Live Pigs & Livestock Sold on the Website):
+1. Cooperative Stock Reporting — EXCLUSIVELY BY `CELL_MANAGER`:
+   - Cooperative Members (`COOPERATIVE_MEMBER`) and Cooperative Leaders/Admins (`COOPERATIVE_LEADER`) are NOT allowed to submit stock-to-sell requests directly to Project Manager (Gebyian).
+   - Whenever a Cooperative Member or Cooperative Leader has pigs ready to sell, ONLY the `CELL_MANAGER` submits a Cooperative Animal Stock Report (`cooperative_stock_reports`) on their behalf.
+2. Simple Stock, Image, Price & Optional Discount Setup by `Project Manager (Gebyian)`:
+   - `Project Manager (Gebyian)` (with `SUPER_ADMIN` oversight) reviews Cell Manager stock reports or directly adds products via a streamlined form containing:
+     * Product Name (`name`)
+     * Description (`description`)
+     * Local PC Image upload saved to Supabase Storage bucket **`product-image`** (`imageUrl`)
+     * Initial Stock quantity (`stock`)
+     * Price per unit in RWF (`price`) with a **Bargainable (`is_negotiable`)** toggle
+     * Optional Discount (`discount_percent`, `discount_price`, `discount_label`, `discount_ends_at`)
 3. Public Buyer Cart, Checkout & Order Message to `Project Manager (Gebyian)`:
-   - Public buyers browse Gebyian Network (`store_section = 'ANIMALS'`, `isAvailable = true`, `stock > 0`), add animals to their shopping cart, and submit their order.
+   - Public buyers browse the Gebyian Website (`/store` / storefront), add animals to their shopping cart, and submit their order.
    - Placing an order writes to `store_orders` + `store_order_items` (or calls `POST <CONTROL_PANEL_BASE_URL>/api/ecommerce/orders`) AND immediately sends an order notification message in `"Notification"` to `Project Manager (Gebyian)` (`PROJECT_MANAGER`) and `SUPER_ADMIN`.
 
 PART B — ANIMAL FOOD & FEED SUPPLIES (`store_section = 'ANIMAL_FOOD'`):
 1. Stock, Price & Discount Control by `Project Manager (Gebyian)`:
-   - `Project Manager (Gebyian)` creates animal feed/supply products in `store_products` (`store_section = 'ANIMAL_FOOD'`) and sets their stock, RWF price, and optional discount.
+   - `Project Manager (Gebyian)` creates animal feed/supply products in `store_products` (`store_section = 'ANIMAL_FOOD'`) with `product-image` upload, stock, bargainable RWF unit price, and optional discount.
 2. Cell Manager Field Feed Sales:
    - `CELL_MANAGER` sells animal food/feed in their cell (`akagari`) using the stock and prices set by `Project Manager (Gebyian)`.
    - Every Cell Manager feed sale decrements `store_products.stock`, inserts into `cell_feed_sales`, and records a `SUBMITTED` `FinanceTransaction` (`"Animal Feed Sales"`).
@@ -46,7 +53,7 @@ PART B — ANIMAL FOOD & FEED SUPPLIES (`store_section = 'ANIMAL_FOOD'`):
    - `FINANCE_OFFICER` reviews every Cell Manager animal food sale report inside the Control Panel Finance dashboard, verifies or rejects each transaction, and views full revenue & cell sales reports.
 
 ======================================================================
-3. SHARED DATABASE & ENVIRONMENT VARIABLES (.env)
+3. SHARED DATABASE, STORAGE BUCKET & ENVIRONMENT VARIABLES (.env)
 ======================================================================
 Connect to the SAME Supabase project used by the Pig Project Control Panel:
 - SUPABASE_URL=<same SUPABASE_URL as Control Panel>
@@ -55,80 +62,53 @@ Connect to the SAME Supabase project used by the Pig Project Control Panel:
 - CONTROL_PANEL_BASE_URL=<URL of Pig Project Control Panel>
 - ECOMMERCE_WEBHOOK_SECRET=<same secret as Control Panel>
 
-Shared Supabase tables (kept in sync via Control Panel `db.sql` & `update.sql`):
+Shared Supabase tables & bucket (kept in sync via `update.sql`):
+0) Supabase Storage Bucket **`product-image`** (public read, `service_role` upload/manage):
+   - Stores product images uploaded directly from local PC by `Project Manager (Gebyian)` / `SUPER_ADMIN`.
 1) `store_products`:
-   - `id`, `name`, `description`, `price` NUMERIC(12,2), `discount_percent` NUMERIC(5,2) DEFAULT 0, `discount_price` NUMERIC(12,2), `discount_label` TEXT, `discount_starts_at` TIMESTAMP(3), `discount_ends_at` TIMESTAMP(3), `stock` INTEGER DEFAULT 0, `low_stock_threshold` INTEGER DEFAULT 3, `category` TEXT (`Livestock`, `Pork Products`, `Animal Feed`, `Supplements`, `Supplies`, `Training Guides`), `store_section` TEXT DEFAULT `'ANIMALS'` (`'ANIMALS'` | `'ANIMAL_FOOD'`), `imageUrl`, `isAvailable` BOOLEAN, `pig_id`, `source_pig_tag`, `createdAt`, `updatedAt`.
+   - `id`, `name`, `description`, `price` NUMERIC(12,2), `is_negotiable` BOOLEAN NOT NULL DEFAULT false, `discount_percent` NUMERIC(5,2) DEFAULT 0, `discount_price` NUMERIC(12,2), `discount_label` TEXT, `discount_starts_at` TIMESTAMP(3), `discount_ends_at` TIMESTAMP(3), `stock` INTEGER DEFAULT 0, `low_stock_threshold` INTEGER DEFAULT 3, `category` TEXT (`Livestock`, `Pork Products`, `Animal Feed`, `Supplements`, `Supplies`, `Training Guides`), `store_section` TEXT DEFAULT `'ANIMALS'` (`'ANIMALS'` | `'ANIMAL_FOOD'`), `imageUrl`, `isAvailable` BOOLEAN, `pig_id`, `source_pig_tag`, `createdAt`, `updatedAt`.
 2) `store_orders`:
    - `id`, `order_number` (UNIQUE, "ORD-YYYY-XXXX"), `customer_name`, `customer_email`, `customer_phone`, `shipping_address`, `subtotal_amount` NUMERIC(12,2), `discount_total` NUMERIC(12,2) DEFAULT 0, `total_amount` NUMERIC(12,2), `status` ("PENDING" | "PAID" | "PROCESSING" | "DISPATCHED" | "COMPLETED" | "CANCELLED"), `payment_method`, `payment_reference`, `notes`, `created_at`, `updated_at`.
 3) `store_order_items`:
    - `id`, `order_id`, `product_id`, `quantity`, `original_price` NUMERIC(12,2), `discount_amount` NUMERIC(12,2) DEFAULT 0, `price` NUMERIC(12,2) (discounted unit price paid).
 4) `cooperative_stock_reports`:
-   - Animal stock reported by Cell Manager (`reported_by_id`, `cooperative_owner_name`, `cooperative_owner_role`, `cell_name`, `animal_title`, `pig_count`, `estimated_weight_kg`, `suggested_price`, `pig_id`, `source_pig_tag`, `status` PENDING|LISTED|REJECTED, `listed_product_id`).
+   - Animal stock reported EXCLUSIVELY by Cell Manager (`reported_by_id`, `cooperative_owner_name`, `cooperative_owner_role`, `cell_name`, `animal_title`, `pig_count`, `estimated_weight_kg`, `suggested_price`, `pig_id`, `source_pig_tag`, `status` PENDING|LISTED|REJECTED, `listed_product_id`).
 5) `cell_feed_sales`:
    - Animal food sales recorded by Cell Manager (`sale_number`, `product_id`, `product_name`, `buyer_name`, `buyer_phone`, `quantity`, `unit_price`, `total_amount`, `payment_method`, `sold_by_id`, `sold_by_name`, `cell_name`, `finance_transaction_id`, `verification_status` PENDING|VERIFIED|REJECTED).
 
 ======================================================================
-4. STRICT STOCK & INVENTORY LOGIC (NO OVERSELLING)
+4. STRICT STOCK, PERSISTENT PRODUCT NAMES & STOCKED-OUT ALERTS
 ======================================================================
-1. Storefront Visibility:
-   - Default catalog displays `store_section = 'ANIMALS'` (with a clear secondary tab/view for `ANIMAL_FOOD` showing Cell Manager distribution availability) where `isAvailable = true` and `stock > 0`.
-   - Show stock badges: "In Stock", "Only X left!" (`stock <= low_stock_threshold`), or "Out of Stock".
-   - Quantity pickers in product detail and cart MUST cap at live `product.stock`.
+1. Persistent Product Names & Stocked-Out State:
+   - Once a product name is added to `store_products`, its name remains permanently in the system even when stock drops to `0`.
+   - When `stock === 0`, the product is clearly marked **`STOCKED OUT`** in both the Gebyian Manager dashboard and on the public Gebyian Website (`Add to Cart` disabled, sorted after in-stock items) so Project Manager (Gebyian) can easily restock it without re-entering details.
+   - Whenever stock reaches `0` (via buyer checkout, Cell Manager feed sale, or manager stock edit), the system MUST immediately create a `WARNING` alert (`"Stocked Out Alert: <Product Name>"`) in `"Notification"` for `Project Manager (Gebyian)` (`PROJECT_MANAGER`) and `SUPER_ADMIN`.
 2. Live Re-Validation & Atomic Stock Deduction (`POST /api/orders`):
    - Re-fetch every cart item using `SUPABASE_SERVICE_ROLE_KEY` (or call `POST <CONTROL_PANEL_BASE_URL>/api/ecommerce/orders`).
    - Reject (`409 Conflict`) if `isAvailable === false`, `stock < requestedQuantity`, or if a `pig_id`-linked pig fails veterinary clearance.
-   - Perform an atomic conditional stock decrement (`stock = stock - quantity` only when `stock >= quantity` and `isAvailable = true`); roll back on conflict.
-   - When a `pig_id`-linked SKU hits `stock === 0`, mark `"Pig".status = 'SOLD'`.
-   - Immediately insert `"Notification"` alerts for BOTH `Project Manager (Gebyian)` (`PROJECT_MANAGER`) and `SUPER_ADMIN` with order number, buyer contact, items, and total RWF.
+   - Decrement `store_products.stock` atomically (`stock >= quantity`) and mark `"Pig".status = 'SOLD'` when `pig_id`-linked stock hits `0`.
+   - Immediately notify `Project Manager (Gebyian)` (`PROJECT_MANAGER`) and `SUPER_ADMIN` with order details AND stocked-out alert if any item reached `0`.
 3. Stock Restoration on Cancellation:
    - Cancelled orders restore `store_products.stock += item.quantity` and restore linked `"Pig".status = 'ACTIVE'`.
 
 ======================================================================
-5. MANAGER-CONTROLLED PRODUCT DISCOUNT LOGIC
+5. BARGAINABLE PRICING & OPTIONAL MANAGER DISCOUNT LOGIC
 ======================================================================
-1. Effective Price Calculation Utility (`getEffectiveProductPrice(product, now)`):
+1. Bargainable Unit Pricing:
+   - Products with `is_negotiable = true` show a `"Bargainable"` badge alongside the unit RWF price so buyers know the listed unit price is negotiable with Project Manager (Gebyian).
+2. Effective Price Calculation Utility (`getEffectiveProductPrice(product, now)`):
    - Active check: `(discount_starts_at == null || now >= discount_starts_at)` AND `(discount_ends_at == null || now <= discount_ends_at)`.
    - If active and `discount_price > 0 && discount_price < price`: `effectivePrice = discount_price`, `discountPercent = Math.round(((price - discount_price) / price) * 100)`.
    - Else if active and `discount_percent > 0 && discount_percent <= 90`: `effectivePrice = Math.round(price * (1 - discount_percent / 100))`.
    - Otherwise: `effectivePrice = price`.
-2. Storefront Display:
-   - Show Amazon Orange (`#FF8A00`) discount badge (`-{percent}%` + optional `discount_label`), crossed-out original RWF price (`line-through`), bold discounted RWF price, and cart/checkout savings breakdown ("Original Subtotal", "Discount Savings", "Final Total").
-   - Include an "On Sale / Discounted" filter chip in the catalog.
-3. Server-Side Price Integrity:
-   - `POST /api/orders` MUST compute `original_price`, `discount_amount`, final `price`, `discount_total`, and `total_amount` exclusively on the server from DB `store_products` and active discount windows—never trusting browser-submitted prices.
+3. Storefront Display & Server Integrity:
+   - Show Amazon Orange (`#FF8A00`) discount badge (`-{percent}%` + optional `discount_label`), crossed-out original RWF price (`line-through`), bold discounted RWF price, and cart/checkout savings breakdown.
+   - `POST /api/orders` computes all pricing strictly on the server from DB `store_products`.
 
 ======================================================================
-6. GEBYIAN NETWORK PAGES & API INTEGRATION
+6. GEBYIAN NETWORK WEBSITE PAGES & API INTEGRATION
 ======================================================================
-- `/` (Gebyian Network Catalog): Split cleanly with tabs for **Animals Marketplace** (`store_section = 'ANIMALS'`) and **Animal Food & Supplies** (`store_section = 'ANIMAL_FOOD'`, noting Cell Manager cell distribution or local pickup), plus search bar, "On Sale" toggle, category filters, `Vet-Cleared Tag` badge when `source_pig_tag` exists, discount badge, live stock badge, and Add to Cart for Animals.
-- `/products/[id]` (Product Detail): Full photo, description, vet traceability badge, live stock count, active discount & expiry notice, quantity picker capped at `stock`, Add to Cart.
-- `/cart` & `/checkout`: Persistent cart synced with live DB prices & stock, customer checkout form (`customerName`, `customerPhone` / `customerEmail`, `shippingAddress`, `paymentMethod`: MTN MoMo, Airtel Money, Bank Transfer, Cash on Delivery, `notes`). On submit, calls `POST <CONTROL_PANEL_BASE_URL>/api/ecommerce/orders` (or creates order in Supabase + notifies `Project Manager (Gebyian)` & `SUPER_ADMIN`).
-- `/track` (Order Tracker): Lookup by `order_number` + phone/email showing real-time status (`PENDING` -> `PAID` -> `PROCESSING` -> `DISPATCHED` -> `COMPLETED` / `CANCELLED`), itemized receipt with discount savings, and payment confirmation status synced from `Project Manager (Gebyian)`.
-- `/api/payments/callback`: Verifies payment amount against `store_orders.total_amount` and forwards `PAID` / `CANCELLED` webhooks to `POST <CONTROL_PANEL_BASE_URL>/api/ecommerce/webhooks/payment` with `x-webhook-secret`.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- `/store` (Gebyian Website Catalog): Split cleanly with tabs for **Animals Marketplace** (`store_section = 'ANIMALS'`) and **Animal Food & Supplies** (`store_section = 'ANIMAL_FOOD'`), plus search bar, "On Sale" toggle, category filters, `Bargainable` price badge, `Vet-Cleared Tag` badge, discount badge, live stock / `STOCKED OUT` badge, `product-image` photos, and Add to Cart.
+- `/store/track` (Order Tracker): Lookup by `order_number` + phone/email showing real-time status (`PENDING` -> `PAID` -> `PROCESSING` -> `DISPATCHED` -> `COMPLETED` / `CANCELLED`), itemized receipt with discount savings, and payment confirmation status synced from `Project Manager (Gebyian)`.
+- `/api/ecommerce/products` & `/api/ecommerce/orders`: Real-time JSON endpoints backed by shared Supabase tables.
+- `/api/ecommerce/webhooks/payment`: Verifies payment amount against `store_orders.total_amount` with `x-webhook-secret`.

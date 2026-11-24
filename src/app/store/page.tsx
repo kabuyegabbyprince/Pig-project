@@ -10,16 +10,22 @@ export default async function PublicStorePage() {
 
   try {
     const rows = await prisma.storeProduct.findMany({
-      where: { isAvailable: true, stock: { gt: 0 } },
+      where: { isAvailable: true },
       orderBy: { createdAt: "desc" },
     });
-    products = rows.map((p) => {
+    const sorted = [...rows].sort((a, b) => {
+      if (a.stock > 0 && b.stock === 0) return -1;
+      if (a.stock === 0 && b.stock > 0) return 1;
+      return 0;
+    });
+    products = sorted.map((p) => {
       const pricing = getEffectiveProductPrice(p);
       return {
         id: p.id,
         name: p.name,
         description: p.description,
         price: p.price.toString(),
+        isNegotiable: Boolean((p as { isNegotiable?: boolean }).isNegotiable),
         effectivePrice: pricing.effectivePrice.toFixed(2),
         hasActiveDiscount: pricing.hasActiveDiscount,
         discountPercent: pricing.discountPercentApplied,

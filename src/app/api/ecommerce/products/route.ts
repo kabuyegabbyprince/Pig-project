@@ -9,16 +9,21 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category")?.trim();
     const section = searchParams.get("section")?.trim().toUpperCase();
-    const includeOutOfStock = searchParams.get("includeOutOfStock") === "true";
+    const inStockOnly = searchParams.get("inStockOnly") === "true" || searchParams.get("includeOutOfStock") === "false";
 
-    const products = await prisma.storeProduct.findMany({
+    const rows = await prisma.storeProduct.findMany({
       where: {
         isAvailable: true,
-        ...(includeOutOfStock ? {} : { stock: { gt: 0 } }),
+        ...(inStockOnly ? { stock: { gt: 0 } } : {}),
         ...(category && category !== "ALL" ? { category } : {}),
         ...(section === "ANIMALS" || section === "ANIMAL_FOOD" ? { storeSection: section } : {}),
       },
       orderBy: { createdAt: "desc" },
+    });
+    const products = [...rows].sort((a, b) => {
+      if (a.stock > 0 && b.stock === 0) return -1;
+      if (a.stock === 0 && b.stock > 0) return 1;
+      return 0;
     });
 
     return NextResponse.json({
@@ -31,6 +36,7 @@ export async function GET(req: NextRequest) {
           name: p.name,
           description: p.description,
           price: p.price.toString(),
+          isNegotiable: Boolean((p as { isNegotiable?: boolean }).isNegotiable),
           effectivePrice: pricing.effectivePrice.toFixed(2),
           hasActiveDiscount: pricing.hasActiveDiscount,
           discountPercent: pricing.discountPercentApplied,

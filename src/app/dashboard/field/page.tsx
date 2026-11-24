@@ -18,25 +18,24 @@ export default async function FieldDashboard() {
   const role = normalizeRoleValue(session?.user?.role);
 
   const quickActions = [
-    ...(role === "CELL_MANAGER" || role === "SUPER_ADMIN" || role === "PROJECT_MANAGER"
+    ...(role === "CELL_MANAGER" || role === "SUPER_ADMIN"
       ? [
           {
             label: "Animal Food Sales (Cell)",
             href: "/dashboard/field/feed-sales",
             icon: Wheat,
           },
-        ]
-      : []),
-    ...(role === "CELL_MANAGER" ||
-    role === "COOPERATIVE_LEADER" ||
-    role === "SUPER_ADMIN" ||
-    role === "PROJECT_MANAGER"
-      ? [
           {
             label: "Report Animal Stock to Sell",
             href: "/dashboard/field/stock-reports",
             icon: Tag,
           },
+        ]
+      : []),
+    ...(role === "CELL_MANAGER" ||
+    role === "COOPERATIVE_LEADER" ||
+    role === "SUPER_ADMIN"
+      ? [
           {
             label: "Cooperative Team",
             href: "/dashboard/field/cooperative",

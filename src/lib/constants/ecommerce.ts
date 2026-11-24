@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS "store_products" (
   "name" TEXT NOT NULL,
   "description" TEXT,
   "price" NUMERIC(12, 2) NOT NULL,
+  "is_negotiable" BOOLEAN NOT NULL DEFAULT false,
   "discount_percent" NUMERIC(5, 2) NOT NULL DEFAULT 0,
   "discount_price" NUMERIC(12, 2),
   "discount_label" TEXT,
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS "store_products" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "is_negotiable" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_percent" NUMERIC(5, 2) NOT NULL DEFAULT 0;
 ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_price" NUMERIC(12, 2);
 ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_label" TEXT;
@@ -165,5 +167,19 @@ DO $$ BEGIN
     CREATE POLICY "Public read published team"
       ON "team_members" FOR SELECT TO anon, authenticated USING ("is_published" = true);
   END IF;
+END $$;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('product-image', 'product-image', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Public read product-image" ON storage.objects;
+  CREATE POLICY "Public read product-image"
+    ON storage.objects FOR SELECT TO public USING (bucket_id = 'product-image');
+  DROP POLICY IF EXISTS "Service role manage product-image" ON storage.objects;
+  CREATE POLICY "Service role manage product-image"
+    ON storage.objects FOR ALL TO service_role USING (bucket_id = 'product-image') WITH CHECK (bucket_id = 'product-image');
+EXCEPTION WHEN others THEN null;
 END $$;
 `;

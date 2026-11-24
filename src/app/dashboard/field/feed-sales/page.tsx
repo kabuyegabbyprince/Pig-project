@@ -39,6 +39,7 @@ export default async function FieldFeedSalesPage() {
         name: p.name,
         description: p.description,
         price: p.price.toString(),
+        isNegotiable: Boolean((p as { isNegotiable?: boolean }).isNegotiable),
         effectivePrice: pricing.effectivePrice.toFixed(2),
         hasActiveDiscount: pricing.hasActiveDiscount,
         discountPercent: pricing.discountPercentApplied,

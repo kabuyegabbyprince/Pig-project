@@ -32,7 +32,6 @@ import {
   Tag,
   Wheat,
   Bell,
-  ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
@@ -73,9 +72,22 @@ const adminNavigation: NavItem[] = [
 
 const gebyianNavigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard/gebyian", icon: LayoutDashboard },
-  { name: "Gebyian Network", href: "/dashboard/admin/ecommerce", icon: ShoppingBag },
-  { name: "Order & Stock Alerts", href: "/dashboard/admin/notifications", icon: Bell },
-  { name: "Live Storefront", href: "/store", icon: ExternalLink },
+  {
+    name: "Gebyian Stock",
+    icon: ShoppingBag,
+    children: [
+      { name: "Animal", href: "/dashboard/admin/ecommerce/animals" },
+      { name: "Animal Food", href: "/dashboard/admin/ecommerce/animal-food" },
+    ],
+  },
+  {
+    name: "Order & Stock Alerts",
+    icon: Bell,
+    children: [
+      { name: "Animals Order & Stock", href: "/dashboard/admin/ecommerce/animals-orders" },
+      { name: "Animal Foods Stock & Order", href: "/dashboard/admin/ecommerce/animal-food-orders" },
+    ],
+  },
   { name: "Activity History", href: "/dashboard/history", icon: History },
   { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
 ];
@@ -83,7 +95,7 @@ const gebyianNavigation: NavItem[] = [
 const fieldNavigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard/field", icon: LayoutDashboard },
   { name: "Cooperative Team", href: "/dashboard/field/cooperative", icon: UsersRound, cellManagerOrLeaderOnly: true },
-  { name: "Report Animal Stock", href: "/dashboard/field/stock-reports", icon: Tag, cellManagerOrLeaderOnly: true },
+  { name: "Report Animal Stock", href: "/dashboard/field/stock-reports", icon: Tag, cellManagerOnly: true },
   { name: "Animal Food Sales", href: "/dashboard/field/feed-sales", icon: Wheat, cellManagerOnly: true },
   { name: "Pig Register", href: "/dashboard/field/pigs/new", icon: PlusCircle },
   { name: "Beneficiaries", href: "/dashboard/field/beneficiaries", icon: Users },
@@ -199,7 +211,7 @@ export function DashboardShell({
                     <Link
                       key={sub.name}
                       href={sub.href}
-                      prefetch={false}
+                      prefetch={role === "PROJECT_MANAGER" ? true : false}
                       onClick={() => isMobile && setMobileMenuOpen(false)}
                       className={`flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
                         isSubActive
@@ -224,7 +236,7 @@ export function DashboardShell({
         <Link
           key={item.name}
           href={item.href!}
-          prefetch={false}
+          prefetch={role === "PROJECT_MANAGER" ? true : false}
           onClick={() => isMobile && setMobileMenuOpen(false)}
           className={`group flex items-center rounded-lg px-3 ${
             isMobile ? "py-2.5" : "py-2"

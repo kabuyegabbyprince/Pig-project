@@ -144,6 +144,7 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     updatedAt: "updated_at",
   },
   storeProduct: {
+    isNegotiable: "is_negotiable",
     discountPercent: "discount_percent",
     discountPrice: "discount_price",
     discountLabel: "discount_label",

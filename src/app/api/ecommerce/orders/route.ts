@@ -239,15 +239,17 @@ export async function POST(req: NextRequest) {
         data: { stock: remainingStock },
       });
 
-      if (line.product.pigId && remainingStock === 0) {
-        await prisma.pig.update({
-          where: { id: line.product.pigId },
-          data: { status: PigStatus.SOLD },
-        });
+      if (remainingStock === 0) {
+        if (line.product.pigId) {
+          await prisma.pig.update({
+            where: { id: line.product.pigId },
+            data: { status: PigStatus.SOLD },
+          });
+        }
       }
     }
 
-    // Notify both Project Manager (Gebyian) and Super Admins about incoming Gebyian Network order
+    // Notify both Project Manager (Gebyian) and Super Admins about incoming Gebyian Network order & any stocked-out items
     const managers = await prisma.user.findMany({
       where: {
         role: { in: [Role.PROJECT_MANAGER, Role.SUPER_ADMIN] },
@@ -260,15 +262,31 @@ export async function POST(req: NextRequest) {
       const itemSummary = verifiedLines
         .map((l) => `${l.quantity}x ${l.product.name}`)
         .join(", ");
-      await prisma.notification.createMany({
-        data: managers.map((m) => ({
+      const orderAlerts = managers.map((m) => ({
+        userId: m.id,
+        type: NotificationType.INFO,
+        title: `New Gebyian Network Order ${orderNumber}`,
+        message: `${customerName} (${customerPhone || customerEmail || "no contact"}) ordered ${itemSummary} totaling ${totalAmount.toString()} RWF (${paymentMethod}).`,
+        relatedEntity: "STORE_ORDER",
+        relatedEntityId: createdOrder.id,
+      }));
+
+      const stockedOutLines = verifiedLines.filter(
+        (l) => Math.max(0, l.product.stock - l.quantity) === 0
+      );
+      const stockOutAlerts = stockedOutLines.flatMap((l) =>
+        managers.map((m) => ({
           userId: m.id,
-          type: NotificationType.INFO,
-          title: `New Gebyian Network Order ${orderNumber}`,
-          message: `${customerName} (${customerPhone || customerEmail || "no contact"}) ordered ${itemSummary} totaling ${totalAmount.toString()} RWF (${paymentMethod}).`,
-          relatedEntity: "STORE_ORDER",
-          relatedEntityId: createdOrder.id,
-        })),
+          type: NotificationType.WARNING,
+          title: `Stocked Out Alert: ${l.product.name}`,
+          message: `"${l.product.name}" reached 0 stock after order ${orderNumber}. Its item name remains in Gebyian Network marked Stocked Out for restocking.`,
+          relatedEntity: "STORE_PRODUCT",
+          relatedEntityId: l.product.id,
+        }))
+      );
+
+      await prisma.notification.createMany({
+        data: [...orderAlerts, ...stockOutAlerts],
       });
     }
 

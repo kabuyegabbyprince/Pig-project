@@ -76,8 +76,8 @@ export function CellStockReportClient({
           Report Cooperative Animal Stock to Sell
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          When Cooperative Leaders or Cooperative Members have pigs ready to sell, report their stock here so the
-          Project Manager (Gebyian) can set official stock, pricing, and discounts for buyers on Gebyian Network.
+          Submitted exclusively by Cell Managers when Cooperative Members or Cooperative Leaders have pigs ready to sell
+          (cooperative members &amp; admins do not submit directly). Project Manager (Gebyian) reviews your report and sets official stock, bargainable price &amp; discounts on Gebyian Website.
         </p>
       </div>
 

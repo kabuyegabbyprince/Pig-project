@@ -14,7 +14,8 @@ import {
 } from "@prisma/client";
 import { prisma, isSupabaseTableMissingError } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
-import { checkPigVetClearance } from "@/lib/vet-clearance";
+import { checkPigVetClearance, getClearedPigsForSale } from "@/lib/vet-clearance";
+import { uploadToProductImageBucket } from "@/lib/product-images";
 import { applyStoreOrderStatusChange } from "@/lib/ecommerce-service";
 import { getEffectiveProductPrice } from "@/lib/ecommerce-pricing";
 
@@ -30,6 +31,7 @@ export type SerializedStoreProduct = {
   name: string;
   description: string | null;
   price: string;
+  isNegotiable: boolean;
   effectivePrice: string;
   hasActiveDiscount: boolean;
   discountPercent: number;
@@ -63,6 +65,7 @@ export type SerializedStoreOrder = {
   notes: string | null;
   createdAt: string;
   itemCount: number;
+  sections: ("ANIMALS" | "ANIMAL_FOOD")[];
   syncedToFinance: boolean;
   refundedToFinance: boolean;
 };
@@ -122,6 +125,7 @@ function serializeProduct(p: Awaited<ReturnType<typeof prisma.storeProduct.findM
     name: p.name,
     description: p.description,
     price: p.price.toString(),
+    isNegotiable: Boolean((p as { isNegotiable?: boolean }).isNegotiable),
     effectivePrice: pricing.effectivePrice.toFixed(2),
     hasActiveDiscount: pricing.hasActiveDiscount,
     discountPercent: pricing.discountPercentApplied,
@@ -140,9 +144,43 @@ function serializeProduct(p: Awaited<ReturnType<typeof prisma.storeProduct.findM
   };
 }
 
-export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
+async function notifyManagersStockedOut(
+  productName: string,
+  productId: string,
+  source: string
+) {
   try {
-    const [products, orders, syncedTransactions, healthyPigs, stockReports, feedSales] =
+    const managers = await prisma.user.findMany({
+      where: {
+        role: { in: [Role.PROJECT_MANAGER, Role.SUPER_ADMIN] },
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (managers.length === 0) return;
+
+    await prisma.notification.createMany({
+      data: managers.map((m) => ({
+        userId: m.id,
+        type: NotificationType.WARNING,
+        title: `Stocked Out Alert: ${productName}`,
+        message: `"${productName}" has reached 0 units in stock (${source}). Its item name remains saved in Gebyian Network marked Stocked Out so you can restock it anytime.`,
+        relatedEntity: "STORE_PRODUCT",
+        relatedEntityId: productId,
+      })),
+    });
+  } catch (err) {
+    console.error("Failed to send stock-out notification:", err);
+  }
+}
+
+export async function getEcommerceOverview(options?: {
+  includeClearedPigs?: boolean;
+}): Promise<EcommerceOverviewData> {
+  const includeClearedPigs = options?.includeClearedPigs !== false;
+  try {
+    const [products, orders, syncedTransactions, stockReports, feedSales] =
       await Promise.all([
         prisma.storeProduct.findMany({ orderBy: { createdAt: "desc" } }),
         prisma.storeOrder.findMany({
@@ -155,21 +193,6 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
             deletedAt: null,
           },
           select: { transactionId: true, reference: true },
-        }),
-        prisma.pig.findMany({
-          where: {
-            deletedAt: null,
-            currentBeneficiaryId: null,
-            healthStatus: PigHealthStatus.HEALTHY,
-            status: { in: [PigStatus.ACTIVE, PigStatus.REGISTERED] },
-          },
-          orderBy: { tagNumber: "asc" },
-          select: {
-            id: true,
-            tagNumber: true,
-            breed: true,
-            currentWeight: true,
-          },
         }),
         prisma.cooperativeStockReport
           .findMany({ orderBy: { createdAt: "desc" }, take: 50 })
@@ -190,6 +213,10 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
         .map((t) => t.transactionId)
     );
 
+    const productSectionMap = new Map<string, "ANIMALS" | "ANIMAL_FOOD">(
+      products.map((p) => [p.id, p.storeSection === "ANIMAL_FOOD" ? "ANIMAL_FOOD" : "ANIMALS"])
+    );
+
     let totalRev = new Prisma.Decimal(0);
     let pendingOrdersCount = 0;
 
@@ -208,6 +235,16 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
       ) {
         pendingOrdersCount += 1;
       }
+      const sectionsSet = new Set<"ANIMALS" | "ANIMAL_FOOD">();
+      for (const item of order.items ?? []) {
+        const pid = (item as { productId?: string | null }).productId;
+        if (pid && productSectionMap.has(pid)) {
+          sectionsSet.add(productSectionMap.get(pid)!);
+        }
+      }
+      if (sectionsSet.size === 0) {
+        sectionsSet.add("ANIMALS");
+      }
       return {
         id: order.id,
         orderNumber: order.orderNumber,
@@ -224,25 +261,18 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
         notes: order.notes,
         createdAt: order.createdAt.toISOString(),
         itemCount: order.items?.length ?? 0,
+        sections: Array.from(sectionsSet),
         syncedToFinance: syncedSet.has(`ECOM-${order.orderNumber}`),
         refundedToFinance: refundSet.has(`ECOM-REFUND-${order.orderNumber}`),
       };
     });
 
-    const linkedPigIds = new Set(products.map((p) => p.pigId).filter(Boolean));
-    const clearedPigs: SerializedClearedPigOption[] = [];
-    for (const p of healthyPigs) {
-      if (linkedPigIds.has(p.id)) continue;
-      const clearance = await checkPigVetClearance(p.id, "SALE");
-      if (clearance.cleared) {
-        clearedPigs.push({
-          id: p.id,
-          tagNumber: p.tagNumber,
-          breed: p.breed,
-          currentWeight: p.currentWeight,
-        });
-      }
-    }
+    const linkedPigIds = new Set(
+      products.map((p) => p.pigId).filter((id): id is string => Boolean(id))
+    );
+    const clearedPigs: SerializedClearedPigOption[] = includeClearedPigs
+      ? await getClearedPigsForSale(linkedPigIds)
+      : [];
 
     return {
       tableMissing: false,
@@ -315,7 +345,12 @@ export async function createStoreProduct(formData: FormData) {
   const category = String(formData.get("category") || "").trim() || null;
   const rawSection = String(formData.get("storeSection") || "ANIMALS").trim().toUpperCase();
   const storeSection = rawSection === "ANIMAL_FOOD" ? "ANIMAL_FOOD" : "ANIMALS";
-  const imageUrl = String(formData.get("imageUrl") || "").trim() || null;
+  const imageFile = formData.get("image") as File | null;
+  const imageUrlInput = String(formData.get("imageUrl") || "").trim() || null;
+  const isNegotiable =
+    formData.get("isNegotiable") === "on" ||
+    formData.get("isNegotiable") === "true" ||
+    formData.get("isNegotiable") === "1";
   const pigIdRaw = String(formData.get("pigId") || "").trim() || null;
   const reportId = String(formData.get("reportId") || "").trim() || null;
 
@@ -350,6 +385,18 @@ export async function createStoreProduct(formData: FormData) {
   const discountEndsAt = discountEndsAtRaw ? new Date(`${discountEndsAtRaw}T23:59:59.000Z`) : null;
   const lowStockThreshold = Math.max(1, Number.parseInt(lowStockRaw, 10) || 3);
 
+  let imageUrl = imageUrlInput;
+  if (imageFile && imageFile.size > 0) {
+    try {
+      imageUrl = await uploadToProductImageBucket(imageFile);
+    } catch (uploadErr) {
+      return {
+        success: false,
+        error: uploadErr instanceof Error ? uploadErr.message : "Failed to upload product image.",
+      };
+    }
+  }
+
   let sourcePigTag: string | null = null;
   if (pigIdRaw) {
     const clearance = await checkPigVetClearance(pigIdRaw, "SALE");
@@ -365,29 +412,41 @@ export async function createStoreProduct(formData: FormData) {
     if (stock === 0) stock = 1;
   }
 
+  const baseData = {
+    name,
+    description,
+    price: new Prisma.Decimal(priceStr),
+    discountPercent: new Prisma.Decimal(discountPercentNum.toFixed(2)),
+    discountPrice:
+      discountPriceNum !== null ? new Prisma.Decimal(discountPriceNum.toFixed(2)) : null,
+    discountLabel,
+    discountEndsAt,
+    stock,
+    lowStockThreshold,
+    category:
+      category ||
+      (storeSection === "ANIMAL_FOOD" ? "Animal Feed" : "Livestock"),
+    storeSection,
+    imageUrl,
+    isAvailable: true,
+    pigId: pigIdRaw,
+    sourcePigTag,
+  };
+
   try {
-    const product = await prisma.storeProduct.create({
-      data: {
-        name,
-        description,
-        price: new Prisma.Decimal(priceStr),
-        discountPercent: new Prisma.Decimal(discountPercentNum.toFixed(2)),
-        discountPrice:
-          discountPriceNum !== null ? new Prisma.Decimal(discountPriceNum.toFixed(2)) : null,
-        discountLabel,
-        discountEndsAt,
-        stock,
-        lowStockThreshold,
-        category:
-          category ||
-          (storeSection === "ANIMAL_FOOD" ? "Animal Feed" : pigIdRaw ? "Livestock" : "Livestock"),
-        storeSection,
-        imageUrl,
-        isAvailable: true,
-        pigId: pigIdRaw,
-        sourcePigTag,
-      },
-    });
+    let product;
+    try {
+      product = await prisma.storeProduct.create({
+        data: { ...baseData, isNegotiable },
+      });
+    } catch (colErr) {
+      const msg = colErr instanceof Error ? colErr.message : "";
+      if (/is_negotiable/i.test(msg)) {
+        product = await prisma.storeProduct.create({ data: baseData });
+      } else {
+        throw colErr;
+      }
+    }
 
     if (reportId) {
       await prisma.cooperativeStockReport
@@ -411,21 +470,31 @@ export async function createStoreProduct(formData: FormData) {
         entityId: product.id,
         newValue: {
           name,
+          description,
           storeSection,
           price: priceStr,
+          isNegotiable,
           discountPercent: discountPercentNum,
           discountPrice: discountPriceNum,
+          discountLabel,
           stock,
           category: product.category,
+          imageUrl,
           pigId: pigIdRaw,
           sourcePigTag,
         },
       },
     });
 
+    revalidatePath("/dashboard/gebyian");
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/ecommerce/animals");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food");
+    revalidatePath("/dashboard/admin/ecommerce/animals-orders");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food-orders");
     revalidatePath("/dashboard/field/feed-sales");
     revalidatePath("/dashboard/field/stock-reports");
+    revalidatePath("/dashboard/history");
     revalidatePath("/dashboard/admin");
     revalidatePath("/store");
     return { success: true };
@@ -435,6 +504,254 @@ export async function createStoreProduct(formData: FormData) {
     }
     console.error("Failed to create store product:", err);
     return { success: false, error: "Failed to create store product." };
+  }
+}
+
+export async function updateStoreProduct(formData: FormData) {
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
+  if (!actor) return { success: false, error: "Unauthorized" };
+
+  const productId = String(formData.get("productId") || "").trim();
+  const name = String(formData.get("name") || "").trim();
+  const description = String(formData.get("description") || "").trim() || null;
+  const priceStr = String(formData.get("price") || "").trim();
+  const stockStr = String(formData.get("stock") || "0").trim();
+  const category = String(formData.get("category") || "").trim() || null;
+  const rawSection = String(formData.get("storeSection") || "").trim().toUpperCase();
+  const imageFile = formData.get("image") as File | null;
+  const imageUrlInput = String(formData.get("imageUrl") || "").trim() || null;
+  const isNegotiable =
+    formData.get("isNegotiable") === "on" ||
+    formData.get("isNegotiable") === "true" ||
+    formData.get("isNegotiable") === "1";
+  const pigIdRaw = String(formData.get("pigId") || "").trim() || null;
+
+  const discountPercentRaw = String(formData.get("discountPercent") || "0").trim();
+  const discountPriceRaw = String(formData.get("discountPrice") || "").trim();
+  const discountLabel = String(formData.get("discountLabel") || "").trim() || null;
+  const discountEndsAtRaw = String(formData.get("discountEndsAt") || "").trim();
+
+  if (!productId) return { success: false, error: "Missing product ID." };
+  if (name.length < 2) return { success: false, error: "Product name is required." };
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(priceStr) || Number(priceStr) <= 0) {
+    return { success: false, error: "Enter a valid positive RWF price." };
+  }
+  const stock = Number.parseInt(stockStr, 10);
+  if (Number.isNaN(stock) || stock < 0) {
+    return { success: false, error: "Stock must be 0 or greater." };
+  }
+
+  const discountPercentNum = Number(discountPercentRaw || 0);
+  if (Number.isNaN(discountPercentNum) || discountPercentNum < 0 || discountPercentNum > 90) {
+    return { success: false, error: "Discount percentage must be between 0 and 90." };
+  }
+  const discountPriceNum = discountPriceRaw ? Number(discountPriceRaw) : null;
+  if (
+    discountPriceNum !== null &&
+    (Number.isNaN(discountPriceNum) || discountPriceNum <= 0 || discountPriceNum >= Number(priceStr))
+  ) {
+    return { success: false, error: "Promo discount price must be positive and below base price." };
+  }
+  const discountEndsAt = discountEndsAtRaw ? new Date(`${discountEndsAtRaw}T23:59:59.000Z`) : null;
+
+  try {
+    const existing = await prisma.storeProduct.findUnique({ where: { id: productId } });
+    if (!existing) return { success: false, error: "Product not found." };
+
+    const storeSection =
+      rawSection === "ANIMAL_FOOD"
+        ? "ANIMAL_FOOD"
+        : rawSection === "ANIMALS"
+          ? "ANIMALS"
+          : existing.storeSection;
+
+    let imageUrl = imageUrlInput ?? existing.imageUrl ?? null;
+    if (imageFile && imageFile.size > 0) {
+      try {
+        imageUrl = await uploadToProductImageBucket(imageFile);
+      } catch (uploadErr) {
+        return {
+          success: false,
+          error: uploadErr instanceof Error ? uploadErr.message : "Failed to upload product image.",
+        };
+      }
+    }
+
+    let sourcePigTag = existing.sourcePigTag ?? null;
+    if (pigIdRaw !== (existing.pigId ?? null)) {
+      if (pigIdRaw) {
+        const clearance = await checkPigVetClearance(pigIdRaw, "SALE");
+        if (!clearance.cleared || !clearance.pig) {
+          return {
+            success: false,
+            error:
+              clearance.reason ||
+              "Selected pig has not passed veterinary clearance and cannot be listed for sale.",
+          };
+        }
+        sourcePigTag = clearance.pig.tagNumber;
+      } else {
+        sourcePigTag = null;
+      }
+    }
+
+    const baseData = {
+      name,
+      description,
+      price: new Prisma.Decimal(Number(priceStr).toFixed(2)),
+      discountPercent: new Prisma.Decimal(discountPercentNum.toFixed(2)),
+      discountPrice:
+        discountPriceNum !== null ? new Prisma.Decimal(discountPriceNum.toFixed(2)) : null,
+      discountLabel,
+      discountEndsAt:
+        discountEndsAt && !Number.isNaN(discountEndsAt.getTime()) ? discountEndsAt : null,
+      stock,
+      category:
+        category ||
+        existing.category ||
+        (storeSection === "ANIMAL_FOOD" ? "Animal Feed" : "Livestock"),
+      storeSection,
+      imageUrl,
+      pigId: pigIdRaw,
+      sourcePigTag,
+    };
+
+    try {
+      await prisma.storeProduct.update({
+        where: { id: productId },
+        data: { ...baseData, isNegotiable },
+      });
+    } catch (colErr) {
+      const msg = colErr instanceof Error ? colErr.message : "";
+      if (/is_negotiable/i.test(msg)) {
+        await prisma.storeProduct.update({ where: { id: productId }, data: baseData });
+      } else {
+        throw colErr;
+      }
+    }
+
+    if (stock === 0 && existing.stock > 0) {
+      await notifyManagersStockedOut(name, productId, "Manager Stock Update");
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: "UPDATED",
+        entity: "STORE_PRODUCT",
+        entityId: productId,
+        previousValue: {
+          name: existing.name,
+          description: existing.description,
+          storeSection: existing.storeSection,
+          price: existing.price.toString(),
+          isNegotiable: Boolean((existing as { isNegotiable?: boolean }).isNegotiable),
+          discountPercent: existing.discountPercent?.toString() ?? "0",
+          discountPrice: existing.discountPrice ? existing.discountPrice.toString() : null,
+          stock: existing.stock,
+          category: existing.category,
+          imageUrl: existing.imageUrl,
+          sourcePigTag: existing.sourcePigTag ?? null,
+        },
+        newValue: {
+          name,
+          description,
+          storeSection,
+          price: Number(priceStr).toFixed(2),
+          isNegotiable,
+          discountPercent: discountPercentNum,
+          discountPrice: discountPriceNum,
+          discountLabel,
+          stock,
+          category: baseData.category,
+          imageUrl,
+          pigId: pigIdRaw,
+          sourcePigTag,
+        },
+      },
+    });
+
+    revalidatePath("/dashboard/gebyian");
+    revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/ecommerce/animals");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food");
+    revalidatePath("/dashboard/admin/ecommerce/animals-orders");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food-orders");
+    revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/dashboard/history");
+    revalidatePath("/store");
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to update store product:", err);
+    return { success: false, error: "Failed to update store product." };
+  }
+}
+
+export async function deleteStoreProduct(productId: string) {
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
+  if (!actor) return { success: false, error: "Unauthorized" };
+  if (!productId) return { success: false, error: "Missing product ID." };
+
+  try {
+    const existing = await prisma.storeProduct.findUnique({ where: { id: productId } });
+    if (!existing) return { success: false, error: "Product not found." };
+
+    // Detach any historical references safely before deleting so order/report history remains intact
+    await Promise.all([
+      prisma.storeOrderItem
+        .updateMany({ where: { productId }, data: { productId: null } })
+        .catch(() => undefined),
+      prisma.cooperativeStockReport
+        .updateMany({ where: { listedProductId: productId }, data: { listedProductId: null } })
+        .catch(() => undefined),
+      prisma.cellFeedSale
+        .updateMany({ where: { productId }, data: { productId: null } })
+        .catch(() => undefined),
+    ]);
+
+    await prisma.storeProduct.delete({ where: { id: productId } });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: "DELETED",
+        entity: "STORE_PRODUCT",
+        entityId: productId,
+        previousValue: {
+          name: existing.name,
+          description: existing.description,
+          storeSection: existing.storeSection,
+          price: existing.price.toString(),
+          isNegotiable: Boolean((existing as { isNegotiable?: boolean }).isNegotiable),
+          discountPercent: existing.discountPercent?.toString() ?? "0",
+          stock: existing.stock,
+          category: existing.category,
+          imageUrl: existing.imageUrl,
+          sourcePigTag: existing.sourcePigTag ?? null,
+        },
+        newValue: {
+          deleted: true,
+          name: existing.name,
+          deletedBy: actor.name,
+        },
+      },
+    });
+
+    revalidatePath("/dashboard/gebyian");
+    revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/ecommerce/animals");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food");
+    revalidatePath("/dashboard/admin/ecommerce/animals-orders");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food-orders");
+    revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/dashboard/history");
+    revalidatePath("/store");
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to delete store product:", err);
+    return { success: false, error: "Failed to delete product from stock." };
   }
 }
 
@@ -476,8 +793,14 @@ export async function toggleProductAvailability(productId: string) {
       },
     });
 
+    revalidatePath("/dashboard/gebyian");
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/ecommerce/animals");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food");
+    revalidatePath("/dashboard/admin/ecommerce/animals-orders");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food-orders");
     revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/dashboard/history");
     revalidatePath("/store");
     return { success: true, isAvailable: nextAvailable };
   } catch (err) {
@@ -502,6 +825,10 @@ export async function updateProductStock(productId: string, stock: number) {
       data: { stock },
     });
 
+    if (stock === 0 && product.stock > 0) {
+      await notifyManagersStockedOut(product.name, product.id, "Manual Stock Update");
+    }
+
     await prisma.auditLog.create({
       data: {
         userId: actor.id,
@@ -514,8 +841,14 @@ export async function updateProductStock(productId: string, stock: number) {
       },
     });
 
+    revalidatePath("/dashboard/gebyian");
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/ecommerce/animals");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food");
+    revalidatePath("/dashboard/admin/ecommerce/animals-orders");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food-orders");
     revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/dashboard/history");
     revalidatePath("/store");
     return { success: true };
   } catch (err) {
@@ -528,6 +861,7 @@ export async function updateProductPricingAndDiscount(params: {
   productId: string;
   price: number;
   stock: number;
+  isNegotiable?: boolean;
   discountPercent: number;
   discountPrice: number | null;
   discountLabel: string | null;
@@ -536,7 +870,16 @@ export async function updateProductPricingAndDiscount(params: {
   const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
   if (!actor) return { success: false, error: "Unauthorized" };
 
-  const { productId, price, stock, discountPercent, discountPrice, discountLabel, discountEndsAt } = params;
+  const {
+    productId,
+    price,
+    stock,
+    isNegotiable,
+    discountPercent,
+    discountPrice,
+    discountLabel,
+    discountEndsAt,
+  } = params;
 
   if (!Number.isFinite(price) || price <= 0) {
     return { success: false, error: "Base price must be greater than 0 RWF." };
@@ -556,20 +899,40 @@ export async function updateProductPricingAndDiscount(params: {
     if (!existing) return { success: false, error: "Product not found." };
 
     const parsedEndsAt = discountEndsAt ? new Date(`${discountEndsAt}T23:59:59.000Z`) : null;
+    const updatePayload = {
+      price: new Prisma.Decimal(price.toFixed(2)),
+      stock,
+      discountPercent: new Prisma.Decimal(discountPercent.toFixed(2)),
+      discountPrice:
+        discountPrice !== null ? new Prisma.Decimal(discountPrice.toFixed(2)) : null,
+      discountLabel: discountLabel?.trim() || null,
+      discountEndsAt:
+        parsedEndsAt && !Number.isNaN(parsedEndsAt.getTime()) ? parsedEndsAt : null,
+    };
 
-    await prisma.storeProduct.update({
-      where: { id: productId },
-      data: {
-        price: new Prisma.Decimal(price.toFixed(2)),
-        stock,
-        discountPercent: new Prisma.Decimal(discountPercent.toFixed(2)),
-        discountPrice:
-          discountPrice !== null ? new Prisma.Decimal(discountPrice.toFixed(2)) : null,
-        discountLabel: discountLabel?.trim() || null,
-        discountEndsAt:
-          parsedEndsAt && !Number.isNaN(parsedEndsAt.getTime()) ? parsedEndsAt : null,
-      },
-    });
+    try {
+      await prisma.storeProduct.update({
+        where: { id: productId },
+        data: {
+          ...updatePayload,
+          ...(typeof isNegotiable === "boolean" ? { isNegotiable } : {}),
+        },
+      });
+    } catch (colErr) {
+      const msg = colErr instanceof Error ? colErr.message : "";
+      if (/is_negotiable/i.test(msg)) {
+        await prisma.storeProduct.update({
+          where: { id: productId },
+          data: updatePayload,
+        });
+      } else {
+        throw colErr;
+      }
+    }
+
+    if (stock === 0 && existing.stock > 0) {
+      await notifyManagersStockedOut(existing.name, existing.id, "Manager Stock Update");
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -586,6 +949,7 @@ export async function updateProductPricingAndDiscount(params: {
         newValue: {
           price: price.toFixed(2),
           stock,
+          isNegotiable: typeof isNegotiable === "boolean" ? isNegotiable : undefined,
           discountPercent,
           discountPrice,
           discountLabel,
@@ -593,8 +957,14 @@ export async function updateProductPricingAndDiscount(params: {
       },
     });
 
+    revalidatePath("/dashboard/gebyian");
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/ecommerce/animals");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food");
+    revalidatePath("/dashboard/admin/ecommerce/animals-orders");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food-orders");
     revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/dashboard/history");
     revalidatePath("/store");
     return { success: true };
   } catch (err) {
@@ -606,11 +976,9 @@ export async function updateProductPricingAndDiscount(params: {
 export async function submitCooperativeStockReport(formData: FormData) {
   const actor = await getActiveUser([
     Role.CELL_MANAGER,
-    Role.COOPERATIVE_LEADER,
-    Role.PROJECT_MANAGER,
     Role.SUPER_ADMIN,
   ]);
-  if (!actor) return { success: false, error: "Unauthorized" };
+  if (!actor) return { success: false, error: "Unauthorized: Only Cell Managers can submit cooperative stock reports." };
 
   const cooperativeOwnerName = String(formData.get("cooperativeOwnerName") || "").trim();
   const cooperativeOwnerRole =
@@ -760,10 +1128,19 @@ export async function recordCellFeedSale(formData: FormData) {
     const totalAmount = unitPrice.mul(quantity);
     const saleNumber = `FEED-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
 
+    const remainingFeedStock = Math.max(0, product.stock - quantity);
     await prisma.storeProduct.update({
       where: { id: product.id },
-      data: { stock: Math.max(0, product.stock - quantity) },
+      data: { stock: remainingFeedStock },
     });
+
+    if (remainingFeedStock === 0) {
+      await notifyManagersStockedOut(
+        product.name,
+        product.id,
+        `Cell Feed Sale ${saleNumber} by ${actor.name}`
+      );
+    }
 
     const finTx = await prisma.financeTransaction.create({
       data: {
@@ -951,7 +1328,12 @@ export async function updateStoreOrderStatus(orderId: string, nextStatus: string
       return { success: false, error: res.error || "Failed to update order status." };
     }
 
+    revalidatePath("/dashboard/gebyian");
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/ecommerce/animals");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food");
+    revalidatePath("/dashboard/admin/ecommerce/animals-orders");
+    revalidatePath("/dashboard/admin/ecommerce/animal-food-orders");
     revalidatePath(`/dashboard/admin/ecommerce/${orderId}`);
     revalidatePath("/dashboard/admin");
     revalidatePath("/dashboard/admin/finance");

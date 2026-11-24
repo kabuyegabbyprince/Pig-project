@@ -132,3 +132,99 @@ export async function checkPigVetClearance(
 
   return { cleared: true, pig };
 }
+
+export type ClearedPigSummary = {
+  id: string;
+  tagNumber: string;
+  breed: string | null;
+  currentWeight: number | null;
+};
+
+/**
+ * Bulk-loads vet-cleared pigs eligible for Gebyian Network SALE in 4 parallel queries
+ * instead of N+1 sequential queries per pig.
+ */
+export async function getClearedPigsForSale(
+  excludePigIds?: Set<string>
+): Promise<ClearedPigSummary[]> {
+  const healthyPigs = await prisma.pig.findMany({
+    where: {
+      deletedAt: null,
+      currentBeneficiaryId: null,
+      healthStatus: PigHealthStatus.HEALTHY,
+      status: { in: [PigStatus.ACTIVE, PigStatus.REGISTERED] },
+    },
+    orderBy: { tagNumber: "asc" },
+    take: 60,
+    select: {
+      id: true,
+      tagNumber: true,
+      breed: true,
+      currentWeight: true,
+      status: true,
+    },
+  });
+
+  const candidatePigs = excludePigIds
+    ? healthyPigs.filter((p) => !excludePigIds.has(p.id))
+    : healthyPigs;
+
+  if (candidatePigs.length === 0) return [];
+
+  const candidateIds = candidatePigs.map((p) => p.id);
+
+  const [unverifiedReturns, exams, vetRecords] = await Promise.all([
+    prisma.pigReturn.findMany({
+      where: { pigId: { in: candidateIds }, veterinaryVerified: false },
+      select: { pigId: true },
+    }),
+    prisma.veterinaryExamination.findMany({
+      where: { pigId: { in: candidateIds } },
+      orderBy: { examinationDate: "desc" },
+      select: { pigId: true, verificationStatus: true },
+    }),
+    prisma.veterinaryRecord.findMany({
+      where: { pigId: { in: candidateIds } },
+      orderBy: { date: "desc" },
+      select: { pigId: true, status: true },
+    }),
+  ]);
+
+  const unverifiedReturnSet = new Set(unverifiedReturns.map((r) => r.pigId));
+  const latestExamByPig = new Map<string, string>();
+  for (const e of exams) {
+    if (!latestExamByPig.has(e.pigId)) {
+      latestExamByPig.set(e.pigId, e.verificationStatus);
+    }
+  }
+  const latestRecordByPig = new Map<string, string>();
+  for (const r of vetRecords) {
+    if (!latestRecordByPig.has(r.pigId)) {
+      latestRecordByPig.set(r.pigId, r.status);
+    }
+  }
+
+  const cleared: ClearedPigSummary[] = [];
+  for (const p of candidatePigs) {
+    if (unverifiedReturnSet.has(p.id)) continue;
+
+    const examStatus = latestExamByPig.get(p.id);
+    if (examStatus && !CLEARED_EXAM_STATUSES.has(examStatus)) continue;
+
+    const recStatus = latestRecordByPig.get(p.id);
+    if (recStatus && BLOCKED_RECORD_STATUSES.has(recStatus.toUpperCase())) continue;
+
+    const hasExplicitClearance =
+      p.status === PigStatus.ACTIVE || Boolean(examStatus) || Boolean(recStatus);
+    if (!hasExplicitClearance) continue;
+
+    cleared.push({
+      id: p.id,
+      tagNumber: p.tagNumber,
+      breed: p.breed,
+      currentWeight: p.currentWeight,
+    });
+  }
+
+  return cleared;
+}
