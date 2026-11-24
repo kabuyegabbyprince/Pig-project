@@ -1,9 +1,10 @@
 "use client";
 
 import type { Session } from "next-auth";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { performSignOut } from "@/lib/client-auth";
 import {
   LayoutDashboard,
   Users,
@@ -306,7 +307,7 @@ export function DashboardShell({
                   <Settings className="h-3.5 w-3.5" />
                 </Link>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={() => void performSignOut("/login")}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
                   title="Sign out"
                   aria-label="Sign out"
@@ -337,7 +338,7 @@ export function DashboardShell({
               </Link>
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={() => void performSignOut("/login")}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#101827] hover:bg-slate-50 transition-colors"
                   title="Sign out"
                   aria-label="Sign out"

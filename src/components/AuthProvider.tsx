@@ -12,6 +12,7 @@ export function AuthProvider({
 }) {
   return (
     <SessionProvider
+      basePath="/api/auth"
       session={session}
       refetchOnWindowFocus={false}
       refetchWhenOffline={false}

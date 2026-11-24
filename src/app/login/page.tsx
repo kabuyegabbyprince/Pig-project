@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { credentialsSignIn } from "@/lib/client-auth";
 import {
   AlertCircle,
   ArrowLeft,
@@ -57,11 +57,10 @@ function LoginForm() {
       : trimmedIdentifier;
 
     try {
-      const res = await signIn("credentials", {
+      const res = await credentialsSignIn({
         email: cleanIdentifier,
         password,
         selectedRole: selectedRole.trim(),
-        redirect: false,
       });
 
       if (res?.error) {
@@ -85,7 +84,10 @@ function LoginForm() {
         setSuccessMessage("Credentials verified! Loading your authorized workspace...");
 
         try {
-          const sessionRes = await fetch("/api/auth/session");
+          const sessionRes = await fetch("/api/auth/session", {
+            credentials: "same-origin",
+            cache: "no-store",
+          });
           const sessionData = await sessionRes.json();
           const userRole = normalizeRoleValue(sessionData?.user?.role);
 
