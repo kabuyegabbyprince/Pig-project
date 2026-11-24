@@ -1,4 +1,53 @@
-Build a production-grade, mobile-responsive E-Commerce Storefront web application for "Gebyian Network" (Pig Project Rwanda Website & Marketplace) using Next.js (App Router), TypeScript, and Tailwind CSS that connects directly to and stays synchronized with the Pig Project Control Panel managed by Project Manager (Gebyian).
+======================================================================
+CLEAN PROMPT TO COPY & RUN TO BUILD THE GEBYIAN NETWORK E-COMMERCE APP
+======================================================================
+
+Build a production-grade, high-performance, mobile-responsive E-Commerce Storefront web application for "Gebyian Network" (Pig Project Rwanda Marketplace & Website) using Next.js (App Router), TypeScript, and Tailwind CSS.
+
+1. BRANDING & VISUAL IDENTITY:
+- Platform Name: Gebyian Network (Pig Project Rwanda Marketplace)
+- Theme: Deep Navy (#101827) for headers & dark surfaces, Amazon Orange (#FF8A00) for CTA buttons, bargainable badges, discount highlights, and active tabs, Pure White (#FFFFFF) for product cards and page background, Light Gray (#F5F5F5) for section surfaces.
+- Currencies: Format all prices in Rwandan Francs (e.g., "45,000 RWF").
+- Responsive: Zero horizontal scroll across mobile, tablet, and desktop. Use lucide-react icons.
+
+2. CONNECTIVITY & BACKEND API INTEGRATION:
+Connect directly to the Pig Project Control Panel backend via CONTROL_PANEL_BASE_URL (or direct shared Supabase database):
+- Products Catalog: GET <CONTROL_PANEL_BASE_URL>/api/ecommerce/products?section=ANIMALS|ANIMAL_FOOD&category=...
+- Order Creation: POST <CONTROL_PANEL_BASE_URL>/api/ecommerce/orders
+  Payload: { customerName, customerPhone, customerEmail, shippingAddress, paymentMethod, notes, items: [{ productId, quantity }] }
+  Response: { success: true, order: { id, orderNumber, status, subtotalAmount, discountTotal, totalAmount, paymentMethod } }
+- Order Tracking: GET <CONTROL_PANEL_BASE_URL>/api/ecommerce/orders?orderNumber=ORD-YYYY-XXXX&contact=...
+  Response: { success: true, order: { orderNumber, status, customerName, subtotalAmount, discountTotal, totalAmount, items, shippingAddress, paymentMethod, createdAt } }
+- Images: Served from Supabase Storage bucket "product-image" (public read).
+
+3. TWO OPERATIONAL STORE SECTIONS:
+- Section 1: "Animals Marketplace" (store_section = 'ANIMALS')
+  Live pigs & breeding stock. Cards display product-image photo, ear tag, breed, price in RWF, "Bargainable" badge (if is_negotiable = true), discount tag (if on sale), and Vet-Cleared badge.
+- Section 2: "Animal Food & Supplies" (store_section = 'ANIMAL_FOOD')
+  Animal feeds, supplements, and supplies. Cards display product-image photo, price per bag/unit in RWF, bargainable badge, stock quantity, and instant Add to Cart.
+
+4. CORE USER WORKFLOWS & PAGES:
+- Homepage & Storefront (/ and /store):
+  * Clean hero header with logo, search bar, and "Track My Order" link.
+  * Section toggle tabs: "All", "Animals Marketplace", "Animal Food & Supplies", and "On Sale".
+  * Category pill filters and real-time product search.
+  * Product grid with Bargainable badge, strikethrough original price, bold effective price, and stock counter.
+  * Persistent Stockout State: Products with 0 stock stay in the system marked "STOCKED OUT" with "Add to Cart" disabled.
+  * Slide-over Shopping Cart Drawer with quantity adjusters, subtotal, discount savings summary, and checkout form.
+  * Checkout Form with Name, Rwandan Phone / Email, Delivery Cell / Address, Payment Method (MTN MoMo, Airtel Money, Bank Transfer / Cash), and Notes.
+  * On order completion: Displays order number (e.g. ORD-2026-8492AK) and a prominent button "Track This Order →" leading to /store/track.
+- Order Tracker (/store/track):
+  * Search by Order Number + optional phone/email.
+  * 5-Stage Visual Progress Timeline: PENDING (Order Placed) -> PAID (Payment Verified) -> PROCESSING (Prepped & Tagged) -> DISPATCHED (Out for Delivery) -> COMPLETED (Delivered).
+  * Clear "CANCELLED" alert banner if an order is cancelled, explaining stock was restored.
+  * Itemized receipt with quantities, unit prices, discount savings, and grand total.
+  * Direct WhatsApp / Call Project Manager assistance banner with order number.
+
+5. REQUIRED ENVIRONMENT VARIABLES (.env):
+CONTROL_PANEL_BASE_URL=https://<your-control-panel-domain>
+NEXT_PUBLIC_APP_URL=https://gebyian-net.ai.studio
+SUPABASE_URL=<supabase_url>
+SUPABASE_ANON_KEY=<supabase_anon_key>
 
 ======================================================================
 1. BRANDING & VISUAL DESIGN SYSTEM
@@ -110,5 +159,169 @@ Shared Supabase tables & bucket (kept in sync via `update.sql`):
 ======================================================================
 - `/store` (Gebyian Website Catalog): Split cleanly with tabs for **Animals Marketplace** (`store_section = 'ANIMALS'`) and **Animal Food & Supplies** (`store_section = 'ANIMAL_FOOD'`), plus search bar, "On Sale" toggle, category filters, `Bargainable` price badge, `Vet-Cleared Tag` badge, discount badge, live stock / `STOCKED OUT` badge, `product-image` photos, and Add to Cart.
 - `/store/track` (Order Tracker): Lookup by `order_number` + phone/email showing real-time status (`PENDING` -> `PAID` -> `PROCESSING` -> `DISPATCHED` -> `COMPLETED` / `CANCELLED`), itemized receipt with discount savings, and payment confirmation status synced from `Project Manager (Gebyian)`.
-- `/api/ecommerce/products` & `/api/ecommerce/orders`: Real-time JSON endpoints backed by shared Supabase tables.
+- `/api/ecommerce/products` & `/api/ecommerce/orders`: Real-time JSON endpoints backed by shared Supabase tables with full CORS preflight support.
 - `/api/ecommerce/webhooks/payment`: Verifies payment amount against `store_orders.total_amount` with `x-webhook-secret`.
+
+======================================================================
+7. COMPLETE "MAKE ORDER" (ORDER CREATION) ARCHITECTURE & WORKFLOW LOGIC
+======================================================================
+The Order Creation flow guarantees transactional integrity, prevents client-side price tampering, enforces livestock veterinary clearances, locks inventory atomically, notifies managers in real time, and persists products even if they sell out:
+
+1. Client Cart & Buyer Checkout Submission:
+   - The public buyer navigates the storefront at `/store`, filters products by section (`Animals Marketplace` or `Animal Food & Supplies`), and adds items to the interactive cart.
+   - At checkout, the buyer provides:
+     * Full Name (`customerName`, minimum 2 characters)
+     * Contact: Rwandan Mobile Phone (`customerPhone`, e.g., 078XXXXXXX) or Email (`customerEmail`)
+     * Delivery Destination / Cell Address (`shippingAddress`)
+     * Payment Method (`MTN MoMo`, `Airtel Money`, `Bank Transfer / Cash on Delivery`)
+     * Delivery / Handover Notes (`notes`, optional special instructions)
+   - The frontend packages the cart as an array of items `[{ productId: string, quantity: number }]` and sends `POST /api/ecommerce/orders`.
+
+2. Server-Authoritative Verification (Zero-Trust Security):
+   - The server resolves each `productId` against `store_products` directly via Prisma/Supabase.
+   - Stock Guard: If `product.stock < requestedQuantity`, the request is immediately rejected (`409 Conflict: Insufficient stock for "<Product Name>"`).
+   - Availability Guard: If `product.isAvailable === false`, the order is rejected.
+   - Veterinary Clearance Guard: For live animals (`product.pigId != null`), the system queries the veterinary registry (`checkPigVetClearance(pigId, 'SALE')`). If the pig is sick, unexamined, or quarantined, the order is blocked with an informative message.
+   - Server Price Recalculation: The server ignores any client-supplied prices. It runs `getEffectiveProductPrice(product)` on each item to compute the true original unit price, active promotional discount, and final unit price in RWF.
+   - Subtotal, Total Discount, and Grand Total are accumulated using high-precision decimals (`Prisma.Decimal`).
+
+3. Transactional Order & Order Items Creation:
+   - Generates a human-readable, unique tracking number: `ORD-<CURRENT_YEAR>-<4_DIGIT_RANDOM><2_LETTER_CODE>` (e.g., `ORD-2026-8492AK`).
+   - Inserts the master record into `store_orders` with initial status `PENDING`.
+   - Inserts each purchased line into `store_order_items` recording `productId`, `quantity`, `original_price`, `discount_amount`, and `price` (unit price charged).
+
+4. Atomic Stock Deduction & Pig Lifecycle Transition:
+   - For every item in the order, decrements `store_products.stock` atomically by the purchased quantity:
+     `remainingStock = Math.max(0, currentStock - quantity)`.
+   - If the product was tied to a specific animal (`pigId`), and the stock drops to 0, updates `Pig.status = 'SOLD'` so the pig cannot be reassigned or distributed in field operations.
+
+5. Persistent Product Names & Stockout Notifications:
+   - Crucial Rule: The product record is NEVER deleted when its stock hits 0. Its name, description, category, and image stay in the system, and its status is marked `STOCKED OUT` so `Project Manager (Gebyian)` can restock it with a single click.
+   - If any ordered product reaches `remainingStock === 0`, the system automatically inserts a `WARNING` notification in the `"Notification"` table:
+     * Title: `Stocked Out Alert: <Product Name>`
+     * Message: `"<Product Name>" reached 0 stock after order <Order Number>. Its item name remains in Gebyian Network marked Stocked Out for restocking.`
+     * Recipient: All active users with `Role.PROJECT_MANAGER` and `Role.SUPER_ADMIN`.
+
+6. Real-Time Manager Order Notification:
+   - The system immediately dispatches an `INFO` notification to `Project Manager (Gebyian)` and `SUPER_ADMIN`:
+     * Title: `New Gebyian Network Order <Order Number>`
+     * Message: `<Customer Name> (<Phone/Email>) ordered <Quantity>x <Product Names> totaling <Total Amount> RWF (<Payment Method>).`
+     * Related Entity: `STORE_ORDER`, linking directly to the order management dashboard.
+
+7. Audit Log Record:
+   - Writes an immutable entry into `AuditLog` (`action = 'ORDER_PLACED'`, `role = 'STOREFRONT'`, `entity = 'STORE_ORDER'`) capturing the buyer's name, order number, line items, and financial values.
+
+8. Buyer Confirmation & Direct Tracking Handover:
+   - The API returns `{ success: true, order: { id, orderNumber, status, subtotalAmount, discountTotal, totalAmount, paymentMethod } }`.
+   - The frontend clears the shopping cart, presents a prominent confirmation banner with the new Order Number, and provides a one-click button: **"Track This Order →"** linking directly to `/store/track?orderNumber=<Order Number>`.
+
+======================================================================
+8. COMPLETE "TRACK ORDER" ARCHITECTURE & WORKFLOW LOGIC
+======================================================================
+The Order Tracking system provides public buyers with complete transparency, real-time stage tracking, and seamless synchronization with the Project Manager's actions in the control panel:
+
+1. Tracking Access & Privacy Verification (`/store/track`):
+   - Public buyers access the tracker directly via URL (`/store/track?orderNumber=ORD-2026-XXXX`) or by entering their Order Number into the search form on `/store/track`.
+   - Optional Privacy Verification: Buyers can provide their registered phone number or email address alongside the order number. The server verifies that the contact matches `customerPhone` or `customerEmail` on file before displaying full delivery address and personal notes.
+
+2. Five-Stage Order Lifecycle State Machine:
+   The order progresses through 5 official sequential statuses:
+   - STAGE 1: `PENDING` ("Order Placed & Awaiting Verification")
+     * Trigger: Order submitted via website.
+     * Explanation: Order details received. Project Manager (Gebyian) verifies payment (via MoMo merchant code or transfer reference) and confirms product readiness.
+   - STAGE 2: `PAID` ("Payment Verified")
+     * Trigger: Project Manager clicks "Mark Paid" or incoming MoMo webhook (`/api/ecommerce/webhooks/payment`) verifies reference and amount.
+     * Explanation: Payment received in full. Order is locked and passed to the packing and logistics queue.
+   - STAGE 3: `PROCESSING` ("Preparing & Tagging")
+     * Trigger: Project Manager updates order to "Processing".
+     * Explanation: Feed bags are prepared and measured, or live animals are tagged with their veterinary ear tag and given pre-transport health review.
+   - STAGE 4: `DISPATCHED` ("Out for Delivery / Ready for Pickup")
+     * Trigger: Project Manager dispatches driver or assigns pickup station.
+     * Explanation: Animals or feed supplies are en route to the customer's delivery cell / address or waiting at the designated collection depot.
+   - STAGE 5: `COMPLETED` ("Delivered & Fulfilled")
+     * Trigger: Customer receives shipment and signs delivery receipt.
+     * Explanation: Order fulfilled successfully. Transaction finalized in system logs.
+   - EXCEPTION STAGE: `CANCELLED` ("Order Cancelled & Stock Restored")
+     * Trigger: Manager cancels order (e.g., customer request, duplicate order, non-payment).
+     * Stock Restoration Action: Automatically adds back `item.quantity` to `store_products.stock` and resets linked `Pig.status = 'ACTIVE'` so live animals are immediately available again.
+
+3. Visual Tracker UI Experience (`TrackOrderClient`):
+   - Multi-Step Visual Progress Stepper: An intuitive horizontal progress bar showing all 5 milestones with checkmark icons, active pulse animations, and color-coded statuses (Orange for active, Green for completed, Red for cancelled).
+   - Order Header & Metadata: Order Number, Customer Name, Date & Time placed, Payment Method, and Current Stage Badge.
+   - Itemized Receipt Table: Shows product name, category, animal ear tag (if applicable), quantity, original unit price, promotional discount savings, and final line total in RWF.
+   - Financial Summary: Clear breakdown showing Subtotal, Discount Savings (highlighted in Amazon Orange), and Total Amount in RWF.
+   - Delivery & Shipping Card: Displays customer destination address and special instructions/notes.
+   - Direct Customer Support & Coordination Note:
+     * Shows direct contact assistance with Project Manager (Gebyian) via phone/WhatsApp and the official MoMo merchant payment code for fast inquiries and payment confirmation.
+
+======================================================================
+9. MASTER E-COMMERCE IMPLEMENTATION PLAN & SYSTEM CHECKLIST
+======================================================================
+Copy-paste this technical checklist as the authoritative blueprint for Gebyian Network E-Commerce:
+
+[x] 1. DATABASE SCHEMA & PERSISTENCE (Supabase PostgreSQL):
+    - `store_products`: Catalog items with `store_section` ('ANIMALS' | 'ANIMAL_FOOD'), `price`, `is_negotiable`, discount fields, `stock`, and `low_stock_threshold`.
+    - `store_orders`: Orders with unique `order_number`, customer info, totals, `status` enum (`PENDING`, `PAID`, `PROCESSING`, `DISPATCHED`, `COMPLETED`, `CANCELLED`).
+    - `store_order_items`: Line items linking order to product with prices and discount amounts.
+    - `cooperative_stock_reports`: Cell Manager stock reporting for cooperative members.
+    - `cell_feed_sales`: Animal food field sales by Cell Manager with Finance Officer verification.
+    - Supabase Storage Bucket `product-image` for PC image uploads.
+
+[x] 2. SERVER-SIDE PRICING & DISCOUNTS:
+    - Pure calculation utility `getEffectiveProductPrice(product, now)` handles percentage discounts, fixed discount prices, start/end date ranges, and bargainable badges.
+    - Always re-calculated on server during `POST /api/ecommerce/orders` to ensure zero price manipulation.
+
+[x] 3. MAKE ORDER WORKFLOW:
+    - Public storefront at `/store` with category filter, search, bargainable tags, and cart sheet.
+    - Pre-checkout validation of stock and veterinary clearance (`checkPigVetClearance`).
+    - Atomic deduction of `store_products.stock`.
+    - Permanent product retention when stock hits 0 (`STOCKED OUT` status).
+    - Automatic `WARNING` alert for stocked-out items sent to `PROJECT_MANAGER` & `SUPER_ADMIN`.
+    - Instant `INFO` notification for new orders sent to `PROJECT_MANAGER` & `SUPER_ADMIN`.
+    - Audit log recorded in `AuditLog`.
+
+[x] 4. TRACK ORDER WORKFLOW:
+    - Order tracking page at `/store/track` querying `GET /api/ecommerce/orders?orderNumber=...`.
+    - Visual 5-stage progress timeline (`PENDING` -> `PAID` -> `PROCESSING` -> `DISPATCHED` -> `COMPLETED`).
+    - Cancellation handler with automatic stock restoration and pig reactivations.
+    - Itemized receipt breakdown with discount savings and delivery details.
+
+[x] 5. PROJECT MANAGER & CONTROL PANEL INTEGRATION:
+    - `/dashboard/gebyian` and `/dashboard/admin/ecommerce` allow Project Manager to create products, upload photos from local PC to `product-image` bucket, manage stock, toggle bargainable flags, update discounts, review orders, and advance order status.
+    - Central configuration in `/config.ts` (`GEBYIAN_WEBSITE_URL = "https://gebyian-net.ai.studio"`).
+    - Full CORS preflight handling (`OPTIONS` + `Access-Control-Allow-Origin: *`) across all ecommerce API endpoints.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

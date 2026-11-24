@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma, isSupabaseTableMissingError } from "@/lib/prisma";
 import { getEffectiveProductPrice } from "@/lib/ecommerce-pricing";
+import { handleCorsPreflight, jsonWithCors } from "@/lib/cors";
 
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS() {
+  return handleCorsPreflight();
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,7 +31,7 @@ export async function GET(req: NextRequest) {
       return 0;
     });
 
-    return NextResponse.json({
+    return jsonWithCors({
       success: true,
       tableMissing: false,
       products: products.map((p) => {
@@ -55,13 +60,13 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     if (isSupabaseTableMissingError(err)) {
-      return NextResponse.json({
+      return jsonWithCors({
         success: true,
         tableMissing: true,
         products: [],
       });
     }
     console.error("E-Commerce products GET error:", err);
-    return NextResponse.json({ error: "Failed to load store products." }, { status: 500 });
+    return jsonWithCors({ error: "Failed to load store products." }, { status: 500 });
   }
 }

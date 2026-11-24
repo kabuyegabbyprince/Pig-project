@@ -1,10 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { NotificationType, OrderStatus, PigStatus, Prisma, Role } from "@prisma/client";
 import { prisma, isSupabaseTableMissingError } from "@/lib/prisma";
 import { checkPigVetClearance } from "@/lib/vet-clearance";
 import { getEffectiveProductPrice } from "@/lib/ecommerce-pricing";
+import { handleCorsPreflight, jsonWithCors } from "@/lib/cors";
 
 export const dynamic = "force-dynamic";
+
+export async function OPTIONS() {
+  return handleCorsPreflight();
+}
 
 function generateOrderNumber(): string {
   const year = new Date().getFullYear();
@@ -20,7 +25,7 @@ export async function GET(req: NextRequest) {
     const contact = searchParams.get("contact")?.trim();
 
     if (!orderNumber) {
-      return NextResponse.json(
+      return jsonWithCors(
         { error: "Provide an orderNumber query parameter to track an order." },
         { status: 400 }
       );
@@ -40,7 +45,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Order not found." }, { status: 404 });
+      return jsonWithCors({ error: "Order not found." }, { status: 404 });
     }
 
     if (contact) {
@@ -50,14 +55,14 @@ export async function GET(req: NextRequest) {
         ?.replace(/[\s\-().]/g, "")
         .endsWith(normalizedContact.slice(-8));
       if (!emailMatch && !phoneMatch) {
-        return NextResponse.json(
+        return jsonWithCors(
           { error: "Order number and phone/email do not match." },
           { status: 403 }
         );
       }
     }
 
-    return NextResponse.json({
+    return jsonWithCors({
       success: true,
       order: {
         orderNumber: order.orderNumber,
@@ -69,6 +74,7 @@ export async function GET(req: NextRequest) {
         paymentMethod: order.paymentMethod,
         paymentReference: order.paymentReference ?? null,
         shippingAddress: order.shippingAddress ?? null,
+        notes: order.notes ?? null,
         createdAt: order.createdAt.toISOString(),
         updatedAt: order.updatedAt.toISOString(),
         items: (order.items ?? []).map((item) => ({
@@ -85,13 +91,13 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     if (isSupabaseTableMissingError(err)) {
-      return NextResponse.json(
+      return jsonWithCors(
         { error: "E-Commerce tables are not yet provisioned in Supabase." },
         { status: 503 }
       );
     }
     console.error("Order track error:", err);
-    return NextResponse.json({ error: "Failed to track order." }, { status: 500 });
+    return jsonWithCors({ error: "Failed to track order." }, { status: 500 });
   }
 }
 
@@ -121,16 +127,16 @@ export async function POST(req: NextRequest) {
     const items = Array.isArray(body.items) ? body.items : [];
 
     if (customerName.length < 2) {
-      return NextResponse.json({ error: "Customer full name is required." }, { status: 400 });
+      return jsonWithCors({ error: "Customer full name is required." }, { status: 400 });
     }
     if (!customerPhone && !customerEmail) {
-      return NextResponse.json(
+      return jsonWithCors(
         { error: "Provide at least a telephone number or email address." },
         { status: 400 }
       );
     }
     if (items.length === 0) {
-      return NextResponse.json({ error: "Cart cannot be empty." }, { status: 400 });
+      return jsonWithCors({ error: "Cart cannot be empty." }, { status: 400 });
     }
 
     const requestedMap = new Map<string, number>();
@@ -138,7 +144,7 @@ export async function POST(req: NextRequest) {
       const pid = String(item?.productId || "").trim();
       const qty = Number(item?.quantity);
       if (!pid || !Number.isInteger(qty) || qty < 1) {
-        return NextResponse.json({ error: "Invalid cart item or quantity." }, { status: 400 });
+        return jsonWithCors({ error: "Invalid cart item or quantity." }, { status: 400 });
       }
       requestedMap.set(pid, (requestedMap.get(pid) ?? 0) + qty);
     }
@@ -164,13 +170,13 @@ export async function POST(req: NextRequest) {
     for (const [pid, qty] of requestedMap.entries()) {
       const product = productMap.get(pid);
       if (!product || !product.isAvailable) {
-        return NextResponse.json(
+        return jsonWithCors(
           { error: `Product is no longer available for purchase.` },
           { status: 400 }
         );
       }
       if (product.stock < qty) {
-        return NextResponse.json(
+        return jsonWithCors(
           { error: `Insufficient stock for "${product.name}" (available: ${product.stock}).` },
           { status: 409 }
         );
@@ -178,7 +184,7 @@ export async function POST(req: NextRequest) {
       if (product.pigId) {
         const clearance = await checkPigVetClearance(product.pigId, "SALE");
         if (!clearance.cleared) {
-          return NextResponse.json(
+          return jsonWithCors(
             { error: `Livestock item "${product.name}" is temporarily unavailable pending vet clearance.` },
             { status: 409 }
           );
@@ -308,7 +314,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(
+    return jsonWithCors(
       {
         success: true,
         order: {
@@ -325,12 +331,12 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     if (isSupabaseTableMissingError(err)) {
-      return NextResponse.json(
+      return jsonWithCors(
         { error: "E-Commerce tables are not yet provisioned in Supabase." },
         { status: 503 }
       );
     }
     console.error("E-Commerce checkout POST error:", err);
-    return NextResponse.json({ error: "Failed to place order." }, { status: 500 });
+    return jsonWithCors({ error: "Failed to place order." }, { status: 500 });
   }
 }
