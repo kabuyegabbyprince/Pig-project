@@ -5,6 +5,10 @@ if (!process.env.AUTH_TRUST_HOST) {
   process.env.AUTH_TRUST_HOST = "true";
 }
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
+
