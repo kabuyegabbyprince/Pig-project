@@ -113,16 +113,14 @@ async function main() {
     });
   }
 
-  console.log("Seeding default staff user accounts for all 7 roles...");
+  console.log("Seeding default staff user accounts for active roles...");
   const bcrypt = await import("bcryptjs");
   const defaultUsers = [
     { name: "Super Administrator", email: "admin@pigproject.rw", role: Role.SUPER_ADMIN, password: "Admin2026!" },
-    { name: "Project Manager", email: "manager@pigproject.rw", role: Role.PROJECT_MANAGER, password: "Manager2026!" },
+    { name: "Project Manager (Gebyian)", email: "manager@pigproject.rw", role: Role.PROJECT_MANAGER, password: "Manager2026!" },
     { name: "Cell Manager", email: "cell@pigproject.rw", role: Role.CELL_MANAGER, password: "Cell2026!" },
     { name: "Veterinarian Doctor", email: "vet@pigproject.rw", role: Role.VETERINARIAN, password: "Vet2026!" },
     { name: "Finance Officer", email: "finance@pigproject.rw", role: Role.FINANCE_OFFICER, password: "Finance2026!" },
-    { name: "Project Trainer", email: "trainer@pigproject.rw", role: Role.TRAINER, password: "Trainer2026!" },
-    { name: "Project Funder", email: "funder@pigproject.rw", role: Role.FUNDER, password: "Funder2026!" },
   ];
 
   for (const u of defaultUsers) {

@@ -133,8 +133,7 @@ export async function createBeneficiary(formData: FormData) {
   redirect(
     user.role === Role.CELL_MANAGER ||
       user.role === Role.COOPERATIVE_LEADER ||
-      user.role === Role.COOPERATIVE_MEMBER ||
-      user.role === Role.TRAINER
+      user.role === Role.COOPERATIVE_MEMBER
       ? "/dashboard/field/beneficiaries"
       : "/dashboard/admin/beneficiaries"
   );

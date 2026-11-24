@@ -1,11 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { OrderStatus, PigHealthStatus, PigStatus, Prisma, Role } from "@prisma/client";
+import { randomUUID } from "crypto";
+import {
+  FinanceStatus,
+  FinanceType,
+  NotificationType,
+  OrderStatus,
+  PigHealthStatus,
+  PigStatus,
+  Prisma,
+  Role,
+} from "@prisma/client";
 import { prisma, isSupabaseTableMissingError } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
 import { checkPigVetClearance } from "@/lib/vet-clearance";
 import { applyStoreOrderStatusChange } from "@/lib/ecommerce-service";
+import { getEffectiveProductPrice } from "@/lib/ecommerce-pricing";
 
 export type SerializedClearedPigOption = {
   id: string;
@@ -19,8 +30,16 @@ export type SerializedStoreProduct = {
   name: string;
   description: string | null;
   price: string;
+  effectivePrice: string;
+  hasActiveDiscount: boolean;
+  discountPercent: number;
+  discountPrice: string | null;
+  discountLabel: string | null;
+  discountEndsAt: string | null;
   stock: number;
+  lowStockThreshold: number;
   category: string | null;
+  storeSection: "ANIMALS" | "ANIMAL_FOOD";
   imageUrl: string | null;
   isAvailable: boolean;
   pigId: string | null;
@@ -35,6 +54,8 @@ export type SerializedStoreOrder = {
   customerEmail: string | null;
   customerPhone: string | null;
   shippingAddress: string | null;
+  subtotalAmount: string;
+  discountTotal: string;
   totalAmount: string;
   status: OrderStatus;
   paymentMethod: string | null;
@@ -46,46 +67,117 @@ export type SerializedStoreOrder = {
   refundedToFinance: boolean;
 };
 
+export type SerializedStockReport = {
+  id: string;
+  reportedByName: string;
+  cooperativeOwnerName: string;
+  cooperativeOwnerRole: string;
+  cellName: string;
+  animalTitle: string;
+  pigCount: number;
+  estimatedWeightKg: string | null;
+  suggestedPrice: string | null;
+  pigId: string | null;
+  sourcePigTag: string | null;
+  notes: string | null;
+  status: string;
+  listedProductId: string | null;
+  createdAt: string;
+};
+
+export type SerializedCellFeedSale = {
+  id: string;
+  saleNumber: string;
+  productId: string | null;
+  productName: string;
+  buyerName: string;
+  buyerPhone: string | null;
+  quantity: number;
+  unitPrice: string;
+  totalAmount: string;
+  paymentMethod: string;
+  soldByName: string;
+  cellName: string | null;
+  financeTransactionId: string | null;
+  verificationStatus: string;
+  notes: string | null;
+  createdAt: string;
+};
+
 export type EcommerceOverviewData = {
   tableMissing: boolean;
   products: SerializedStoreProduct[];
   orders: SerializedStoreOrder[];
   clearedPigs: SerializedClearedPigOption[];
+  stockReports: SerializedStockReport[];
+  feedSales: SerializedCellFeedSale[];
   totalRevenue: string;
   pendingOrdersCount: number;
 };
 
+function serializeProduct(p: Awaited<ReturnType<typeof prisma.storeProduct.findMany>>[number]): SerializedStoreProduct {
+  const pricing = getEffectiveProductPrice(p);
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price.toString(),
+    effectivePrice: pricing.effectivePrice.toFixed(2),
+    hasActiveDiscount: pricing.hasActiveDiscount,
+    discountPercent: pricing.discountPercentApplied,
+    discountPrice: p.discountPrice ? p.discountPrice.toString() : null,
+    discountLabel: p.discountLabel ?? null,
+    discountEndsAt: p.discountEndsAt ? p.discountEndsAt.toISOString() : null,
+    stock: p.stock,
+    lowStockThreshold: p.lowStockThreshold ?? 3,
+    category: p.category,
+    storeSection: p.storeSection === "ANIMAL_FOOD" ? "ANIMAL_FOOD" : "ANIMALS",
+    imageUrl: p.imageUrl,
+    isAvailable: p.isAvailable,
+    pigId: p.pigId ?? null,
+    sourcePigTag: p.sourcePigTag ?? null,
+    createdAt: p.createdAt.toISOString(),
+  };
+}
+
 export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
   try {
-    const [products, orders, syncedTransactions, healthyPigs] = await Promise.all([
-      prisma.storeProduct.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.storeOrder.findMany({
-        orderBy: { createdAt: "desc" },
-        include: { items: true },
-      }),
-      prisma.financeTransaction.findMany({
-        where: {
-          reference: { in: ["E-Commerce Sales", "E-Commerce Refunds"] },
-          deletedAt: null,
-        },
-        select: { transactionId: true, reference: true },
-      }),
-      prisma.pig.findMany({
-        where: {
-          deletedAt: null,
-          currentBeneficiaryId: null,
-          healthStatus: PigHealthStatus.HEALTHY,
-          status: { in: [PigStatus.ACTIVE, PigStatus.REGISTERED] },
-        },
-        orderBy: { tagNumber: "asc" },
-        select: {
-          id: true,
-          tagNumber: true,
-          breed: true,
-          currentWeight: true,
-        },
-      }),
-    ]);
+    const [products, orders, syncedTransactions, healthyPigs, stockReports, feedSales] =
+      await Promise.all([
+        prisma.storeProduct.findMany({ orderBy: { createdAt: "desc" } }),
+        prisma.storeOrder.findMany({
+          orderBy: { createdAt: "desc" },
+          include: { items: true },
+        }),
+        prisma.financeTransaction.findMany({
+          where: {
+            reference: { in: ["E-Commerce Sales", "E-Commerce Refunds"] },
+            deletedAt: null,
+          },
+          select: { transactionId: true, reference: true },
+        }),
+        prisma.pig.findMany({
+          where: {
+            deletedAt: null,
+            currentBeneficiaryId: null,
+            healthStatus: PigHealthStatus.HEALTHY,
+            status: { in: [PigStatus.ACTIVE, PigStatus.REGISTERED] },
+          },
+          orderBy: { tagNumber: "asc" },
+          select: {
+            id: true,
+            tagNumber: true,
+            breed: true,
+            currentWeight: true,
+          },
+        }),
+        prisma.cooperativeStockReport
+          .findMany({ orderBy: { createdAt: "desc" }, take: 50 })
+          .catch(() => []),
+        prisma.cellFeedSale
+          .findMany({ orderBy: { createdAt: "desc" }, take: 50 })
+          .catch(() => []),
+      ]);
 
     const syncedSet = new Set(
       syncedTransactions
@@ -123,6 +215,8 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
         customerEmail: order.customerEmail,
         customerPhone: order.customerPhone,
         shippingAddress: order.shippingAddress ?? null,
+        subtotalAmount: (order.subtotalAmount ?? order.totalAmount).toString(),
+        discountTotal: (order.discountTotal ?? 0).toString(),
         totalAmount: order.totalAmount.toString(),
         status: order.status,
         paymentMethod: order.paymentMethod,
@@ -150,25 +244,46 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
       }
     }
 
-    const serializedProducts: SerializedStoreProduct[] = products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      price: p.price.toString(),
-      stock: p.stock,
-      category: p.category,
-      imageUrl: p.imageUrl,
-      isAvailable: p.isAvailable,
-      pigId: p.pigId ?? null,
-      sourcePigTag: p.sourcePigTag ?? null,
-      createdAt: p.createdAt.toISOString(),
-    }));
-
     return {
       tableMissing: false,
-      products: serializedProducts,
+      products: products.map(serializeProduct),
       orders: serializedOrders,
       clearedPigs,
+      stockReports: stockReports.map((r) => ({
+        id: r.id,
+        reportedByName: r.reportedByName,
+        cooperativeOwnerName: r.cooperativeOwnerName,
+        cooperativeOwnerRole: r.cooperativeOwnerRole,
+        cellName: r.cellName,
+        animalTitle: r.animalTitle,
+        pigCount: r.pigCount,
+        estimatedWeightKg: r.estimatedWeightKg ? r.estimatedWeightKg.toString() : null,
+        suggestedPrice: r.suggestedPrice ? r.suggestedPrice.toString() : null,
+        pigId: r.pigId ?? null,
+        sourcePigTag: r.sourcePigTag ?? null,
+        notes: r.notes ?? null,
+        status: r.status,
+        listedProductId: r.listedProductId ?? null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      feedSales: feedSales.map((s) => ({
+        id: s.id,
+        saleNumber: s.saleNumber,
+        productId: s.productId ?? null,
+        productName: s.productName,
+        buyerName: s.buyerName,
+        buyerPhone: s.buyerPhone ?? null,
+        quantity: s.quantity,
+        unitPrice: s.unitPrice.toString(),
+        totalAmount: s.totalAmount.toString(),
+        paymentMethod: s.paymentMethod,
+        soldByName: s.soldByName,
+        cellName: s.cellName ?? null,
+        financeTransactionId: s.financeTransactionId ?? null,
+        verificationStatus: s.verificationStatus,
+        notes: s.notes ?? null,
+        createdAt: s.createdAt.toISOString(),
+      })),
       totalRevenue: totalRev.toString(),
       pendingOrdersCount,
     };
@@ -179,6 +294,8 @@ export async function getEcommerceOverview(): Promise<EcommerceOverviewData> {
         products: [],
         orders: [],
         clearedPigs: [],
+        stockReports: [],
+        feedSales: [],
         totalRevenue: "0",
         pendingOrdersCount: 0,
       };
@@ -196,8 +313,17 @@ export async function createStoreProduct(formData: FormData) {
   const priceStr = String(formData.get("price") || "").trim();
   const stockStr = String(formData.get("stock") || "0").trim();
   const category = String(formData.get("category") || "").trim() || null;
+  const rawSection = String(formData.get("storeSection") || "ANIMALS").trim().toUpperCase();
+  const storeSection = rawSection === "ANIMAL_FOOD" ? "ANIMAL_FOOD" : "ANIMALS";
   const imageUrl = String(formData.get("imageUrl") || "").trim() || null;
   const pigIdRaw = String(formData.get("pigId") || "").trim() || null;
+  const reportId = String(formData.get("reportId") || "").trim() || null;
+
+  const discountPercentRaw = String(formData.get("discountPercent") || "0").trim();
+  const discountPriceRaw = String(formData.get("discountPrice") || "").trim();
+  const discountLabel = String(formData.get("discountLabel") || "").trim() || null;
+  const discountEndsAtRaw = String(formData.get("discountEndsAt") || "").trim();
+  const lowStockRaw = String(formData.get("lowStockThreshold") || "3").trim();
 
   if (name.length < 2) {
     return { success: false, error: "Product name is required." };
@@ -209,6 +335,20 @@ export async function createStoreProduct(formData: FormData) {
   if (Number.isNaN(stock) || stock < 0) {
     return { success: false, error: "Stock must be 0 or greater." };
   }
+
+  const discountPercentNum = Number(discountPercentRaw || 0);
+  if (Number.isNaN(discountPercentNum) || discountPercentNum < 0 || discountPercentNum > 90) {
+    return { success: false, error: "Discount percentage must be between 0 and 90." };
+  }
+  const discountPriceNum = discountPriceRaw ? Number(discountPriceRaw) : null;
+  if (
+    discountPriceNum !== null &&
+    (Number.isNaN(discountPriceNum) || discountPriceNum <= 0 || discountPriceNum >= Number(priceStr))
+  ) {
+    return { success: false, error: "Promo discount price must be positive and less than base price." };
+  }
+  const discountEndsAt = discountEndsAtRaw ? new Date(`${discountEndsAtRaw}T23:59:59.000Z`) : null;
+  const lowStockThreshold = Math.max(1, Number.parseInt(lowStockRaw, 10) || 3);
 
   let sourcePigTag: string | null = null;
   if (pigIdRaw) {
@@ -222,7 +362,6 @@ export async function createStoreProduct(formData: FormData) {
       };
     }
     sourcePigTag = clearance.pig.tagNumber;
-    // Live individual animal SKU is quantity 1 unless explicitly adjusted
     if (stock === 0) stock = 1;
   }
 
@@ -232,14 +371,36 @@ export async function createStoreProduct(formData: FormData) {
         name,
         description,
         price: new Prisma.Decimal(priceStr),
+        discountPercent: new Prisma.Decimal(discountPercentNum.toFixed(2)),
+        discountPrice:
+          discountPriceNum !== null ? new Prisma.Decimal(discountPriceNum.toFixed(2)) : null,
+        discountLabel,
+        discountEndsAt,
         stock,
-        category: category || (pigIdRaw ? "Livestock" : null),
+        lowStockThreshold,
+        category:
+          category ||
+          (storeSection === "ANIMAL_FOOD" ? "Animal Feed" : pigIdRaw ? "Livestock" : "Livestock"),
+        storeSection,
         imageUrl,
         isAvailable: true,
         pigId: pigIdRaw,
         sourcePigTag,
       },
     });
+
+    if (reportId) {
+      await prisma.cooperativeStockReport
+        .update({
+          where: { id: reportId },
+          data: {
+            status: "LISTED",
+            listedProductId: product.id,
+            reviewedById: actor.id,
+          },
+        })
+        .catch(() => undefined);
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -250,7 +411,10 @@ export async function createStoreProduct(formData: FormData) {
         entityId: product.id,
         newValue: {
           name,
+          storeSection,
           price: priceStr,
+          discountPercent: discountPercentNum,
+          discountPrice: discountPriceNum,
           stock,
           category: product.category,
           pigId: pigIdRaw,
@@ -260,6 +424,8 @@ export async function createStoreProduct(formData: FormData) {
     });
 
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/dashboard/field/stock-reports");
     revalidatePath("/dashboard/admin");
     revalidatePath("/store");
     return { success: true };
@@ -311,6 +477,7 @@ export async function toggleProductAvailability(productId: string) {
     });
 
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/field/feed-sales");
     revalidatePath("/store");
     return { success: true, isAvailable: nextAvailable };
   } catch (err) {
@@ -348,11 +515,417 @@ export async function updateProductStock(productId: string, stock: number) {
     });
 
     revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/field/feed-sales");
     revalidatePath("/store");
     return { success: true };
   } catch (err) {
     console.error("Failed to update stock:", err);
     return { success: false, error: "Failed to update stock." };
+  }
+}
+
+export async function updateProductPricingAndDiscount(params: {
+  productId: string;
+  price: number;
+  stock: number;
+  discountPercent: number;
+  discountPrice: number | null;
+  discountLabel: string | null;
+  discountEndsAt: string | null;
+}) {
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
+  if (!actor) return { success: false, error: "Unauthorized" };
+
+  const { productId, price, stock, discountPercent, discountPrice, discountLabel, discountEndsAt } = params;
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return { success: false, error: "Base price must be greater than 0 RWF." };
+  }
+  if (!Number.isInteger(stock) || stock < 0) {
+    return { success: false, error: "Stock must be a non-negative integer." };
+  }
+  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 90) {
+    return { success: false, error: "Discount % must be between 0 and 90." };
+  }
+  if (discountPrice !== null && (discountPrice <= 0 || discountPrice >= price)) {
+    return { success: false, error: "Promo discount price must be positive and below base price." };
+  }
+
+  try {
+    const existing = await prisma.storeProduct.findUnique({ where: { id: productId } });
+    if (!existing) return { success: false, error: "Product not found." };
+
+    const parsedEndsAt = discountEndsAt ? new Date(`${discountEndsAt}T23:59:59.000Z`) : null;
+
+    await prisma.storeProduct.update({
+      where: { id: productId },
+      data: {
+        price: new Prisma.Decimal(price.toFixed(2)),
+        stock,
+        discountPercent: new Prisma.Decimal(discountPercent.toFixed(2)),
+        discountPrice:
+          discountPrice !== null ? new Prisma.Decimal(discountPrice.toFixed(2)) : null,
+        discountLabel: discountLabel?.trim() || null,
+        discountEndsAt:
+          parsedEndsAt && !Number.isNaN(parsedEndsAt.getTime()) ? parsedEndsAt : null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: "PRICING_AND_DISCOUNT_UPDATED",
+        entity: "STORE_PRODUCT",
+        entityId: productId,
+        previousValue: {
+          price: existing.price.toString(),
+          stock: existing.stock,
+          discountPercent: existing.discountPercent?.toString() ?? "0",
+        },
+        newValue: {
+          price: price.toFixed(2),
+          stock,
+          discountPercent,
+          discountPrice,
+          discountLabel,
+        },
+      },
+    });
+
+    revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/store");
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to update product pricing/discount:", err);
+    return { success: false, error: "Failed to update pricing & discount." };
+  }
+}
+
+export async function submitCooperativeStockReport(formData: FormData) {
+  const actor = await getActiveUser([
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.PROJECT_MANAGER,
+    Role.SUPER_ADMIN,
+  ]);
+  if (!actor) return { success: false, error: "Unauthorized" };
+
+  const cooperativeOwnerName = String(formData.get("cooperativeOwnerName") || "").trim();
+  const cooperativeOwnerRole =
+    String(formData.get("cooperativeOwnerRole") || "COOPERATIVE_MEMBER").trim();
+  const cellName = String(formData.get("cellName") || "").trim();
+  const animalTitle = String(formData.get("animalTitle") || "").trim();
+  const pigCount = Number.parseInt(String(formData.get("pigCount") || "1"), 10);
+  const weightRaw = String(formData.get("estimatedWeightKg") || "").trim();
+  const priceRaw = String(formData.get("suggestedPrice") || "").trim();
+  const pigId = String(formData.get("pigId") || "").trim() || null;
+  const notes = String(formData.get("notes") || "").trim() || null;
+
+  if (!cooperativeOwnerName || !cellName || !animalTitle) {
+    return { success: false, error: "Owner name, cell name, and animal description are required." };
+  }
+  if (!Number.isInteger(pigCount) || pigCount < 1) {
+    return { success: false, error: "Animal stock count must be at least 1." };
+  }
+
+  let sourcePigTag: string | null = null;
+  if (pigId) {
+    const pig = await prisma.pig.findUnique({
+      where: { id: pigId },
+      select: { tagNumber: true },
+    });
+    sourcePigTag = pig?.tagNumber ?? null;
+  }
+
+  try {
+    const report = await prisma.cooperativeStockReport.create({
+      data: {
+        reportedById: actor.id,
+        reportedByName: actor.name,
+        cooperativeOwnerName,
+        cooperativeOwnerRole,
+        cellName,
+        animalTitle,
+        pigCount,
+        estimatedWeightKg:
+          weightRaw && !Number.isNaN(Number(weightRaw))
+            ? new Prisma.Decimal(Number(weightRaw).toFixed(2))
+            : null,
+        suggestedPrice:
+          priceRaw && !Number.isNaN(Number(priceRaw))
+            ? new Prisma.Decimal(Number(priceRaw).toFixed(2))
+            : null,
+        pigId,
+        sourcePigTag,
+        notes,
+        status: "PENDING",
+      },
+    });
+
+    // Notify Project Manager (Gebyian) & Super Admins to set official stock, price & discount on Gebyian Network
+    const managers = await prisma.user.findMany({
+      where: {
+        role: { in: [Role.PROJECT_MANAGER, Role.SUPER_ADMIN] },
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (managers.length > 0) {
+      await prisma.notification.createMany({
+        data: managers.map((m) => ({
+          userId: m.id,
+          type: NotificationType.INFO,
+          title: `Gebyian Network Stock Report (${cellName})`,
+          message: `${actor.name} reported ${pigCount}x "${animalTitle}" from ${cooperativeOwnerName} (${cooperativeOwnerRole.replace(/_/g, " ")}) ready for Project Manager (Gebyian) pricing & listing.`,
+          relatedEntity: "COOPERATIVE_STOCK_REPORT",
+          relatedEntityId: report.id,
+        })),
+      });
+    }
+
+    revalidatePath("/dashboard/field/stock-reports");
+    revalidatePath("/dashboard/admin/ecommerce");
+    return { success: true };
+  } catch (err) {
+    if (isSupabaseTableMissingError(err)) {
+      return {
+        success: false,
+        error: "Run update.sql in Supabase SQL Editor first to enable cooperative_stock_reports.",
+      };
+    }
+    console.error("Failed to submit cooperative stock report:", err);
+    return { success: false, error: "Failed to submit animal stock report." };
+  }
+}
+
+export async function rejectCooperativeStockReport(reportId: string) {
+  const actor = await getActiveUser([Role.PROJECT_MANAGER, Role.SUPER_ADMIN]);
+  if (!actor) return { success: false, error: "Unauthorized" };
+
+  try {
+    await prisma.cooperativeStockReport.update({
+      where: { id: reportId },
+      data: {
+        status: "REJECTED",
+        reviewedById: actor.id,
+      },
+    });
+
+    revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/field/stock-reports");
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to reject cooperative stock report:", err);
+    return { success: false, error: "Failed to update stock report." };
+  }
+}
+
+export async function recordCellFeedSale(formData: FormData) {
+  const actor = await getActiveUser([Role.CELL_MANAGER, Role.PROJECT_MANAGER, Role.SUPER_ADMIN]);
+  if (!actor) return { success: false, error: "Unauthorized" };
+
+  const productId = String(formData.get("productId") || "").trim();
+  const buyerName = String(formData.get("buyerName") || "").trim();
+  const buyerPhone = String(formData.get("buyerPhone") || "").trim() || null;
+  const cellName = String(formData.get("cellName") || "").trim() || null;
+  const paymentMethod = String(formData.get("paymentMethod") || "Cash").trim();
+  const quantity = Number.parseInt(String(formData.get("quantity") || "1"), 10);
+  const notes = String(formData.get("notes") || "").trim() || null;
+
+  if (!productId || !buyerName) {
+    return { success: false, error: "Feed product and buyer name are required." };
+  }
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    return { success: false, error: "Quantity must be at least 1." };
+  }
+
+  try {
+    const product = await prisma.storeProduct.findUnique({ where: { id: productId } });
+    if (!product || !product.isAvailable) {
+      return { success: false, error: "Selected animal food product is unavailable." };
+    }
+    if (product.stock < quantity) {
+      return {
+        success: false,
+        error: `Insufficient feed stock for "${product.name}" (available: ${product.stock}).`,
+      };
+    }
+
+    const pricing = getEffectiveProductPrice(product);
+    const unitPrice = new Prisma.Decimal(pricing.effectivePrice.toFixed(2));
+    const totalAmount = unitPrice.mul(quantity);
+    const saleNumber = `FEED-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
+
+    await prisma.storeProduct.update({
+      where: { id: product.id },
+      data: { stock: Math.max(0, product.stock - quantity) },
+    });
+
+    const finTx = await prisma.financeTransaction.create({
+      data: {
+        transactionId: saleNumber,
+        type: FinanceType.INCOME,
+        amount: totalAmount,
+        reference: "Animal Feed Sales",
+        description: `Cell Feed Sale ${saleNumber}: ${quantity}x ${product.name} to ${buyerName}${
+          cellName ? ` (${cellName})` : ""
+        }${pricing.hasActiveDiscount ? ` [Discount ${pricing.discountPercentApplied}% applied]` : ""}`,
+        paymentMethod,
+        recordedById: actor.id,
+        transactionDate: new Date(),
+        status: FinanceStatus.SUBMITTED,
+      },
+    });
+
+    const sale = await prisma.cellFeedSale.create({
+      data: {
+        saleNumber,
+        productId: product.id,
+        productName: product.name,
+        buyerName,
+        buyerPhone,
+        quantity,
+        unitPrice,
+        totalAmount,
+        paymentMethod,
+        soldById: actor.id,
+        soldByName: actor.name,
+        cellName,
+        financeTransactionId: finTx.transactionId,
+        verificationStatus: "PENDING",
+        notes,
+      },
+    });
+
+    // Notify Finance Officer / Super Admin for verification
+    const financeUsers = await prisma.user.findMany({
+      where: {
+        role: { in: [Role.FINANCE_OFFICER, Role.SUPER_ADMIN] },
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (financeUsers.length > 0) {
+      await prisma.notification.createMany({
+        data: financeUsers.map((acc) => ({
+          userId: acc.id,
+          type: NotificationType.INFO,
+          title: `Feed Sale Verification Needed (${saleNumber})`,
+          message: `Cell Manager ${actor.name} sold ${quantity}x ${product.name} to ${buyerName} for ${totalAmount.toString()} RWF (${paymentMethod}). Please verify in Finance.`,
+          relatedEntity: "CELL_FEED_SALE",
+          relatedEntityId: sale.id,
+        })),
+      });
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: "CELL_FEED_SALE_RECORDED",
+        entity: "CELL_FEED_SALE",
+        entityId: sale.id,
+        newValue: {
+          saleNumber,
+          productName: product.name,
+          quantity,
+          totalAmount: totalAmount.toString(),
+          cellName,
+        },
+      },
+    });
+
+    revalidatePath("/dashboard/field/feed-sales");
+    revalidatePath("/dashboard/finance");
+    revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/admin/finance");
+    return { success: true, saleNumber };
+  } catch (err) {
+    if (isSupabaseTableMissingError(err)) {
+      return {
+        success: false,
+        error: "Run update.sql in Supabase SQL Editor first to enable cell_feed_sales.",
+      };
+    }
+    console.error("Failed to record cell feed sale:", err);
+    return { success: false, error: "Failed to record animal food sale." };
+  }
+}
+
+export async function verifyCellFeedSale(saleId: string, decision: "VERIFIED" | "REJECTED") {
+  const actor = await getActiveUser([Role.FINANCE_OFFICER, Role.SUPER_ADMIN]);
+  if (!actor) return { success: false, error: "Unauthorized" };
+
+  try {
+    const sale = await prisma.cellFeedSale.findUnique({ where: { id: saleId } });
+    if (!sale) return { success: false, error: "Feed sale record not found." };
+    if (sale.verificationStatus !== "PENDING") {
+      return { success: false, error: "This sale has already been processed." };
+    }
+
+    await prisma.cellFeedSale.update({
+      where: { id: sale.id },
+      data: {
+        verificationStatus: decision,
+        verifiedById: actor.id,
+        verifiedAt: new Date(),
+      },
+    });
+
+    if (sale.financeTransactionId) {
+      const finTx = await prisma.financeTransaction.findUnique({
+        where: { transactionId: sale.financeTransactionId },
+      });
+      if (finTx) {
+        await prisma.financeTransaction.update({
+          where: { id: finTx.id },
+          data: {
+            status:
+              decision === "VERIFIED" ? FinanceStatus.APPROVED : FinanceStatus.REJECTED,
+            approvedById: actor.id,
+            approvedAt: new Date(),
+          },
+        });
+      }
+    }
+
+    // Restore feed stock if rejected
+    if (decision === "REJECTED" && sale.productId) {
+      const product = await prisma.storeProduct.findUnique({ where: { id: sale.productId } });
+      if (product) {
+        await prisma.storeProduct.update({
+          where: { id: product.id },
+          data: { stock: product.stock + sale.quantity },
+        });
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: `CELL_FEED_SALE_${decision}`,
+        entity: "CELL_FEED_SALE",
+        entityId: sale.id,
+        newValue: { saleNumber: sale.saleNumber, decision, totalAmount: sale.totalAmount.toString() },
+      },
+    });
+
+    revalidatePath("/dashboard/finance");
+    revalidatePath("/dashboard/finance/reports");
+    revalidatePath("/dashboard/admin/finance");
+    revalidatePath("/dashboard/admin/ecommerce");
+    revalidatePath("/dashboard/field/feed-sales");
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to verify cell feed sale:", err);
+    return { success: false, error: "Verification failed." };
   }
 }
 
@@ -382,6 +955,7 @@ export async function updateStoreOrderStatus(orderId: string, nextStatus: string
     revalidatePath(`/dashboard/admin/ecommerce/${orderId}`);
     revalidatePath("/dashboard/admin");
     revalidatePath("/dashboard/admin/finance");
+    revalidatePath("/dashboard/finance");
     revalidatePath("/dashboard/admin/reports");
     revalidatePath("/store");
     return res;
@@ -403,6 +977,7 @@ export async function getStoreOrderDetail(orderId: string) {
                 id: true,
                 name: true,
                 category: true,
+                storeSection: true,
                 sourcePigTag: true,
                 imageUrl: true,
               },

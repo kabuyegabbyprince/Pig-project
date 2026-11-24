@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { NotificationType, OrderStatus, PigStatus, Prisma, Role } from "@prisma/client";
 import { prisma, isSupabaseTableMissingError } from "@/lib/prisma";
 import { checkPigVetClearance } from "@/lib/vet-clearance";
+import { getEffectiveProductPrice } from "@/lib/ecommerce-pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
         items: {
           include: {
             product: {
-              select: { name: true, category: true, sourcePigTag: true },
+              select: { name: true, category: true, storeSection: true, sourcePigTag: true },
             },
           },
         },
@@ -42,11 +43,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
-    // Basic contact match when provided so buyers can verify ownership cleanly
     if (contact) {
       const normalizedContact = contact.replace(/[\s\-().]/g, "").toLowerCase();
       const emailMatch = order.customerEmail?.toLowerCase() === normalizedContact;
-      const phoneMatch = order.customerPhone?.replace(/[\s\-().]/g, "").endsWith(normalizedContact.slice(-8));
+      const phoneMatch = order.customerPhone
+        ?.replace(/[\s\-().]/g, "")
+        .endsWith(normalizedContact.slice(-8));
       if (!emailMatch && !phoneMatch) {
         return NextResponse.json(
           { error: "Order number and phone/email do not match." },
@@ -61,6 +63,8 @@ export async function GET(req: NextRequest) {
         orderNumber: order.orderNumber,
         status: order.status,
         customerName: order.customerName,
+        subtotalAmount: (order.subtotalAmount ?? order.totalAmount).toString(),
+        discountTotal: (order.discountTotal ?? 0).toString(),
         totalAmount: order.totalAmount.toString(),
         paymentMethod: order.paymentMethod,
         paymentReference: order.paymentReference ?? null,
@@ -70,8 +74,11 @@ export async function GET(req: NextRequest) {
         items: (order.items ?? []).map((item) => ({
           name: item.product?.name || "Product",
           category: item.product?.category || "General",
+          storeSection: item.product?.storeSection || "ANIMALS",
           sourcePigTag: item.product?.sourcePigTag ?? null,
           quantity: item.quantity,
+          originalPrice: (item.originalPrice ?? item.price).toString(),
+          discountAmount: (item.discountAmount ?? 0).toString(),
           price: item.price.toString(),
         })),
       },
@@ -126,7 +133,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cart cannot be empty." }, { status: 400 });
     }
 
-    // Aggregate quantities per productId
     const requestedMap = new Map<string, number>();
     for (const item of items) {
       const pid = String(item?.productId || "").trim();
@@ -143,10 +149,15 @@ export async function POST(req: NextRequest) {
     });
     const productMap = new Map(dbProducts.map((p) => [p.id, p]));
 
+    let subtotalAmount = new Prisma.Decimal(0);
+    let discountTotal = new Prisma.Decimal(0);
     let totalAmount = new Prisma.Decimal(0);
+
     const verifiedLines: Array<{
       product: (typeof dbProducts)[number];
       quantity: number;
+      originalPrice: Prisma.Decimal;
+      discountPerUnit: Prisma.Decimal;
       unitPrice: Prisma.Decimal;
     }> = [];
 
@@ -174,11 +185,22 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const unitPrice = product.price instanceof Prisma.Decimal
-        ? product.price
-        : new Prisma.Decimal(String(product.price));
+      const pricing = getEffectiveProductPrice(product);
+      const originalPrice = new Prisma.Decimal(pricing.originalPrice.toFixed(2));
+      const unitPrice = new Prisma.Decimal(pricing.effectivePrice.toFixed(2));
+      const discountPerUnit = new Prisma.Decimal(pricing.discountAmountPerUnit.toFixed(2));
+
+      subtotalAmount = subtotalAmount.plus(originalPrice.mul(qty));
+      discountTotal = discountTotal.plus(discountPerUnit.mul(qty));
       totalAmount = totalAmount.plus(unitPrice.mul(qty));
-      verifiedLines.push({ product, quantity: qty, unitPrice });
+
+      verifiedLines.push({
+        product,
+        quantity: qty,
+        originalPrice,
+        discountPerUnit,
+        unitPrice,
+      });
     }
 
     const orderNumber = generateOrderNumber();
@@ -190,6 +212,8 @@ export async function POST(req: NextRequest) {
         customerEmail,
         customerPhone,
         shippingAddress,
+        subtotalAmount,
+        discountTotal,
         totalAmount,
         status: OrderStatus.PENDING,
         paymentMethod,
@@ -203,6 +227,8 @@ export async function POST(req: NextRequest) {
           orderId: createdOrder.id,
           productId: line.product.id,
           quantity: line.quantity,
+          originalPrice: line.originalPrice,
+          discountAmount: line.discountPerUnit.mul(line.quantity),
           price: line.unitPrice,
         },
       });
@@ -221,18 +247,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Notify Super Admins about incoming storefront order
-    const admins = await prisma.user.findMany({
-      where: { role: Role.SUPER_ADMIN, isActive: true, deletedAt: null },
+    // Notify both Project Manager (Gebyian) and Super Admins about incoming Gebyian Network order
+    const managers = await prisma.user.findMany({
+      where: {
+        role: { in: [Role.PROJECT_MANAGER, Role.SUPER_ADMIN] },
+        isActive: true,
+        deletedAt: null,
+      },
       select: { id: true },
     });
-    if (admins.length > 0) {
+    if (managers.length > 0) {
+      const itemSummary = verifiedLines
+        .map((l) => `${l.quantity}x ${l.product.name}`)
+        .join(", ");
       await prisma.notification.createMany({
-        data: admins.map((a) => ({
-          userId: a.id,
+        data: managers.map((m) => ({
+          userId: m.id,
           type: NotificationType.INFO,
-          title: `New Store Order ${orderNumber}`,
-          message: `${customerName} placed order ${orderNumber} totaling ${totalAmount.toString()} RWF (${paymentMethod}).`,
+          title: `New Gebyian Network Order ${orderNumber}`,
+          message: `${customerName} (${customerPhone || customerEmail || "no contact"}) ordered ${itemSummary} totaling ${totalAmount.toString()} RWF (${paymentMethod}).`,
           relatedEntity: "STORE_ORDER",
           relatedEntityId: createdOrder.id,
         })),
@@ -248,6 +281,8 @@ export async function POST(req: NextRequest) {
         newValue: {
           orderNumber,
           customerName,
+          subtotalAmount: subtotalAmount.toString(),
+          discountTotal: discountTotal.toString(),
           totalAmount: totalAmount.toString(),
           paymentMethod,
           itemCount: verifiedLines.length,
@@ -262,6 +297,8 @@ export async function POST(req: NextRequest) {
           id: createdOrder.id,
           orderNumber: createdOrder.orderNumber,
           status: createdOrder.status,
+          subtotalAmount: subtotalAmount.toString(),
+          discountTotal: discountTotal.toString(),
           totalAmount: totalAmount.toString(),
           paymentMethod,
         },

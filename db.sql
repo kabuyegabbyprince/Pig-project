@@ -1148,3 +1148,349 @@ ALTER TABLE "Comment" ADD CONSTRAINT "Comment_senderId_fkey" FOREIGN KEY ("sende
 -- AddForeignKey
 ALTER TABLE "Comment" ADD CONSTRAINT "Comment_repliedById_fkey" FOREIGN KEY ("repliedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+
+
+
+
+
+
+
+
+-- ============================================================================
+-- PIG PROJECT RWANDA — DATABASE UPDATE & MIGRATION SCRIPT (update.sql)
+-- ============================================================================
+
+-- 1. Role Enum Updates (Removed FIELD_OFFICER, verified cooperative hierarchy)
+-- Note: PostgreSQL ENUM modifications or text casting
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'PROJECT_MANAGER';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'COOPERATIVE_LEADER';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'COOPERATIVE_MEMBER';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'CELL_MANAGER';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'VETERINARIAN';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'ACCOUNTANT';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'FINANCE_OFFICER';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'TRAINER';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'FUNDER';
+
+-- 2. Gallery Storage Bucket / Table schema support
+CREATE TABLE IF NOT EXISTS "gallery_items" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "image_url" TEXT NOT NULL,
+    "category" TEXT,
+    "location" TEXT,
+    "photo_date" TIMESTAMP(3),
+    "photographer" TEXT,
+    "display_order" INTEGER NOT NULL DEFAULT 0,
+    "is_published" BOOLEAN NOT NULL DEFAULT TRUE,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "gallery_items_pkey" PRIMARY KEY ("id")
+);
+
+-- 3. Cooperative & Cell Management structures
+-- Cell Managers manage akagari/cell operations, Veterinarians verify pig health clearances, 
+-- Accountants verify transactions, Cooperative Leaders aggregate member reports.
+CREATE INDEX IF NOT EXISTS "idx_gallery_published" ON "gallery_items"("is_published");
+CREATE INDEX IF NOT EXISTS "idx_gallery_category" ON "gallery_items"("category");
+
+-- 4. Website Content (Hero Section with updated asset)
+CREATE TABLE IF NOT EXISTS "website_content" (
+    "id" TEXT NOT NULL,
+    "page" TEXT NOT NULL DEFAULT 'home',
+    "section" TEXT NOT NULL DEFAULT 'hero',
+    "title" TEXT,
+    "description" TEXT,
+    "primary_button_text" TEXT,
+    "primary_button_link" TEXT,
+    "secondary_button_text" TEXT,
+    "secondary_button_link" TEXT,
+    "image_url" TEXT,
+    "image_alt" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "website_content_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "website_content_page_section_key" ON "website_content"("page", "section");
+-- ============================================================================
+-- PIG PROJECT RWANDA — E-COMMERCE, DISCOUNTS, ANIMAL STOCK REPORTS & FEED SALES
+-- Idempotent SQL Migration Script — Run in Supabase SQL Editor
+-- ============================================================================
+
+-- 1. OrderStatus Enum
+DO $$ BEGIN
+  CREATE TYPE "OrderStatus" AS ENUM (
+    'PENDING',
+    'PAID',
+    'PROCESSING',
+    'DISPATCHED',
+    'COMPLETED',
+    'CANCELLED'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+-- 2. Store Products (2-Part Catalog: 'ANIMALS' & 'ANIMAL_FOOD' + Discounts & Stock)
+CREATE TABLE IF NOT EXISTS "store_products" (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "description" TEXT,
+  "price" NUMERIC(12, 2) NOT NULL,
+  "discount_percent" NUMERIC(5, 2) NOT NULL DEFAULT 0,
+  "discount_price" NUMERIC(12, 2),
+  "discount_label" TEXT,
+  "discount_starts_at" TIMESTAMP(3),
+  "discount_ends_at" TIMESTAMP(3),
+  "stock" INTEGER NOT NULL DEFAULT 0,
+  "low_stock_threshold" INTEGER NOT NULL DEFAULT 3,
+  "category" TEXT,
+  "store_section" TEXT NOT NULL DEFAULT 'ANIMALS',
+  "imageUrl" TEXT,
+  "isAvailable" BOOLEAN NOT NULL DEFAULT true,
+  "pig_id" TEXT REFERENCES "Pig"("id") ON DELETE SET NULL,
+  "source_pig_tag" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_percent" NUMERIC(5, 2) NOT NULL DEFAULT 0;
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_price" NUMERIC(12, 2);
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_label" TEXT;
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_starts_at" TIMESTAMP(3);
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "discount_ends_at" TIMESTAMP(3);
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "low_stock_threshold" INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "store_section" TEXT NOT NULL DEFAULT 'ANIMALS';
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "pig_id" TEXT REFERENCES "Pig"("id") ON DELETE SET NULL;
+ALTER TABLE "store_products" ADD COLUMN IF NOT EXISTS "source_pig_tag" TEXT;
+
+-- 3. Store Orders
+CREATE TABLE IF NOT EXISTS "store_orders" (
+  "id" TEXT PRIMARY KEY,
+  "order_number" TEXT UNIQUE NOT NULL,
+  "customer_name" TEXT NOT NULL,
+  "customer_email" TEXT,
+  "customer_phone" TEXT,
+  "shipping_address" TEXT,
+  "subtotal_amount" NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  "discount_total" NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  "total_amount" NUMERIC(12, 2) NOT NULL,
+  "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',
+  "payment_method" TEXT,
+  "payment_reference" TEXT,
+  "notes" TEXT,
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE "store_orders" ADD COLUMN IF NOT EXISTS "shipping_address" TEXT;
+ALTER TABLE "store_orders" ADD COLUMN IF NOT EXISTS "payment_reference" TEXT;
+ALTER TABLE "store_orders" ADD COLUMN IF NOT EXISTS "subtotal_amount" NUMERIC(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE "store_orders" ADD COLUMN IF NOT EXISTS "discount_total" NUMERIC(12, 2) NOT NULL DEFAULT 0;
+
+-- 4. Store Order Items
+CREATE TABLE IF NOT EXISTS "store_order_items" (
+  "id" TEXT PRIMARY KEY,
+  "order_id" TEXT NOT NULL REFERENCES "store_orders"("id") ON DELETE CASCADE,
+  "product_id" TEXT REFERENCES "store_products"("id") ON DELETE SET NULL,
+  "quantity" INTEGER NOT NULL,
+  "original_price" NUMERIC(12, 2),
+  "discount_amount" NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  "price" NUMERIC(12, 2) NOT NULL
+);
+
+ALTER TABLE "store_order_items" ADD COLUMN IF NOT EXISTS "original_price" NUMERIC(12, 2);
+ALTER TABLE "store_order_items" ADD COLUMN IF NOT EXISTS "discount_amount" NUMERIC(12, 2) NOT NULL DEFAULT 0;
+
+-- 5. Cooperative Animal Stock Reports (Cell Manager reports cooperative animals -> Project Manager sets stock & prices)
+CREATE TABLE IF NOT EXISTS "cooperative_stock_reports" (
+  "id" TEXT PRIMARY KEY,
+  "reported_by_id" TEXT NOT NULL,
+  "reported_by_name" TEXT NOT NULL,
+  "cooperative_owner_name" TEXT NOT NULL,
+  "cooperative_owner_role" TEXT NOT NULL DEFAULT 'COOPERATIVE_MEMBER',
+  "cell_name" TEXT NOT NULL,
+  "animal_title" TEXT NOT NULL,
+  "pig_count" INTEGER NOT NULL DEFAULT 1,
+  "estimated_weight_kg" NUMERIC(8, 2),
+  "suggested_price" NUMERIC(12, 2),
+  "pig_id" TEXT REFERENCES "Pig"("id") ON DELETE SET NULL,
+  "source_pig_tag" TEXT,
+  "notes" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'PENDING',
+  "listed_product_id" TEXT REFERENCES "store_products"("id") ON DELETE SET NULL,
+  "reviewed_by_id" TEXT,
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Cell Manager Animal Food Sales (Cell Manager sells Feed -> Accountant verifies & sees reports)
+CREATE TABLE IF NOT EXISTS "cell_feed_sales" (
+  "id" TEXT PRIMARY KEY,
+  "sale_number" TEXT UNIQUE NOT NULL,
+  "product_id" TEXT REFERENCES "store_products"("id") ON DELETE SET NULL,
+  "product_name" TEXT NOT NULL,
+  "buyer_name" TEXT NOT NULL,
+  "buyer_phone" TEXT,
+  "quantity" INTEGER NOT NULL,
+  "unit_price" NUMERIC(12, 2) NOT NULL,
+  "total_amount" NUMERIC(12, 2) NOT NULL,
+  "payment_method" TEXT NOT NULL DEFAULT 'Cash',
+  "sold_by_id" TEXT NOT NULL,
+  "sold_by_name" TEXT NOT NULL,
+  "cell_name" TEXT,
+  "finance_transaction_id" TEXT,
+  "verification_status" TEXT NOT NULL DEFAULT 'PENDING',
+  "verified_by_id" TEXT,
+  "verified_at" TIMESTAMP(3),
+  "notes" TEXT,
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 7. Indexes
+CREATE INDEX IF NOT EXISTS "store_products_pig_id_idx" ON "store_products"("pig_id");
+CREATE INDEX IF NOT EXISTS "store_products_section_idx" ON "store_products"("store_section");
+CREATE INDEX IF NOT EXISTS "store_orders_order_number_idx" ON "store_orders"("order_number");
+CREATE INDEX IF NOT EXISTS "store_orders_status_idx" ON "store_orders"("status");
+CREATE INDEX IF NOT EXISTS "store_order_items_order_id_idx" ON "store_order_items"("order_id");
+CREATE INDEX IF NOT EXISTS "store_order_items_product_id_idx" ON "store_order_items"("product_id");
+CREATE INDEX IF NOT EXISTS "coop_stock_reports_status_idx" ON "cooperative_stock_reports"("status");
+CREATE INDEX IF NOT EXISTS "cell_feed_sales_status_idx" ON "cell_feed_sales"("verification_status");
+CREATE INDEX IF NOT EXISTS "cell_feed_sales_sold_by_idx" ON "cell_feed_sales"("sold_by_id");
+
+-- 8. Row-Level Security (RLS) Policies
+ALTER TABLE "store_products" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "store_orders" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "store_order_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "cooperative_stock_reports" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "cell_feed_sales" ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Public read available store products" ON "store_products";
+  CREATE POLICY "Public read available store products"
+    ON "store_products" FOR SELECT
+    TO anon, authenticated
+    USING ("isAvailable" = true);
+EXCEPTION WHEN undefined_table THEN null;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'website_content') THEN
+    ALTER TABLE "website_content" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Public read website content" ON "website_content";
+    CREATE POLICY "Public read website content"
+      ON "website_content" FOR SELECT TO anon, authenticated USING (true);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'gallery_items') THEN
+    ALTER TABLE "gallery_items" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Public read published gallery" ON "gallery_items";
+    CREATE POLICY "Public read published gallery"
+      ON "gallery_items" FOR SELECT TO anon, authenticated USING ("is_published" = true);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'team_members') THEN
+    ALTER TABLE "team_members" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Public read published team" ON "team_members";
+    CREATE POLICY "Public read published team"
+      ON "team_members" FOR SELECT TO anon, authenticated USING ("is_published" = true);
+  END IF;
+END $$;
+
+
+
+
+
+
+
+
+-- ============================================================================
+-- PIG PROJECT RWANDA & GEBYIAN NETWORK — ROLE CLEANUP & SETTINGS MIGRATION
+-- Idempotent, Transaction-Safe SQL Migration Script — Run in Supabase SQL Editor
+-- ============================================================================
+
+-- 1. Migrate & Clean Up Removed Roles ('TRAINER', 'FUNDER', 'ACCOUNTANT', 'FIELD_OFFICER')
+-- Remaining 7 active roles:
+--   SUPER_ADMIN, PROJECT_MANAGER (Gebyian), CELL_MANAGER,
+--   COOPERATIVE_LEADER, COOPERATIVE_MEMBER, VETERINARIAN, FINANCE_OFFICER
+
+-- 1A. Update public."users" table (TEXT role column)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') THEN
+    UPDATE "users" SET "role" = 'FINANCE_OFFICER' WHERE UPPER("role") = 'ACCOUNTANT';
+    UPDATE "users" SET "role" = 'CELL_MANAGER' WHERE UPPER("role") = 'FIELD_OFFICER';
+    UPDATE "users" SET "status" = 'INACTIVE' WHERE UPPER("role") IN ('TRAINER', 'FUNDER');
+  END IF;
+END $$;
+
+-- 1B. Archive removed role accounts on public."User" and rebuild "Role" enum cleanly
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'User') THEN
+    UPDATE "User"
+      SET "isActive" = false,
+          "deletedAt" = COALESCE("deletedAt", NOW())
+      WHERE "role"::text IN ('TRAINER', 'FUNDER');
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'Role'
+      AND e.enumlabel IN ('TRAINER', 'FUNDER', 'ACCOUNTANT', 'FIELD_OFFICER')
+  ) OR (
+    EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Role')
+    AND (
+      SELECT COUNT(*) FROM pg_enum e JOIN pg_type t ON e.enumtypid = t.oid WHERE t.typname = 'Role'
+    ) <> 7
+  ) THEN
+    DROP TYPE IF EXISTS "Role_active";
+    CREATE TYPE "Role_active" AS ENUM (
+      'SUPER_ADMIN',
+      'PROJECT_MANAGER',
+      'CELL_MANAGER',
+      'COOPERATIVE_LEADER',
+      'COOPERATIVE_MEMBER',
+      'VETERINARIAN',
+      'FINANCE_OFFICER'
+    );
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'User') THEN
+      ALTER TABLE "User" ALTER COLUMN "role" DROP DEFAULT;
+      ALTER TABLE "User"
+        ALTER COLUMN "role" TYPE "Role_active"
+        USING (
+          CASE "role"::text
+            WHEN 'ACCOUNTANT' THEN 'FINANCE_OFFICER'
+            WHEN 'FIELD_OFFICER' THEN 'CELL_MANAGER'
+            WHEN 'TRAINER' THEN 'CELL_MANAGER'
+            WHEN 'FUNDER' THEN 'CELL_MANAGER'
+            ELSE "role"::text
+          END
+        )::"Role_active";
+      ALTER TABLE "User" ALTER COLUMN "role" SET DEFAULT 'CELL_MANAGER';
+    END IF;
+
+    DROP TYPE "Role";
+    ALTER TYPE "Role_active" RENAME TO "Role";
+  END IF;
+END $$;
+
+-- 2. Register Gebyian Network E-Commerce Brand Settings
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'SystemSetting') THEN
+    INSERT INTO "SystemSetting" ("id", "key", "value", "description", "updatedAt")
+    VALUES
+      ('gebyian-network-name', 'ecommerce_network_name', 'Gebyian Network', 'Official name of the connected E-Commerce storefront managed by Project Manager (Gebyian).', NOW()),
+      ('gebyian-manager-title', 'ecommerce_manager_title', 'Project Manager (Gebyian)', 'Authorized E-Commerce Manager title responsible for Gebyian Network stock, pricing, discounts, and orders.', NOW())
+    ON CONFLICT ("key") DO UPDATE
+      SET "value" = EXCLUDED."value",
+          "description" = EXCLUDED."description",
+          "updatedAt" = NOW();
+  END IF;
+END $$;

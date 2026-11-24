@@ -10,14 +10,11 @@ generator client {
 enum Role {
   SUPER_ADMIN
   PROJECT_MANAGER
+  CELL_MANAGER
   COOPERATIVE_LEADER
   COOPERATIVE_MEMBER
-  CELL_MANAGER
   VETERINARIAN
-  ACCOUNTANT
   FINANCE_OFFICER
-  TRAINER
-  FUNDER
 }
 
 enum AccessLevel {
@@ -1034,23 +1031,33 @@ enum OrderStatus {
 }
 
 model StoreProduct {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  price        Decimal  @db.Decimal(12, 2)
-  stock        Int      @default(0)
-  category     String?
-  imageUrl     String?
-  isAvailable  Boolean  @default(true)
-  pigId        String?  @map("pig_id")
-  pig          Pig?     @relation(fields: [pigId], references: [id], onDelete: SetNull)
-  sourcePigTag String?  @map("source_pig_tag")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String    @id @default(cuid())
+  name              String
+  description       String?
+  price             Decimal   @db.Decimal(12, 2)
+  discountPercent   Decimal   @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  discountPrice     Decimal?  @map("discount_price") @db.Decimal(12, 2)
+  discountLabel     String?   @map("discount_label")
+  discountStartsAt  DateTime? @map("discount_starts_at")
+  discountEndsAt    DateTime? @map("discount_ends_at")
+  stock             Int       @default(0)
+  lowStockThreshold Int       @default(3) @map("low_stock_threshold")
+  category          String?
+  storeSection      String    @default("ANIMALS") @map("store_section")
+  imageUrl          String?
+  isAvailable       Boolean   @default(true)
+  pigId             String?   @map("pig_id")
+  pig               Pig?      @relation(fields: [pigId], references: [id], onDelete: SetNull)
+  sourcePigTag      String?   @map("source_pig_tag")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  orderItems StoreOrderItem[]
+  orderItems   StoreOrderItem[]
+  stockReports CooperativeStockReport[]
+  feedSales    CellFeedSale[]
 
   @@index([pigId])
+  @@index([storeSection])
   @@map("store_products")
 }
 
@@ -1061,6 +1068,8 @@ model StoreOrder {
   customerEmail    String?     @map("customer_email")
   customerPhone    String?     @map("customer_phone")
   shippingAddress  String?     @map("shipping_address")
+  subtotalAmount   Decimal     @default(0) @map("subtotal_amount") @db.Decimal(12, 2)
+  discountTotal    Decimal     @default(0) @map("discount_total") @db.Decimal(12, 2)
   totalAmount      Decimal     @db.Decimal(12, 2) @map("total_amount")
   status           OrderStatus @default(PENDING)
   paymentMethod    String?     @map("payment_method")
@@ -1077,17 +1086,70 @@ model StoreOrder {
 }
 
 model StoreOrderItem {
-  id        String       @id @default(cuid())
-  orderId   String       @map("order_id")
-  order     StoreOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String?      @map("product_id")
-  product   StoreProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  quantity  Int
-  price     Decimal      @db.Decimal(12, 2)
+  id             String        @id @default(cuid())
+  orderId        String        @map("order_id")
+  order          StoreOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String?       @map("product_id")
+  product        StoreProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  quantity       Int
+  originalPrice  Decimal?      @map("original_price") @db.Decimal(12, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  price          Decimal       @db.Decimal(12, 2)
 
   @@index([orderId])
   @@index([productId])
   @@map("store_order_items")
 }
 
+model CooperativeStockReport {
+  id                   String        @id @default(cuid())
+  reportedById         String        @map("reported_by_id")
+  reportedByName       String        @map("reported_by_name")
+  cooperativeOwnerName String        @map("cooperative_owner_name")
+  cooperativeOwnerRole String        @default("COOPERATIVE_MEMBER") @map("cooperative_owner_role")
+  cellName             String        @map("cell_name")
+  animalTitle          String        @map("animal_title")
+  pigCount             Int           @default(1) @map("pig_count")
+  estimatedWeightKg    Decimal?      @map("estimated_weight_kg") @db.Decimal(8, 2)
+  suggestedPrice       Decimal?      @map("suggested_price") @db.Decimal(12, 2)
+  pigId                String?       @map("pig_id")
+  sourcePigTag         String?       @map("source_pig_tag")
+  notes                String?
+  status               String        @default("PENDING")
+  listedProductId      String?       @map("listed_product_id")
+  listedProduct        StoreProduct? @relation(fields: [listedProductId], references: [id], onDelete: SetNull)
+  reviewedById         String?       @map("reviewed_by_id")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
 
+  @@index([status])
+  @@map("cooperative_stock_reports")
+}
+
+model CellFeedSale {
+  id                   String        @id @default(cuid())
+  saleNumber           String        @unique @map("sale_number")
+  productId            String?       @map("product_id")
+  product              StoreProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName          String        @map("product_name")
+  buyerName            String        @map("buyer_name")
+  buyerPhone           String?       @map("buyer_phone")
+  quantity             Int
+  unitPrice            Decimal       @map("unit_price") @db.Decimal(12, 2)
+  totalAmount          Decimal       @map("total_amount") @db.Decimal(12, 2)
+  paymentMethod        String        @default("Cash") @map("payment_method")
+  soldById             String        @map("sold_by_id")
+  soldByName           String        @map("sold_by_name")
+  cellName             String?       @map("cell_name")
+  financeTransactionId String?       @map("finance_transaction_id")
+  verificationStatus   String        @default("PENDING") @map("verification_status")
+  verifiedById         String?       @map("verified_by_id")
+  verifiedAt           DateTime?     @map("verified_at")
+  notes                String?
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  @@index([verificationStatus])
+  @@index([soldById])
+  @@map("cell_feed_sales")
+}

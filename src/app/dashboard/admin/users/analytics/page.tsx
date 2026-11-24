@@ -41,10 +41,7 @@ export default async function UserAnalyticsPage() {
     COOPERATIVE_LEADER: 0,
     COOPERATIVE_MEMBER: 0,
     VETERINARIAN: 0,
-    ACCOUNTANT: 0,
     FINANCE_OFFICER: 0,
-    TRAINER: 0,
-    FUNDER: 0,
   };
 
   for (const user of users) {

@@ -8,12 +8,14 @@ import {
   Loader2,
   Minus,
   Package,
+  Percent,
   Plus,
   Search,
   ShoppingBag,
   ShoppingCart,
   Tag,
   Trash2,
+  Wheat,
 } from "lucide-react";
 import { formatRwf } from "@/lib/format-rwf";
 
@@ -22,8 +24,14 @@ export type StorefrontProduct = {
   name: string;
   description: string | null;
   price: string;
+  effectivePrice: string;
+  hasActiveDiscount: boolean;
+  discountPercent: number;
+  discountLabel: string | null;
   stock: number;
+  lowStockThreshold: number;
   category: string;
+  storeSection: "ANIMALS" | "ANIMAL_FOOD";
   imageUrl: string | null;
   sourcePigTag: string | null;
 };
@@ -33,6 +41,8 @@ type CartItem = {
   quantity: number;
 };
 
+type SectionTab = "ALL" | "ANIMALS" | "ANIMAL_FOOD" | "DISCOUNTS";
+
 export function StorefrontClient({
   initialProducts,
   tableMissing,
@@ -41,7 +51,9 @@ export function StorefrontClient({
   tableMissing: boolean;
 }) {
   const [products, setProducts] = useState<StorefrontProduct[]>(initialProducts);
+  const [activeSection, setActiveSection] = useState<SectionTab>("ALL");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -54,24 +66,61 @@ export function StorefrontClient({
   const [confirmedOrder, setConfirmedOrder] = useState<{
     orderNumber: string;
     totalAmount: string;
+    discountTotal?: string;
     paymentMethod: string;
   } | null>(null);
 
+  const sectionCounts = useMemo(() => {
+    return {
+      ALL: products.length,
+      ANIMALS: products.filter((p) => p.storeSection === "ANIMALS").length,
+      ANIMAL_FOOD: products.filter((p) => p.storeSection === "ANIMAL_FOOD").length,
+      DISCOUNTS: products.filter((p) => p.hasActiveDiscount).length,
+    };
+  }, [products]);
+
+  const sectionFiltered = useMemo(() => {
+    return products.filter((p) => {
+      if (activeSection === "ANIMALS" && p.storeSection !== "ANIMALS") return false;
+      if (activeSection === "ANIMAL_FOOD" && p.storeSection !== "ANIMAL_FOOD") return false;
+      if (activeSection === "DISCOUNTS" && !p.hasActiveDiscount) return false;
+      return true;
+    });
+  }, [products, activeSection]);
+
   const categories = useMemo(() => {
     const set = new Set<string>(["ALL"]);
-    for (const p of products) {
+    for (const p of sectionFiltered) {
       if (p.category) set.add(p.category);
     }
     return Array.from(set);
-  }, [products]);
+  }, [sectionFiltered]);
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === "ALL") return products;
-    return products.filter((p) => p.category === selectedCategory);
-  }, [products, selectedCategory]);
+    const q = searchQuery.trim().toLowerCase();
+    return sectionFiltered.filter((p) => {
+      if (selectedCategory !== "ALL" && p.category !== selectedCategory) return false;
+      if (
+        q &&
+        !p.name.toLowerCase().includes(q) &&
+        !(p.description || "").toLowerCase().includes(q) &&
+        !(p.sourcePigTag || "").toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [sectionFiltered, selectedCategory, searchQuery]);
 
-  const cartTotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
+  const cartSummary = useMemo(() => {
+    let subtotal = 0;
+    let total = 0;
+    for (const item of cart) {
+      subtotal += Number(item.product.price) * item.quantity;
+      total += Number(item.product.effectivePrice) * item.quantity;
+    }
+    const discountSavings = Math.max(0, subtotal - total);
+    return { subtotal, total, discountSavings };
   }, [cart]);
 
   const addToCart = (product: StorefrontProduct) => {
@@ -130,7 +179,6 @@ export function StorefrontClient({
         setError(data.error || "Could not place order.");
       } else {
         setConfirmedOrder(data.order);
-        // Decrement local product stock
         const orderedMap = new Map(cart.map((c) => [c.product.id, c.quantity]));
         setProducts((prev) =>
           prev
@@ -150,8 +198,13 @@ export function StorefrontClient({
     }
   };
 
+  const handleSectionChange = (tab: SectionTab) => {
+    setActiveSection(tab);
+    setSelectedCategory("ALL");
+  };
+
   return (
-    <div className="min-h-screen bg-[#F5F5F5] text-[#101827]">
+    <div className="min-h-screen w-full overflow-x-clip bg-[#F5F5F5] text-[#101827]">
       {/* Header */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -169,10 +222,10 @@ export function StorefrontClient({
             </Link>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#FF8A00]">
-                Abafashamyumvire Cooperative Store
+                Pig Project Rwanda &bull; Official E-Commerce
               </p>
               <h1 className="text-lg sm:text-xl font-bold text-[#101827]">
-                Pig Farm Marketplace
+                Gebyian Network Marketplace
               </h1>
             </div>
           </div>
@@ -198,79 +251,208 @@ export function StorefrontClient({
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {tableMissing ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
-            The E-Commerce database tables have not been provisioned in Supabase yet. Sign in as Super Admin and run the SQL migration shown in{" "}
+            The E-Commerce database tables have not been provisioned in Supabase yet. Execute{" "}
+            <span className="font-mono font-semibold">update.sql</span> in Supabase SQL Editor or check{" "}
             <span className="font-semibold">/dashboard/admin/ecommerce</span>.
           </div>
         ) : (
           <div className="grid gap-8 lg:grid-cols-3 items-start">
             {/* Catalog Grid */}
             <div className="lg:col-span-2 space-y-5">
-              {/* Category Filter */}
-              <div className="flex flex-wrap items-center gap-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
-                      selectedCategory === cat
-                        ? "bg-[#101827] text-white"
-                        : "border border-slate-200 bg-white text-[#101827] hover:border-[#FF8A00] hover:text-[#FF8A00]"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+              {/* Two-Part Division Tabs + Search */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSectionChange("ALL")}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                        activeSection === "ALL"
+                          ? "bg-[#101827] text-white"
+                          : "border border-slate-200 bg-slate-50 text-[#101827] hover:border-[#FF8A00]"
+                      }`}
+                    >
+                      <ShoppingBag className="h-3.5 w-3.5 text-[#FF8A00]" />
+                      <span>All ({sectionCounts.ALL})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSectionChange("ANIMALS")}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                        activeSection === "ANIMALS"
+                          ? "bg-[#101827] text-white"
+                          : "border border-slate-200 bg-slate-50 text-[#101827] hover:border-[#FF8A00]"
+                      }`}
+                    >
+                      <Tag className="h-3.5 w-3.5 text-[#FF8A00]" />
+                      <span>Animals &amp; Livestock ({sectionCounts.ANIMALS})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSectionChange("ANIMAL_FOOD")}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                        activeSection === "ANIMAL_FOOD"
+                          ? "bg-[#101827] text-white"
+                          : "border border-slate-200 bg-slate-50 text-[#101827] hover:border-[#FF8A00]"
+                      }`}
+                    >
+                      <Wheat className="h-3.5 w-3.5 text-[#FF8A00]" />
+                      <span>Animal Food &amp; Feed ({sectionCounts.ANIMAL_FOOD})</span>
+                    </button>
+                    {sectionCounts.DISCOUNTS > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleSectionChange("DISCOUNTS")}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                          activeSection === "DISCOUNTS"
+                            ? "bg-[#FF8A00] text-[#101827]"
+                            : "border border-orange-200 bg-orange-50 text-[#FF8A00] hover:bg-orange-100"
+                        }`}
+                      >
+                        <Percent className="h-3.5 w-3.5" />
+                        <span>On Sale ({sectionCounts.DISCOUNTS})</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative w-full sm:w-56">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search pigs, tags, feed..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs text-[#101827] focus:border-[#FF8A00] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Category Filter */}
+                {categories.length > 2 && (
+                  <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`rounded-lg px-3 py-1 text-xs font-semibold transition cursor-pointer ${
+                          selectedCategory === cat
+                            ? "bg-[#FF8A00] text-[#101827]"
+                            : "border border-slate-200 bg-white text-slate-600 hover:border-[#FF8A00] hover:text-[#FF8A00]"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {filteredProducts.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
                   <Package className="mx-auto h-8 w-8 text-slate-400 mb-2" />
-                  No products are currently published in this category.
+                  No products are currently available matching your filter.
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {filteredProducts.map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="inline-flex rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#FF8A00]">
-                            {product.category}
-                          </span>
-                          <span className="text-[11px] font-medium text-slate-500">
-                            {product.stock} in stock
-                          </span>
-                        </div>
-                        <h2 className="mt-3 text-base font-bold text-[#101827]">{product.name}</h2>
-                        {product.sourcePigTag && (
-                          <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#FF8A00]">
-                            <Tag className="h-3 w-3" />
-                            Vet-Cleared Tag: {product.sourcePigTag}
-                          </p>
-                        )}
-                        <p className="mt-2 text-xs text-slate-600 line-clamp-2">
-                          {product.description || "Verified cooperative farm product."}
-                        </p>
-                      </div>
+                  {filteredProducts.map((product) => {
+                    const inCartQty = cart.find((c) => c.product.id === product.id)?.quantity ?? 0;
+                    const maxReached = inCartQty >= product.stock;
+                    const isLowStock = product.stock <= product.lowStockThreshold;
 
-                      <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-3">
-                        <p className="text-base font-bold text-[#101827]">
-                          {formatRwf(product.price)}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => addToCart(product)}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] transition"
-                        >
-                          <Plus className="h-3.5 w-3.5 text-[#FF8A00]" />
-                          <span>Add to Cart</span>
-                        </button>
+                    return (
+                      <div
+                        key={product.id}
+                        className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-[#FF8A00]/60 transition"
+                      >
+                        <div>
+                          {product.imageUrl && (
+                            <div className="mb-3 overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={product.imageUrl}
+                                alt={product.name}
+                                className="h-40 w-full object-cover"
+                              />
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                                  product.storeSection === "ANIMAL_FOOD"
+                                    ? "bg-slate-100 text-[#101827]"
+                                    : "bg-orange-50 text-[#FF8A00]"
+                                }`}
+                              >
+                                {product.storeSection === "ANIMAL_FOOD" ? "Animal Food" : "Animals"}
+                              </span>
+                              <span className="inline-flex rounded-md border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                {product.category}
+                              </span>
+                            </div>
+
+                            <span
+                              className={`text-[11px] font-bold ${
+                                isLowStock ? "text-[#FF8A00]" : "text-slate-500"
+                              }`}
+                            >
+                              {isLowStock ? `Only ${product.stock} left!` : `${product.stock} in stock`}
+                            </span>
+                          </div>
+
+                          <div className="mt-2.5 flex items-start justify-between gap-2">
+                            <h2 className="text-base font-bold text-[#101827]">{product.name}</h2>
+                            {product.hasActiveDiscount && (
+                              <span className="shrink-0 rounded-md bg-[#FF8A00] px-2 py-0.5 text-[11px] font-extrabold text-[#101827]">
+                                -{product.discountPercent}%{product.discountLabel ? ` · ${product.discountLabel}` : ""}
+                              </span>
+                            )}
+                          </div>
+
+                          {product.sourcePigTag && (
+                            <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#FF8A00]">
+                              <Tag className="h-3 w-3" />
+                              Vet-Cleared Tag: {product.sourcePigTag}
+                            </p>
+                          )}
+
+                          <p className="mt-2 text-xs text-slate-600 line-clamp-2">
+                            {product.description || "Verified cooperative farm product."}
+                          </p>
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-3">
+                          <div>
+                            {product.hasActiveDiscount ? (
+                              <div className="flex flex-col">
+                                <span className="text-[11px] text-slate-400 line-through">
+                                  {formatRwf(product.price)}
+                                </span>
+                                <span className="text-base font-extrabold text-[#FF8A00]">
+                                  {formatRwf(product.effectivePrice)}
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-base font-bold text-[#101827]">
+                                {formatRwf(product.price)}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={maxReached}
+                            onClick={() => addToCart(product)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] disabled:opacity-45 cursor-pointer transition"
+                          >
+                            <Plus className="h-3.5 w-3.5 text-[#FF8A00]" />
+                            <span>{maxReached ? "Max Stock" : "Add to Cart"}</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -280,9 +462,9 @@ export function StorefrontClient({
               <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="h-4.5 w-4.5 text-[#FF8A00]" />
-                  <h2 className="text-base font-bold text-[#101827]">Your Order</h2>
+                  <h2 className="text-base font-bold text-[#101827]">Your Order Cart</h2>
                 </div>
-                <span className="rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-bold text-[#FF8A00]">
+                <span className="rounded-lg bg-orange-50 px-2.5 py-0.5 text-xs font-bold text-[#FF8A00]">
                   {cart.reduce((s, c) => s + c.quantity, 0)} items
                 </span>
               </div>
@@ -295,7 +477,7 @@ export function StorefrontClient({
                   </div>
                   <p className="text-xs text-slate-700">
                     Total: {formatRwf(confirmedOrder.totalAmount)} ({confirmedOrder.paymentMethod}).
-                    Use your order number to track verification and dispatch.
+                    Project Manager (Gebyian) has been notified to confirm dispatch.
                   </p>
                   <Link
                     href={`/store/track?orderNumber=${encodeURIComponent(confirmedOrder.orderNumber)}`}
@@ -315,7 +497,7 @@ export function StorefrontClient({
               {cart.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-500">
                   <ShoppingBag className="mx-auto h-7 w-7 text-slate-400 mb-1.5" />
-                  Select products from the catalog to start your order.
+                  Select animals or feed products from the catalog to start your order.
                 </div>
               ) : (
                 <>
@@ -327,13 +509,22 @@ export function StorefrontClient({
                       >
                         <div className="min-w-0">
                           <p className="font-semibold text-[#101827] truncate">{item.product.name}</p>
-                          <p className="text-[11px] text-slate-500">{formatRwf(item.product.price)}</p>
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            <span className="font-semibold text-[#FF8A00]">
+                              {formatRwf(item.product.effectivePrice)}
+                            </span>
+                            {item.product.hasActiveDiscount && (
+                              <span className="text-slate-400 line-through">
+                                {formatRwf(item.product.price)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
                             onClick={() => updateCartQty(item.product.id, -1)}
-                            className="rounded border border-slate-200 p-1 hover:bg-white"
+                            className="rounded border border-slate-200 p-1 hover:bg-white cursor-pointer"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
@@ -341,14 +532,14 @@ export function StorefrontClient({
                           <button
                             type="button"
                             onClick={() => updateCartQty(item.product.id, 1)}
-                            className="rounded border border-slate-200 p-1 hover:bg-white"
+                            className="rounded border border-slate-200 p-1 hover:bg-white cursor-pointer"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
                           <button
                             type="button"
                             onClick={() => removeFromCart(item.product.id)}
-                            className="ml-1 text-rose-600 hover:text-rose-800"
+                            className="ml-1 text-rose-600 hover:text-rose-800 cursor-pointer"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -357,9 +548,25 @@ export function StorefrontClient({
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-3">
-                    <span className="text-xs font-semibold uppercase text-slate-500">Order Total</span>
-                    <span className="text-lg font-bold text-[#101827]">{formatRwf(cartTotal)}</span>
+                  <div className="space-y-1.5 border-t border-slate-200 pt-3 text-xs">
+                    {cartSummary.discountSavings > 0 && (
+                      <>
+                        <div className="flex items-center justify-between text-slate-500">
+                          <span>Subtotal</span>
+                          <span>{formatRwf(cartSummary.subtotal)}</span>
+                        </div>
+                        <div className="flex items-center justify-between font-semibold text-[#FF8A00]">
+                          <span>Discount Savings</span>
+                          <span>-{formatRwf(cartSummary.discountSavings)}</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="font-bold uppercase text-slate-600">Order Total</span>
+                      <span className="text-lg font-extrabold text-[#101827]">
+                        {formatRwf(cartSummary.total)}
+                      </span>
+                    </div>
                   </div>
 
                   <form onSubmit={handleCheckout} className="space-y-3 border-t border-slate-200 pt-4">
@@ -387,7 +594,7 @@ export function StorefrontClient({
                     <input
                       value={shippingAddress}
                       onChange={(e) => setShippingAddress(e.target.value)}
-                      placeholder="Delivery District / Sector / Address"
+                      placeholder="Delivery District / Sector / Cell"
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[#FF8A00] focus:outline-none"
                     />
                     <select
@@ -410,7 +617,7 @@ export function StorefrontClient({
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#101827] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#1f2937] disabled:opacity-50 transition"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#101827] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#1f2937] disabled:opacity-50 cursor-pointer transition"
                     >
                       {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#FF8A00]" />}
                       <span>{submitting ? "Submitting Order..." : "Place Order"}</span>

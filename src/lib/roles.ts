@@ -16,14 +16,14 @@ export const ROLE_OPTIONS: readonly RoleOption[] = [
   },
   {
     value: Role.PROJECT_MANAGER,
-    label: "Project Manager",
-    description: "E-commerce, orders, and supplies management",
+    label: "Project Manager (Gebyian)",
+    description: "Gebyian Network e-commerce, orders, stock, and supplies",
     badgeColor: "bg-[#FF8A00]",
   },
   {
     value: Role.CELL_MANAGER,
     label: "Cell Manager",
-    description: "Akagari cell cooperative and livestock operations",
+    description: "Akagari cell cooperative, animal stock reports, and feed sales",
     badgeColor: "bg-slate-700",
   },
   {
@@ -45,35 +45,17 @@ export const ROLE_OPTIONS: readonly RoleOption[] = [
     badgeColor: "bg-sky-600",
   },
   {
-    value: Role.ACCOUNTANT,
-    label: "Accountant",
-    description: "Cell manager transaction verification",
-    badgeColor: "bg-indigo-600",
-  },
-  {
     value: Role.FINANCE_OFFICER,
     label: "Finance Officer",
-    description: "Income, expenses, and fund balance",
+    description: "Verify cell feed sales, income, expenses, and fund balance",
     badgeColor: "bg-amber-700",
-  },
-  {
-    value: Role.TRAINER,
-    label: "Trainer",
-    description: "Beneficiary education and training",
-    badgeColor: "bg-slate-600",
-  },
-  {
-    value: Role.FUNDER,
-    label: "Funder",
-    description: "Project monitoring and executive reports",
-    badgeColor: "bg-rose-600",
   },
 ] as const;
 
 export const ALL_ROLE_VALUES: readonly Role[] = ROLE_OPTIONS.map((r) => r.value);
 
 /**
- * Roles selectable on the Sign-In form (all non-admin database roles).
+ * Roles selectable on the Sign-In form (all active non-admin database roles).
  * Super Administrators sign in directly without needing a role dropdown selection.
  */
 export const SIGN_IN_ROLE_OPTIONS: readonly RoleOption[] = ROLE_OPTIONS.filter(
@@ -100,11 +82,9 @@ export const FIELD_OPERATIONS_ROLES: readonly Role[] = [
   Role.CELL_MANAGER,
   Role.COOPERATIVE_LEADER,
   Role.COOPERATIVE_MEMBER,
-  Role.TRAINER,
 ];
 
 export const FINANCE_OPERATIONS_ROLES: readonly Role[] = [
-  Role.ACCOUNTANT,
   Role.FINANCE_OFFICER,
 ];
 

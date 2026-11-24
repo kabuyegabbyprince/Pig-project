@@ -147,6 +147,26 @@ export default async function AdminEcommerceOrderDetailPage({
               )}
             </tbody>
             <tfoot>
+              {Number(order.discountTotal ?? 0) > 0 && (
+                <>
+                  <tr className="border-t border-slate-200 bg-slate-50/40">
+                    <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-slate-500">
+                      Subtotal
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs font-semibold text-slate-700">
+                      {formatRwf(order.subtotalAmount ?? order.totalAmount)}
+                    </td>
+                  </tr>
+                  <tr className="bg-orange-50/50">
+                    <td colSpan={4} className="px-3 py-2 text-right text-xs font-semibold text-[#FF8A00]">
+                      Discount Applied
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs font-bold text-[#FF8A00]">
+                      -{formatRwf(order.discountTotal ?? 0)}
+                    </td>
+                  </tr>
+                </>
+              )}
               <tr className="border-t-2 border-slate-200 bg-slate-50/70">
                 <td colSpan={4} className="px-3 py-3 text-right text-xs font-bold uppercase text-slate-600">
                   Total Order Amount

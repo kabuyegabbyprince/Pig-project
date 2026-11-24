@@ -29,6 +29,8 @@ import {
   ChevronDown,
   ShoppingBag,
   UsersRound,
+  Tag,
+  Wheat,
 } from "lucide-react";
 import { useState } from "react";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
@@ -39,6 +41,7 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   superAdminOnly?: boolean;
   cellManagerOrLeaderOnly?: boolean;
+  cellManagerOnly?: boolean;
   children?: { name: string; href: string }[];
 };
 
@@ -50,7 +53,7 @@ const adminNavigation: NavItem[] = [
   { name: "Distributions", href: "/dashboard/admin/distributions", icon: ArrowRightCircle },
   { name: "Veterinary", href: "/dashboard/admin/veterinary", icon: Stethoscope },
   { name: "Finance", href: "/dashboard/admin/finance", icon: TrendingUp },
-  { name: "E-Commerce", href: "/dashboard/admin/ecommerce", icon: ShoppingBag },
+  { name: "Gebyian Network", href: "/dashboard/admin/ecommerce", icon: ShoppingBag },
   {
     name: "Post",
     icon: Send,
@@ -69,6 +72,8 @@ const adminNavigation: NavItem[] = [
 const fieldNavigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard/field", icon: LayoutDashboard },
   { name: "Cooperative Team", href: "/dashboard/field/cooperative", icon: UsersRound, cellManagerOrLeaderOnly: true },
+  { name: "Report Animal Stock", href: "/dashboard/field/stock-reports", icon: Tag, cellManagerOrLeaderOnly: true },
+  { name: "Animal Food Sales", href: "/dashboard/field/feed-sales", icon: Wheat, cellManagerOnly: true },
   { name: "Pig Register", href: "/dashboard/field/pigs/new", icon: PlusCircle },
   { name: "Beneficiaries", href: "/dashboard/field/beneficiaries", icon: Users },
   { name: "Register Beneficiary", href: "/dashboard/field/beneficiaries/new", icon: UserPlus },
@@ -126,26 +131,22 @@ export function DashboardShell({
   if (
     role === "CELL_MANAGER" ||
     role === "COOPERATIVE_LEADER" ||
-    role === "COOPERATIVE_MEMBER" ||
-    role === "TRAINER"
+    role === "COOPERATIVE_MEMBER"
   ) {
-    navigation = fieldNavigation.filter(
-      (item) =>
-        !item.cellManagerOrLeaderOnly ||
-        role === "CELL_MANAGER" ||
-        role === "COOPERATIVE_LEADER"
-    );
+    navigation = fieldNavigation.filter((item) => {
+      if (item.cellManagerOnly && role !== "CELL_MANAGER") return false;
+      if (
+        item.cellManagerOrLeaderOnly &&
+        role !== "CELL_MANAGER" &&
+        role !== "COOPERATIVE_LEADER"
+      ) {
+        return false;
+      }
+      return true;
+    });
   }
   if (role === "VETERINARIAN") navigation = vetNavigation;
-  if (role === "ACCOUNTANT" || role === "FINANCE_OFFICER") navigation = financeNavigation;
-  if (role === "FUNDER") {
-    navigation = [
-      { name: "Dashboard", href: "/dashboard/admin/reports", icon: LayoutDashboard },
-      { name: "Project Reports", href: "/dashboard/admin/reports", icon: FileText },
-      { name: "Historical Records", href: "/dashboard/history", icon: History },
-      { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
-    ];
-  }
+  if (role === "FINANCE_OFFICER") navigation = financeNavigation;
 
   const renderNav = (items: NavItem[], isMobile = false) => {
     return items.map((item) => {

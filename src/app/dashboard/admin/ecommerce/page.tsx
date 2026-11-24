@@ -18,14 +18,14 @@ export default async function AdminEcommercePage() {
   return (
     <div className="space-y-6 pb-10">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Shared Database Storefront Control
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
+          Gebyian Network &bull; Shared Database Control
         </p>
         <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-          E-Commerce Order &amp; Catalog Control
+          Gebyian Network E-Commerce Control
         </h1>
         <p className="mt-1 text-xs text-slate-500">
-          Centralized command center for products, stock levels, customer orders, and automatic finance revenue reconciliation.
+          Managed by Project Manager (Gebyian): control Animals &amp; Animal Food stock, pricing, discounts, cooperative stock reports, orders, and Finance sync.
         </p>
       </div>
 

@@ -29,7 +29,7 @@ export default async function NewFinanceTransactionPage({
         <div>
           <h1 className="text-2xl font-bold font-serif text-[#1c2b23] flex items-center">
             {isIncome ? (
-              <><TrendingUp className="h-6 w-6 mr-2 text-[#2c5a43]" /> Record New Income</>
+              <><TrendingUp className="h-6 w-6 mr-2 text-[#FF8A00]" /> Record New Income</>
             ) : (
               <><TrendingDown className="h-6 w-6 mr-2 text-[#a44d67]" /> Record New Expense</>
             )}
@@ -81,6 +81,8 @@ export default async function NewFinanceTransactionPage({
                   <>
                     <option value="Donor funding">Donor funding</option>
                     <option value="Pig sales">Pig sales</option>
+                    <option value="Animal Feed Sales">Animal Feed Sales</option>
+                    <option value="E-Commerce Sales">E-Commerce Sales</option>
                     <option value="Contributions">Contributions</option>
                     <option value="Government Grant">Government Grant</option>
                     <option value="Other income">Other income</option>
@@ -147,9 +149,9 @@ export default async function NewFinanceTransactionPage({
             </Link>
             <SubmitButton
               pendingText="Saving record..."
-              className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#2c5a43] hover:bg-[#1c2b23] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2c5a43] cursor-pointer"
+              className="inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#101827] hover:bg-[#1f2937] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FF8A00] cursor-pointer"
             >
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="h-4 w-4 mr-2 text-[#FF8A00]" />
               Save Record
             </SubmitButton>
           </div>

@@ -21,10 +21,9 @@ const FIELD_ROLES = new Set([
   "CELL_MANAGER",
   "COOPERATIVE_LEADER",
   "COOPERATIVE_MEMBER",
-  "TRAINER",
 ]);
 
-const FINANCE_ROLES = new Set(["ACCOUNTANT", "FINANCE_OFFICER"]);
+const FINANCE_ROLES = new Set(["FINANCE_OFFICER"]);
 
 export default withAuth(
   function middleware(req) {
@@ -49,9 +48,6 @@ export default withAuth(
       if (FINANCE_ROLES.has(role)) {
         return NextResponse.redirect(new URL("/dashboard/finance", req.url));
       }
-      if (role === "FUNDER") {
-        return NextResponse.redirect(new URL("/dashboard/admin/reports", req.url));
-      }
     }
 
     if (path.startsWith("/dashboard/admin/users")) {
@@ -71,8 +67,7 @@ export default withAuth(
       if (
         role !== "SUPER_ADMIN" &&
         role !== "PROJECT_MANAGER" &&
-        role !== "ACCOUNTANT" &&
-        role !== "FUNDER"
+        role !== "FINANCE_OFFICER"
       ) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }

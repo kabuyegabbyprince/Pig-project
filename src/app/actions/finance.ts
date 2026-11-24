@@ -10,6 +10,8 @@ import { prisma } from "@/lib/prisma";
 const incomeCategories = new Set([
   "Donor funding",
   "Pig sales",
+  "Animal Feed Sales",
+  "E-Commerce Sales",
   "Contributions",
   "Government Grant",
   "Other income",
@@ -147,7 +149,7 @@ export async function createFinanceTransaction(formData: FormData) {
 
 export async function approveTransaction(formData: FormData) {
   const user = await getFinanceUser();
-  if (!user || user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+  if (!user) throw new Error("Unauthorized");
   const id = readText(formData, "transactionId");
   if (!id || id.length > 64) {
     throw new Error("A valid transaction is required.");

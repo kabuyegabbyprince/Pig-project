@@ -20,15 +20,11 @@ export default async function DashboardRedirect() {
     case "CELL_MANAGER":
     case "COOPERATIVE_LEADER":
     case "COOPERATIVE_MEMBER":
-    case "TRAINER":
       redirect("/dashboard/field");
     case "VETERINARIAN":
       redirect("/dashboard/vet");
-    case "ACCOUNTANT":
     case "FINANCE_OFFICER":
       redirect("/dashboard/finance");
-    case "FUNDER":
-      redirect("/dashboard/admin/reports");
     default:
       redirect("/login");
   }

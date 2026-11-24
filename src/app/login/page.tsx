@@ -95,16 +95,13 @@ function LoginForm() {
           } else if (
             userRole === "CELL_MANAGER" ||
             userRole === "COOPERATIVE_LEADER" ||
-            userRole === "COOPERATIVE_MEMBER" ||
-            userRole === "TRAINER"
+            userRole === "COOPERATIVE_MEMBER"
           ) {
             target = "/dashboard/field";
           } else if (userRole === "VETERINARIAN") {
             target = "/dashboard/vet";
-          } else if (userRole === "ACCOUNTANT" || userRole === "FINANCE_OFFICER") {
+          } else if (userRole === "FINANCE_OFFICER") {
             target = "/dashboard/finance";
-          } else if (userRole === "FUNDER") {
-            target = "/dashboard/admin/reports";
           }
 
           router.push(target);

@@ -188,7 +188,7 @@ export default async function AdminDashboardOverview() {
       tone: "bg-indigo-50 text-indigo-700",
     },
     {
-      title: "E-Commerce Orders",
+      title: "Gebyian Network Orders",
       value: ecommerceOverview.tableMissing
         ? "Phase 2 Setup"
         : `${ecommerceOverview.orders.length} (${formatRwf(ecommerceOverview.totalRevenue)})`,
@@ -207,12 +207,6 @@ export default async function AdminDashboardOverview() {
             icon: ShieldCheck,
           },
           {
-            title: "E-Commerce Store Control",
-            description: "Manage shared-DB products, stock, orders, and ledger sync.",
-            href: "/dashboard/admin/ecommerce",
-            icon: ShoppingBag,
-          },
-          {
             title: "Website Hero & Content",
             description: "Edit public homepage hero copy, CTA links, and media.",
             href: "/dashboard/admin/website",
@@ -226,6 +220,12 @@ export default async function AdminDashboardOverview() {
           },
         ]
       : []),
+    {
+      title: "Gebyian Network (E-Commerce)",
+      description: "Manage Animals & Animal Food stock, prices, discounts, orders, and ledger sync.",
+      href: "/dashboard/admin/ecommerce",
+      icon: ShoppingBag,
+    },
     {
       title: "Beneficiaries",
       description: "Inspect and manage rural households enrolled in the program.",
@@ -301,8 +301,8 @@ export default async function AdminDashboardOverview() {
           </p>
         </div>
 
-        {isSuperAdmin && (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isSuperAdmin && (
             <Link
               href="/dashboard/admin/users/new"
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#1f2937] transition"
@@ -310,15 +310,15 @@ export default async function AdminDashboardOverview() {
               <Plus className="h-3.5 w-3.5 text-[#FF8A00]" />
               <span>Add Staff User</span>
             </Link>
-            <Link
-              href="/dashboard/admin/ecommerce"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] shadow-xs hover:bg-orange-50 transition"
-            >
-              <ShoppingBag className="h-3.5 w-3.5 text-[#FF8A00]" />
-              <span>Manage E-Commerce</span>
-            </Link>
-          </div>
-        )}
+          )}
+          <Link
+            href="/dashboard/admin/ecommerce"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] shadow-xs hover:bg-orange-50 transition"
+          >
+            <ShoppingBag className="h-3.5 w-3.5 text-[#FF8A00]" />
+            <span>Manage Gebyian Network</span>
+          </Link>
+        </div>
       </div>
 
       {/* KPI Grid */}

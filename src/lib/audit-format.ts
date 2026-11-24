@@ -6,7 +6,7 @@ export function formatRole(role?: string | null): string {
     case "ADMIN":
       return "Super Administrator";
     case "PROJECT_MANAGER":
-      return "Project Manager";
+      return "Project Manager (Gebyian)";
     case "CELL_MANAGER":
     case "FIELD_OFFICER":
     case "EMPLOYEE":
@@ -19,15 +19,9 @@ export function formatRole(role?: string | null): string {
     case "VETERINARIAN":
     case "VET":
       return "Veterinarian";
-    case "ACCOUNTANT":
-      return "Accountant";
     case "FINANCE_OFFICER":
     case "FINANCE":
       return "Finance Officer";
-    case "TRAINER":
-      return "Trainer";
-    case "FUNDER":
-      return "Funder";
     default:
       return role;
   }

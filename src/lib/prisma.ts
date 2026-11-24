@@ -50,6 +50,8 @@ const TABLE_MAP: Record<string, string> = {
   storeProduct: "store_products",
   storeOrder: "store_orders",
   storeOrderItem: "store_order_items",
+  cooperativeStockReport: "cooperative_stock_reports",
+  cellFeedSale: "cell_feed_sales",
 };
 
 const FIELD_TO_COL: Record<string, Record<string, string>> = {
@@ -142,6 +144,13 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     updatedAt: "updated_at",
   },
   storeProduct: {
+    discountPercent: "discount_percent",
+    discountPrice: "discount_price",
+    discountLabel: "discount_label",
+    discountStartsAt: "discount_starts_at",
+    discountEndsAt: "discount_ends_at",
+    lowStockThreshold: "low_stock_threshold",
+    storeSection: "store_section",
     pigId: "pig_id",
     sourcePigTag: "source_pig_tag",
   },
@@ -151,6 +160,8 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     customerEmail: "customer_email",
     customerPhone: "customer_phone",
     shippingAddress: "shipping_address",
+    subtotalAmount: "subtotal_amount",
+    discountTotal: "discount_total",
     totalAmount: "total_amount",
     paymentMethod: "payment_method",
     paymentReference: "payment_reference",
@@ -160,6 +171,44 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
   storeOrderItem: {
     orderId: "order_id",
     productId: "product_id",
+    originalPrice: "original_price",
+    discountAmount: "discount_amount",
+  },
+  cooperativeStockReport: {
+    reportedById: "reported_by_id",
+    reportedByName: "reported_by_name",
+    cooperativeOwnerName: "cooperative_owner_name",
+    cooperativeOwnerRole: "cooperative_owner_role",
+    cellName: "cell_name",
+    animalTitle: "animal_title",
+    pigCount: "pig_count",
+    estimatedWeightKg: "estimated_weight_kg",
+    suggestedPrice: "suggested_price",
+    pigId: "pig_id",
+    sourcePigTag: "source_pig_tag",
+    listedProductId: "listed_product_id",
+    reviewedById: "reviewed_by_id",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
+  },
+  cellFeedSale: {
+    saleNumber: "sale_number",
+    productId: "product_id",
+    productName: "product_name",
+    buyerName: "buyer_name",
+    buyerPhone: "buyer_phone",
+    unitPrice: "unit_price",
+    totalAmount: "total_amount",
+    paymentMethod: "payment_method",
+    soldById: "sold_by_id",
+    soldByName: "sold_by_name",
+    cellName: "cell_name",
+    financeTransactionId: "finance_transaction_id",
+    verificationStatus: "verification_status",
+    verifiedById: "verified_by_id",
+    verifiedAt: "verified_at",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
   },
 };
 
@@ -193,9 +242,25 @@ const MODELS_WITH_UPDATED_AT = new Set([
   "backendUser",
   "storeProduct",
   "storeOrder",
+  "cooperativeStockReport",
+  "cellFeedSale",
 ]);
 
-const DECIMAL_FIELDS = new Set(["amount", "purchasePrice", "price", "totalAmount"]);
+const DECIMAL_FIELDS = new Set([
+  "amount",
+  "purchasePrice",
+  "price",
+  "discountPercent",
+  "discountPrice",
+  "subtotalAmount",
+  "discountTotal",
+  "totalAmount",
+  "originalPrice",
+  "discountAmount",
+  "estimatedWeightKg",
+  "suggestedPrice",
+  "unitPrice",
+]);
 
 const DATE_FIELDS = new Set([
   "createdAt",
@@ -237,6 +302,9 @@ const DATE_FIELDS = new Set([
   "date",
   "expiresAt",
   "usedAt",
+  "discountStartsAt",
+  "discountEndsAt",
+  "verifiedAt",
 ]);
 
 type RelationSpec = {
@@ -332,12 +400,20 @@ const RELATIONS: Record<string, Record<string, RelationSpec>> = {
   storeProduct: {
     pig: { type: "one", targetModel: "pig", localField: "pigId", foreignField: "id" },
     orderItems: { type: "many", targetModel: "storeOrderItem", localField: "id", foreignField: "productId" },
+    stockReports: { type: "many", targetModel: "cooperativeStockReport", localField: "id", foreignField: "listedProductId" },
+    feedSales: { type: "many", targetModel: "cellFeedSale", localField: "id", foreignField: "productId" },
   },
   storeOrder: {
     items: { type: "many", targetModel: "storeOrderItem", localField: "id", foreignField: "orderId" },
   },
   storeOrderItem: {
     order: { type: "one", targetModel: "storeOrder", localField: "orderId", foreignField: "id" },
+    product: { type: "one", targetModel: "storeProduct", localField: "productId", foreignField: "id" },
+  },
+  cooperativeStockReport: {
+    listedProduct: { type: "one", targetModel: "storeProduct", localField: "listedProductId", foreignField: "id" },
+  },
+  cellFeedSale: {
     product: { type: "one", targetModel: "storeProduct", localField: "productId", foreignField: "id" },
   },
 };

@@ -83,11 +83,11 @@ export function TrackOrderClient({
         <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm space-y-5">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#FF8A00]">
-              Buyer Order Tracking
+              Gebyian Network Order Tracking
             </p>
             <h1 className="mt-1 text-2xl font-bold text-[#101827]">Track Your Order</h1>
             <p className="mt-1 text-xs text-slate-600">
-              Enter your Order Number (e.g. ORD-2026-1234AB) to view live payment, processing, and dispatch status.
+              Enter your Order Number (e.g. ORD-2026-1234AB) to view live payment, processing, and dispatch status from Project Manager (Gebyian).
             </p>
           </div>
 
