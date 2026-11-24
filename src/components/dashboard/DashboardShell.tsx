@@ -31,6 +31,8 @@ import {
   UsersRound,
   Tag,
   Wheat,
+  Bell,
+  ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
@@ -66,6 +68,15 @@ const adminNavigation: NavItem[] = [
   { name: "Historical Records", href: "/dashboard/history", icon: History },
   { name: "Website Content", href: "/dashboard/admin/website", icon: ImageIcon, superAdminOnly: true },
   { name: "System Settings", href: "/dashboard/admin/settings", icon: Settings, superAdminOnly: true },
+  { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
+];
+
+const gebyianNavigation: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard/gebyian", icon: LayoutDashboard },
+  { name: "Gebyian Network", href: "/dashboard/admin/ecommerce", icon: ShoppingBag },
+  { name: "Order & Stock Alerts", href: "/dashboard/admin/notifications", icon: Bell },
+  { name: "Live Storefront", href: "/store", icon: ExternalLink },
+  { name: "Activity History", href: "/dashboard/history", icon: History },
   { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
 ];
 
@@ -127,7 +138,7 @@ export function DashboardShell({
   const role = normalizeRoleValue(session?.user?.role as string | undefined);
   let navigation: NavItem[] = [];
   if (role === "SUPER_ADMIN") navigation = adminNavigation;
-  if (role === "PROJECT_MANAGER") navigation = adminNavigation.filter((item) => !item.superAdminOnly);
+  if (role === "PROJECT_MANAGER") navigation = gebyianNavigation;
   if (
     role === "CELL_MANAGER" ||
     role === "COOPERATIVE_LEADER" ||
@@ -244,10 +255,10 @@ export function DashboardShell({
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-[#FF8A00] leading-none">
-                  Pig Project
+                  {role === "PROJECT_MANAGER" ? "Gebyian Network" : "Pig Project"}
                 </p>
                 <h1 className="mt-0.5 text-sm font-bold tracking-tight text-white group-hover:text-[#FF8A00] transition-colors">
-                  Rwanda Operations
+                  {role === "PROJECT_MANAGER" ? "Marketplace Control" : "Rwanda Operations"}
                 </h1>
               </div>
             </Link>
@@ -305,9 +316,11 @@ export function DashboardShell({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-[#FF8A00]">
-                    Pig Project Rwanda
+                    {role === "PROJECT_MANAGER" ? "Gebyian Network" : "Pig Project Rwanda"}
                   </p>
-                  <h1 className="truncate text-sm font-bold text-[#101827]">Operations Workspace</h1>
+                  <h1 className="truncate text-sm font-bold text-[#101827]">
+                    {role === "PROJECT_MANAGER" ? "Marketplace Control" : "Operations Workspace"}
+                  </h1>
                 </div>
               </Link>
               <div className="flex items-center gap-2 shrink-0">

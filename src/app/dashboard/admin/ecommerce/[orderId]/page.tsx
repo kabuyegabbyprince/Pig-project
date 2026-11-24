@@ -33,7 +33,7 @@ export default async function AdminEcommerceOrderDetailPage({
           className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to E-Commerce Control</span>
+          <span>Back to Gebyian Network Control</span>
         </Link>
 
         <OrderDetailControls orderId={order.id} initialStatus={order.status} />

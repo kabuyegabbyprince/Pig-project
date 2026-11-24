@@ -15,8 +15,9 @@ export default async function DashboardRedirect() {
 
   switch (role) {
     case "SUPER_ADMIN":
-    case "PROJECT_MANAGER":
       redirect("/dashboard/admin");
+    case "PROJECT_MANAGER":
+      redirect("/dashboard/gebyian");
     case "CELL_MANAGER":
     case "COOPERATIVE_LEADER":
     case "COOPERATIVE_MEMBER":

@@ -32,7 +32,6 @@ export default async function PigsPage({
 }) {
   const activeUser = await getActiveUser([
     Role.SUPER_ADMIN,
-    Role.PROJECT_MANAGER,
     Role.CELL_MANAGER,
     Role.COOPERATIVE_LEADER,
     Role.VETERINARIAN,

@@ -280,7 +280,7 @@ export function EcommerceManager({
 
       {/* Cooperative Animal Stock Reports from Cell Managers */}
       {initialData.stockReports.length > 0 && (
-        <section className="rounded-2xl border border-orange-200/80 bg-white p-5 sm:p-6 shadow-xs">
+        <section id="coop-reports" className="scroll-mt-20 rounded-2xl border border-orange-200/80 bg-white p-5 sm:p-6 shadow-xs">
           <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
               <ClipboardList className="h-4.5 w-4.5" />
@@ -389,7 +389,7 @@ export function EcommerceManager({
       )}
 
       {/* Product Catalog Management */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
+      <section id="catalog" className="scroll-mt-20 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
@@ -844,7 +844,7 @@ export function EcommerceManager({
 
       {/* Part 2: Cell Manager Animal Food Sales Activity */}
       {initialData.feedSales.length > 0 && (
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
+        <section id="feed-sales" className="scroll-mt-20 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
           <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#101827]">
               <Wheat className="h-4.5 w-4.5 text-[#FF8A00]" />
@@ -908,13 +908,13 @@ export function EcommerceManager({
       )}
 
       {/* Orders Control */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
+      <section id="orders" className="scroll-mt-20 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
         <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-[#FF8A00]">
             <ShoppingBag className="h-4.5 w-4.5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900">E-Commerce Orders &amp; Revenue Control</h2>
+            <h2 className="text-base font-bold text-[#101827]">Gebyian Network Orders &amp; Revenue Control</h2>
             <p className="text-xs text-slate-500">
               Approve, dispatch, and complete orders. Paid orders post income to FinanceTransaction; cancelled orders restore stock and auto-post refund reversals when already paid.
             </p>

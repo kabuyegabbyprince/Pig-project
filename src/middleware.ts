@@ -36,8 +36,11 @@ export default withAuth(
     }
 
     if (path === "/dashboard") {
-      if (role === "SUPER_ADMIN" || role === "PROJECT_MANAGER") {
+      if (role === "SUPER_ADMIN") {
         return NextResponse.redirect(new URL("/dashboard/admin", req.url));
+      }
+      if (role === "PROJECT_MANAGER") {
+        return NextResponse.redirect(new URL("/dashboard/gebyian", req.url));
       }
       if (role === "VETERINARIAN") {
         return NextResponse.redirect(new URL("/dashboard/vet", req.url));
@@ -47,6 +50,12 @@ export default withAuth(
       }
       if (FINANCE_ROLES.has(role)) {
         return NextResponse.redirect(new URL("/dashboard/finance", req.url));
+      }
+    }
+
+    if (path.startsWith("/dashboard/gebyian")) {
+      if (role !== "PROJECT_MANAGER" && role !== "SUPER_ADMIN") {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
 
@@ -63,36 +72,37 @@ export default withAuth(
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    if (path.startsWith("/dashboard/admin/reports")) {
-      if (
-        role !== "SUPER_ADMIN" &&
-        role !== "PROJECT_MANAGER" &&
-        role !== "FINANCE_OFFICER"
-      ) {
+    if (path.startsWith("/dashboard/admin/ecommerce")) {
+      if (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER") {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
+    } else if (path.startsWith("/dashboard/admin/notifications")) {
+      // Allowed for all active authenticated staff roles
+    } else if (path.startsWith("/dashboard/admin/reports")) {
+      if (role !== "SUPER_ADMIN" && role !== "FINANCE_OFFICER") {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     } else if (
       path.startsWith("/dashboard/admin") &&
       !path.startsWith("/dashboard/admin/users")
     ) {
-      if (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER") {
+      if (role !== "SUPER_ADMIN") {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
 
-    if ((path.startsWith("/dashboard/team") || path.startsWith("/dashboard/gallery")) && role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER") {
+    if ((path.startsWith("/dashboard/team") || path.startsWith("/dashboard/gallery")) && role !== "SUPER_ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    if (path.startsWith("/dashboard/vet") && role !== "VETERINARIAN" && role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER") {
+    if (path.startsWith("/dashboard/vet") && role !== "VETERINARIAN" && role !== "SUPER_ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
     if (
       path.startsWith("/dashboard/field") &&
       !FIELD_ROLES.has(role) &&
-      role !== "SUPER_ADMIN" &&
-      role !== "PROJECT_MANAGER"
+      role !== "SUPER_ADMIN"
     ) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
@@ -100,8 +110,7 @@ export default withAuth(
     if (
       path.startsWith("/dashboard/finance") &&
       !FINANCE_ROLES.has(role) &&
-      role !== "SUPER_ADMIN" &&
-      role !== "PROJECT_MANAGER"
+      role !== "SUPER_ADMIN"
     ) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }

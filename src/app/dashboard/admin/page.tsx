@@ -41,7 +41,7 @@ import { UserRoleActions } from "@/components/admin/UserRoleActions";
 import { formatUserContact } from "@/lib/phone-utils";
 
 export default async function AdminDashboardOverview() {
-  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN]);
   if (!actor) {
     redirect("/dashboard");
   }

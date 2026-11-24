@@ -90,8 +90,10 @@ function LoginForm() {
           const userRole = normalizeRoleValue(sessionData?.user?.role);
 
           let target = "/dashboard";
-          if (userRole === "SUPER_ADMIN" || userRole === "PROJECT_MANAGER") {
+          if (userRole === "SUPER_ADMIN") {
             target = "/dashboard/admin";
+          } else if (userRole === "PROJECT_MANAGER") {
+            target = "/dashboard/gebyian";
           } else if (
             userRole === "CELL_MANAGER" ||
             userRole === "COOPERATIVE_LEADER" ||

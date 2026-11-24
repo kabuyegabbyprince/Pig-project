@@ -17,16 +17,24 @@ export default async function AdminEcommercePage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
-          Gebyian Network &bull; Shared Database Control
-        </p>
-        <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-          Gebyian Network E-Commerce Control
-        </h1>
-        <p className="mt-1 text-xs text-slate-500">
-          Managed by Project Manager (Gebyian): control Animals &amp; Animal Food stock, pricing, discounts, cooperative stock reports, orders, and Finance sync.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
+            Gebyian Network &bull; Shared Database Control
+          </p>
+          <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Gebyian Network E-Commerce Control
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            Managed by Project Manager (Gebyian): control Animals &amp; Animal Food stock, pricing, discounts, cooperative stock reports, orders, and Finance sync.
+          </p>
+        </div>
+        <a
+          href={actor.role === Role.PROJECT_MANAGER ? "/dashboard/gebyian" : "/dashboard/admin"}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#101827] hover:border-[#FF8A00] self-start"
+        >
+          <span>{actor.role === Role.PROJECT_MANAGER ? "Back to Gebyian Overview" : "Back to Admin Overview"}</span>
+        </a>
       </div>
 
       <EcommerceManager initialData={overview} sqlMigration={ECOMMERCE_SQL_MIGRATION} />

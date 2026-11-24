@@ -12,7 +12,6 @@ export const dynamic = 'force-dynamic';
 export default async function NewVisitPage() {
   const activeUser = await getActiveUser([
     Role.SUPER_ADMIN,
-    Role.PROJECT_MANAGER,
     Role.CELL_MANAGER,
     Role.COOPERATIVE_LEADER,
   ]);

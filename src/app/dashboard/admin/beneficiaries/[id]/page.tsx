@@ -19,7 +19,6 @@ function maskNationalId(nid: string | null | undefined): string {
 export default async function BeneficiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const activeUser = await getActiveUser([
     Role.SUPER_ADMIN,
-    Role.PROJECT_MANAGER,
     ...FIELD_OPERATIONS_ROLES,
   ]);
   if (!activeUser) {

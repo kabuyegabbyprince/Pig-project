@@ -18,7 +18,7 @@ export default async function AdminReportsPage({
 }) {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  if (!session || (role !== "SUPER_ADMIN" && role !== "PROJECT_MANAGER" && role !== "FINANCE_OFFICER")) {
+  if (!session || (role !== "SUPER_ADMIN" && role !== "FINANCE_OFFICER")) {
     redirect("/dashboard");
   }
 

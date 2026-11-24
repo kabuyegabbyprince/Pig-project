@@ -9,7 +9,7 @@ import { RevolvingManagerClient } from "@/components/admin/RevolvingManagerClien
 export const dynamic = "force-dynamic";
 
 export default async function AdminRevolvingPage() {
-  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
+  const actor = await getActiveUser([Role.SUPER_ADMIN]);
   if (!actor) redirect("/dashboard");
 
   const data = await getRevolvingManagementOverview();

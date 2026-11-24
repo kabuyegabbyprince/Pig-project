@@ -30,8 +30,8 @@ const saveGalleryImage = async (file: File | null, existingImageUrl?: string | n
   return publicUrl;
 };
 
-const ensureAdminOrProjectManager = async () => {
-  const user = await getActiveUser([Role.SUPER_ADMIN, Role.PROJECT_MANAGER]);
+const ensureAdminOnly = async () => {
+  const user = await getActiveUser([Role.SUPER_ADMIN]);
   if (!user) {
     throw new Error("Unauthorized");
   }
@@ -39,7 +39,7 @@ const ensureAdminOrProjectManager = async () => {
 };
 
 export async function createGalleryItem(formData: FormData) {
-  const user = await ensureAdminOrProjectManager();
+  const user = await ensureAdminOnly();
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -89,7 +89,7 @@ export async function createGalleryItem(formData: FormData) {
 }
 
 export async function updateGalleryItem(id: string, formData: FormData) {
-  const user = await ensureAdminOrProjectManager();
+  const user = await ensureAdminOnly();
   const existing = await prisma.galleryItem.findUnique({ where: { id } });
   if (!existing) throw new Error("Gallery item not found.");
 
@@ -141,7 +141,7 @@ export async function updateGalleryItem(id: string, formData: FormData) {
 }
 
 export async function deleteGalleryItem(id: string) {
-  const user = await ensureAdminOrProjectManager();
+  const user = await ensureAdminOnly();
   const item = await prisma.galleryItem.findUnique({ where: { id } });
   if (!item) throw new Error("Gallery item not found.");
 
@@ -165,7 +165,7 @@ export async function deleteGalleryItem(id: string) {
 }
 
 export async function toggleGalleryItemPublished(id: string) {
-  const user = await ensureAdminOrProjectManager();
+  const user = await ensureAdminOnly();
   const item = await prisma.galleryItem.findUnique({ where: { id } });
   if (!item) throw new Error("Gallery item not found.");
 

@@ -29,7 +29,6 @@ function getStatusBadge(status: PigStatus) {
 export default async function PigDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const activeUser = await getActiveUser([
     Role.SUPER_ADMIN,
-    Role.PROJECT_MANAGER,
     ...FIELD_OPERATIONS_ROLES,
     Role.VETERINARIAN,
   ]);
