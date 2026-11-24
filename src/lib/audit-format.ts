@@ -13,7 +13,7 @@ export function formatRole(role?: string | null): string {
     case "REGISTRAR":
       return "Cell Manager";
     case "COOPERATIVE_LEADER":
-      return "Cooperative Leader";
+      return "Cooperative Manager";
     case "COOPERATIVE_MEMBER":
       return "Cooperative Member";
     case "VETERINARIAN":
@@ -85,6 +85,10 @@ export function formatModule(entity: string): string {
       return "Coop Stock Reports";
     case "CELL_FEED_SALE":
       return "Animal Food Sales";
+    case "COOPERATIVE":
+      return "Cooperatives";
+    case "COOPERATIVE_MEMBER_REPORT":
+      return "Coop Member Reports";
     default:
       return entity.replace(/_/g, " ");
   }
@@ -139,6 +143,15 @@ export function formatActivity(action: string, entity: string): string {
     if (a === "CELL_FEED_SALE_RECORDED") return "Animal Food Sale Recorded";
     if (a === "CELL_FEED_SALE_VERIFIED") return "Animal Food Sale Verified";
     if (a === "CELL_FEED_SALE_REJECTED") return "Animal Food Sale Rejected";
+  }
+  if (e === "COOPERATIVE") {
+    if (a === "CREATED") return "Cooperative Created";
+    if (a === "MANAGER_CHANGED") return "Cooperative Manager Assigned";
+  }
+  if (e === "COOPERATIVE_MEMBER_REPORT") {
+    if (a === "SUBMITTED") return "Member Report Sent to Manager";
+    if (a === "REVIEWED") return "Member Report Reviewed";
+    if (a === "ESCALATED_TO_CELL") return "Member Report Escalated to Cell Manager";
   }
 
   return `${a.charAt(0) + a.slice(1).toLowerCase()} ${formatModule(entity)}`;
@@ -277,6 +290,22 @@ export function formatChangeDescription(log: {
     if (action === "DELETED") {
       return `Deleted stock product "${prodName}" (had ${pv?.stock ?? 0} units at ${Number(pv?.price || 0).toLocaleString()} RWF)`;
     }
+  }
+
+  if (entity === "COOPERATIVE") {
+    if (action === "CREATED") {
+      return `Created cooperative "${nv?.name || ""}" in ${nv?.cellName || "cell"} (max ${nv?.maxMembers ?? 15} members)`;
+    }
+    if (action === "MANAGER_CHANGED") {
+      return `Assigned ${nv?.leaderName || "member"} as Cooperative Manager for "${nv?.cooperativeName || ""}"`;
+    }
+  }
+
+  if (entity === "COOPERATIVE_MEMBER_REPORT") {
+    if (action === "SUBMITTED") {
+      return `Submitted ${nv?.reportType || "report"} (${nv?.animalCount ?? 1} animal(s)) to Cooperative Manager`;
+    }
+    return `Updated member report status to ${nv?.status || action}`;
   }
 
   // Fallback

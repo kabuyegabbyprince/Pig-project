@@ -30,6 +30,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="icon" type="image/png" href="/pplog-.png" />
+        <link rel="apple-touch-icon" href="/pplog-.png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

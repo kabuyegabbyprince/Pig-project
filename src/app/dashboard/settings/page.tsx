@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updatePersonalProfile, changeUserPassword } from "@/app/actions/user";
 import { getUserPreferences } from "@/app/actions/settings";
-import { User, Lock, Palette, CheckCircle, AlertCircle, Settings as SettingsIcon, ChevronRight } from "lucide-react";
+import { User, Lock, Palette, CheckCircle, AlertCircle, Settings as SettingsIcon, ChevronRight, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { SettingsPreferences } from "./settings-preferences";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { getRoleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -24,14 +25,6 @@ export default async function PersonalSettingsPage({
   const [user, initialPreferences] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
     }),
     getUserPreferences(session.user.id),
   ]);
@@ -40,6 +33,7 @@ export default async function PersonalSettingsPage({
     redirect("/login");
   }
 
+  const mustChangePassword = Boolean(user.mustChangePassword);
   const params = await searchParams;
   const profileSuccess = params.profileSuccess === "1";
   const profileError = typeof params.profileError === "string" ? params.profileError : null;
@@ -74,6 +68,18 @@ export default async function PersonalSettingsPage({
         <div className="flex items-center gap-3 rounded-xl border border-[#cfe4d7] bg-[#e7f4ed] p-4 text-sm text-[#064b36]">
           <CheckCircle className="h-5 w-5 shrink-0" />
           <span>Your password has been changed successfully.</span>
+        </div>
+      )}
+
+      {mustChangePassword && !passwordSuccess && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-[#101827]">
+          <KeyRound className="h-5 w-5 shrink-0 text-[#FF8A00] mt-0.5" />
+          <div>
+            <p className="font-bold">Initial Static Password Active</p>
+            <p className="mt-0.5 text-xs text-slate-700">
+              Your account is currently using the static initial password assigned by your Cell Manager. Please set your own private password in the <span className="font-semibold">Change Password</span> section below.
+            </p>
+          </div>
         </div>
       )}
 
@@ -145,7 +151,7 @@ export default async function PersonalSettingsPage({
                 Assigned Role
               </span>
               <div className="mt-1.5 inline-flex items-center rounded-xl bg-[#e3efe7] px-3.5 py-2 text-sm font-semibold text-[#173d2e]">
-                {user.role}
+                {getRoleLabel(user.role)}
               </div>
             </div>
           </div>

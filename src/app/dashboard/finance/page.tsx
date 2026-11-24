@@ -17,6 +17,8 @@ import { formatRwf } from "@/lib/format-rwf";
 import { approveTransaction } from "@/app/actions/finance";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FeedSalesVerificationClient } from "@/components/finance/FeedSalesVerificationClient";
+import { getFinanceWorkspaceData } from "@/app/actions/livestock-finance";
+import { FinanceStockAndAuditClient } from "@/components/finance/FinanceStockAndAuditClient";
 import type { SerializedCellFeedSale } from "@/app/actions/ecommerce";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +32,7 @@ export default async function FinanceDashboard() {
   let feedSalesTableMissing = false;
   let feedSales: SerializedCellFeedSale[] = [];
 
-  const [incomeAggr, expenseAggr, allIncome, allExpenses, pendingTxs] = await Promise.all([
+  const [incomeAggr, expenseAggr, allIncome, allExpenses, pendingTxs, livestockData] = await Promise.all([
     prisma.financeTransaction.aggregate({
       _sum: { amount: true },
       where: { type: "INCOME", status: "APPROVED", deletedAt: null },
@@ -57,6 +59,7 @@ export default async function FinanceDashboard() {
       take: 25,
       include: { recordedBy: true },
     }),
+    getFinanceWorkspaceData(),
   ]);
 
   try {
@@ -104,7 +107,7 @@ export default async function FinanceDashboard() {
     <div className="space-y-8 max-w-7xl mx-auto pb-10">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF8A00]">
-          Finance Officer Verification &amp; Reports
+          Finance Officer Verification &amp; Livestock Stock-In
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#101827]">
           Welcome back, {user.name}
@@ -142,6 +145,17 @@ export default async function FinanceDashboard() {
           </p>
         </div>
       </div>
+
+      {/* Livestock Stock-In, MoMo Code & Distribution Audit */}
+      {livestockData && (
+        <FinanceStockAndAuditClient
+          momoMerchantCode={livestockData.momoMerchantCode}
+          stockedPigs={livestockData.stockedPigs}
+          memberPayments={livestockData.memberPayments}
+          auditRows={livestockData.auditRows}
+          tableMissing={livestockData.schemaMissing}
+        />
+      )}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
         <h2 className="text-xl font-bold text-[#101827]">Quick actions</h2>

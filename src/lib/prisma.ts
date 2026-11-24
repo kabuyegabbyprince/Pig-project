@@ -52,6 +52,9 @@ const TABLE_MAP: Record<string, string> = {
   storeOrderItem: "store_order_items",
   cooperativeStockReport: "cooperative_stock_reports",
   cellFeedSale: "cell_feed_sales",
+  cooperative: "cooperatives",
+  cooperativeMemberReport: "cooperative_member_reports",
+  cooperativeMemberPayment: "cooperative_member_payments",
 };
 
 const FIELD_TO_COL: Record<string, Record<string, string>> = {
@@ -87,6 +90,8 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     updatedAt: "updated_at",
   },
   user: {
+    cooperativeId: "cooperative_id",
+    mustChangePassword: "must_change_password",
     createdAt: "created_at",
     updatedAt: "updated_at",
   },
@@ -102,6 +107,12 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
   pig: {
     tagNumber: "pigId",
     currentBeneficiaryId: "beneficiaryId",
+    cooperativeId: "cooperative_id",
+    ownerMemberId: "owner_member_id",
+    ownerMemberName: "owner_member_name",
+    pigType: "pig_type",
+    daysAge: "days_age",
+    stockedByFinanceId: "stocked_by_finance_id",
     legacyHealthStatus: "healthStatusStr",
   },
   pigDistribution: {
@@ -211,6 +222,34 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     createdAt: "created_at",
     updatedAt: "updated_at",
   },
+  cooperative: {
+    cellName: "cell_name",
+    maxMembers: "max_members",
+    leaderUserId: "leader_user_id",
+    leaderName: "leader_name",
+    createdById: "created_by_id",
+    createdByName: "created_by_name",
+    isActive: "is_active",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
+  },
+  cooperativeMemberReport: {
+    cooperativeId: "cooperative_id",
+    cooperativeName: "cooperative_name",
+    memberId: "member_id",
+    memberName: "member_name",
+    leaderId: "leader_id",
+    leaderName: "leader_name",
+    pigId: "pig_id",
+    pigTag: "pig_tag",
+    reportType: "report_type",
+    animalCount: "animal_count",
+    estimatedWeightKg: "estimated_weight_kg",
+    leaderNotes: "leader_notes",
+    reviewedAt: "reviewed_at",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
+  },
 };
 
 const MODELS_WITH_UPDATED_AT = new Set([
@@ -245,6 +284,9 @@ const MODELS_WITH_UPDATED_AT = new Set([
   "storeOrder",
   "cooperativeStockReport",
   "cellFeedSale",
+  "cooperative",
+  "cooperativeMemberReport",
+  "cooperativeMemberPayment",
 ]);
 
 const DECIMAL_FIELDS = new Set([
@@ -261,6 +303,8 @@ const DECIMAL_FIELDS = new Set([
   "estimatedWeightKg",
   "suggestedPrice",
   "unitPrice",
+  "pigValueFee",
+  "taxFee",
 ]);
 
 const DATE_FIELDS = new Set([
@@ -417,6 +461,12 @@ const RELATIONS: Record<string, Record<string, RelationSpec>> = {
   cellFeedSale: {
     product: { type: "one", targetModel: "storeProduct", localField: "productId", foreignField: "id" },
   },
+  cooperative: {
+    reports: { type: "many", targetModel: "cooperativeMemberReport", localField: "id", foreignField: "cooperativeId" },
+  },
+  cooperativeMemberReport: {
+    cooperative: { type: "one", targetModel: "cooperative", localField: "cooperativeId", foreignField: "id" },
+  },
 };
 
 function toCol(model: string, field: string): string {
@@ -481,6 +531,14 @@ function mapRowFromDb(model: string, row: Record<string, unknown>): Record<strin
     if (!("assignedSectorId" in out)) out.assignedSectorId = null;
     if (!("assignedCellId" in out)) out.assignedCellId = null;
     if (!("assignedVillageId" in out)) out.assignedVillageId = null;
+    if (!("cooperativeId" in out)) out.cooperativeId = null;
+    if (!("mustChangePassword" in out)) out.mustChangePassword = false;
+  }
+
+  if (model === "pig") {
+    if (!("cooperativeId" in out)) out.cooperativeId = null;
+    if (!("ownerMemberId" in out)) out.ownerMemberId = null;
+    if (!("ownerMemberName" in out)) out.ownerMemberName = null;
   }
 
   return out;
@@ -754,6 +812,18 @@ export function isSupabaseTableMissingError(err: unknown): boolean {
       err !== null &&
       "name" in err &&
       (err as { name?: string }).name === "SupabaseTableMissingError")
+  );
+}
+
+export function isSupabaseSchemaMissingError(err: unknown): boolean {
+  if (isSupabaseTableMissingError(err)) return true;
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  return (
+    msg.includes("42703") ||
+    msg.includes("PGRST204") ||
+    msg.includes("PGRST205") ||
+    msg.includes("does not exist") ||
+    msg.includes("Could not find the")
   );
 }
 

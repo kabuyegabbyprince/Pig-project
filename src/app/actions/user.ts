@@ -269,10 +269,22 @@ export async function changeUserPassword(formData: FormData) {
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { password: hashedPassword },
-  });
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword, mustChangePassword: false },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err ?? "");
+    if (msg.includes("42703") || msg.includes("PGRST204") || msg.includes("does not exist")) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      });
+    } else {
+      throw err;
+    }
+  }
   await syncSupabaseAuthUser({
     email: user.email,
     password: newPassword,
@@ -290,6 +302,7 @@ export async function changeUserPassword(formData: FormData) {
   });
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/field");
   revalidatePath("/dashboard/history");
   redirect("/dashboard/settings?passwordSuccess=1");
 }

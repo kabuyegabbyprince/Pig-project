@@ -33,6 +33,8 @@ import {
   Tag,
   Wheat,
   Bell,
+  ClipboardList,
+  PiggyBank,
 } from "lucide-react";
 import { useState } from "react";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
@@ -42,8 +44,6 @@ type NavItem = {
   href?: string;
   icon: React.ComponentType<{ className?: string }>;
   superAdminOnly?: boolean;
-  cellManagerOrLeaderOnly?: boolean;
-  cellManagerOnly?: boolean;
   children?: { name: string; href: string }[];
 };
 
@@ -93,11 +93,13 @@ const gebyianNavigation: NavItem[] = [
   { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
 ];
 
-const fieldNavigation: NavItem[] = [
+const cellManagerNavigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard/field", icon: LayoutDashboard },
-  { name: "Cooperative Team", href: "/dashboard/field/cooperative", icon: UsersRound, cellManagerOrLeaderOnly: true },
-  { name: "Report Animal Stock", href: "/dashboard/field/stock-reports", icon: Tag, cellManagerOnly: true },
-  { name: "Animal Food Sales", href: "/dashboard/field/feed-sales", icon: Wheat, cellManagerOnly: true },
+  { name: "Cooperatives (Max 15)", href: "/dashboard/field/cooperative", icon: UsersRound },
+  { name: "Member & Coop Animals", href: "/dashboard/field/my-animals", icon: PiggyBank },
+  { name: "Coop Escalations", href: "/dashboard/field/member-reports", icon: ClipboardList },
+  { name: "Report Animal Stock", href: "/dashboard/field/stock-reports", icon: Tag },
+  { name: "Animal Food Sales", href: "/dashboard/field/feed-sales", icon: Wheat },
   { name: "Pig Register", href: "/dashboard/field/pigs/new", icon: PlusCircle },
   { name: "Beneficiaries", href: "/dashboard/field/beneficiaries", icon: Users },
   { name: "Register Beneficiary", href: "/dashboard/field/beneficiaries/new", icon: UserPlus },
@@ -105,6 +107,26 @@ const fieldNavigation: NavItem[] = [
   { name: "Piglet Returns", href: "/dashboard/field/returns", icon: ArrowLeftCircle },
   { name: "Operational Reports", href: "/dashboard/field/reports", icon: FileText },
   { name: "Historical Records", href: "/dashboard/history", icon: History },
+  { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
+];
+
+const cooperativeManagerNavigation: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard/field", icon: LayoutDashboard },
+  { name: "My Cooperative", href: "/dashboard/field/cooperative", icon: UsersRound },
+  { name: "Member Reports", href: "/dashboard/field/member-reports", icon: ClipboardList },
+  { name: "Cooperative Animals", href: "/dashboard/field/my-animals", icon: PiggyBank },
+  { name: "Beneficiaries", href: "/dashboard/field/beneficiaries", icon: Users },
+  { name: "Pig Distribution", href: "/dashboard/field/distributions", icon: ArrowRightCircle },
+  { name: "Piglet Returns", href: "/dashboard/field/returns", icon: ArrowLeftCircle },
+  { name: "Daily Reports", href: "/dashboard/field/reports", icon: FileText },
+  { name: "Historical Records", href: "/dashboard/history", icon: History },
+  { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
+];
+
+const cooperativeMemberNavigation: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard/field", icon: LayoutDashboard },
+  { name: "My Animals & Records", href: "/dashboard/field/my-animals", icon: PiggyBank },
+  { name: "Report to Manager", href: "/dashboard/field/member-reports", icon: ClipboardList },
   { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
 ];
 
@@ -152,23 +174,9 @@ export function DashboardShell({
   let navigation: NavItem[] = [];
   if (role === "SUPER_ADMIN") navigation = adminNavigation;
   if (role === "PROJECT_MANAGER") navigation = gebyianNavigation;
-  if (
-    role === "CELL_MANAGER" ||
-    role === "COOPERATIVE_LEADER" ||
-    role === "COOPERATIVE_MEMBER"
-  ) {
-    navigation = fieldNavigation.filter((item) => {
-      if (item.cellManagerOnly && role !== "CELL_MANAGER") return false;
-      if (
-        item.cellManagerOrLeaderOnly &&
-        role !== "CELL_MANAGER" &&
-        role !== "COOPERATIVE_LEADER"
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }
+  if (role === "CELL_MANAGER") navigation = cellManagerNavigation;
+  if (role === "COOPERATIVE_LEADER") navigation = cooperativeManagerNavigation;
+  if (role === "COOPERATIVE_MEMBER") navigation = cooperativeMemberNavigation;
   if (role === "VETERINARIAN") navigation = vetNavigation;
   if (role === "FINANCE_OFFICER") navigation = financeNavigation;
 

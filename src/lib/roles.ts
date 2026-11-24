@@ -28,14 +28,14 @@ export const ROLE_OPTIONS: readonly RoleOption[] = [
   },
   {
     value: Role.COOPERATIVE_LEADER,
-    label: "Cooperative Leader",
-    description: "Member reports and supply coordination",
+    label: "Cooperative Manager",
+    description: "Leads up to 15 cooperative members, reviews member reports & tracks cooperative animals",
     badgeColor: "bg-amber-600",
   },
   {
     value: Role.COOPERATIVE_MEMBER,
     label: "Cooperative Member",
-    description: "Individual pig stock and leader reporting",
+    description: "Keeps personal animal records and submits reports to Cooperative Manager",
     badgeColor: "bg-orange-500",
   },
   {
