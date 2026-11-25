@@ -3,9 +3,12 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Prisma } from "@prisma/client";
 import {
+  AlertTriangle,
+  ArrowRight,
   CheckCircle,
   Clock,
   FileText,
+  PiggyBank,
   PlusCircle,
   TrendingDown,
   TrendingUp,
@@ -18,7 +21,7 @@ import { approveTransaction } from "@/app/actions/finance";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FeedSalesVerificationClient } from "@/components/finance/FeedSalesVerificationClient";
 import { getFinanceWorkspaceData } from "@/app/actions/livestock-finance";
-import { FinanceStockAndAuditClient } from "@/components/finance/FinanceStockAndAuditClient";
+import { FinanceMoMoSettingsCard } from "@/components/finance/FinanceMoMoSettingsCard";
 import type { SerializedCellFeedSale } from "@/app/actions/ecommerce";
 
 export const dynamic = "force-dynamic";
@@ -96,31 +99,74 @@ export default async function FinanceDashboard() {
   const totalIncome = incomeAggr._sum.amount ?? new Prisma.Decimal(0);
   const totalExpenses = expenseAggr._sum.amount ?? new Prisma.Decimal(0);
   const balance = totalIncome.minus(totalExpenses);
+  const totalLivestockInvestment = new Prisma.Decimal(
+    livestockData?.totalLivestockInvestment ?? "0"
+  );
 
   const quickActions = [
-    { label: "Record Income", href: "/dashboard/finance/new?type=INCOME", icon: PlusCircle },
-    { label: "Record Expense", href: "/dashboard/finance/new?type=EXPENSE", icon: PlusCircle },
-    { label: "Finance Reports", href: "/dashboard/finance/reports", icon: FileText },
+    {
+      label: "Pig Stock & Cycles",
+      description: "Manage pig batches, 80,000 RWF investment, recipients & cycles",
+      href: "/dashboard/finance/pigs",
+      icon: PiggyBank,
+    },
+    {
+      label: "Record Income",
+      description: "Log donor funding, grants, or verified sales income",
+      href: "/dashboard/finance/new?type=INCOME",
+      icon: PlusCircle,
+    },
+    {
+      label: "Record Expense",
+      description: "Record operational expenses, transport, or supplies",
+      href: "/dashboard/finance/new?type=EXPENSE",
+      icon: PlusCircle,
+    },
+    {
+      label: "Finance Reports",
+      description: "Review income, expenditure, and ledger summaries",
+      href: "/dashboard/finance/reports",
+      icon: FileText,
+    },
   ];
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-10">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF8A00]">
-          Finance Officer Verification &amp; Livestock Stock-In
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#101827]">
-          Welcome back, {user.name}
-        </h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF8A00]">
+            Finance Officer Verification &amp; Accounting
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#101827]">
+            Welcome back, {user.name}
+          </h1>
+        </div>
+        <Link
+          href="/dashboard/finance/pigs"
+          prefetch={false}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#101827] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1f2937] transition-colors shrink-0"
+        >
+          <PiggyBank className="h-4 w-4 text-[#FF8A00]" />
+          <span>Pig Stock &amp; Cycles</span>
+          <ArrowRight className="h-4 w-4 text-[#FF8A00]" />
+        </Link>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+      {livestockData?.schemaMissing && livestockData.schemaWarning && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900 flex items-center gap-2.5">
+          <AlertTriangle className="h-4 w-4 text-[#FF8A00] shrink-0" />
+          <span>{livestockData.schemaWarning}</span>
+        </div>
+      )}
+
+      {/* 4 Real-DB KPI Cards */}
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-[#FF8A00]">
             <TrendingUp className="h-5 w-5" />
           </div>
           <p className="text-sm font-medium text-slate-500">Total Approved Income</p>
-          <p className="mt-2 break-words text-3xl font-bold leading-tight text-[#101827]">
+          <p className="mt-2 break-words text-2xl font-bold leading-tight text-[#101827]">
             {formatRwf(totalIncome)}
           </p>
         </div>
@@ -130,47 +176,60 @@ export default async function FinanceDashboard() {
             <TrendingDown className="h-5 w-5" />
           </div>
           <p className="text-sm font-medium text-slate-500">Total Approved Expenses</p>
-          <p className="mt-2 break-words text-3xl font-bold leading-tight text-[#101827]">
+          <p className="mt-2 break-words text-2xl font-bold leading-tight text-[#101827]">
             {formatRwf(totalExpenses)}
           </p>
         </div>
+
+        <Link
+          href="/dashboard/finance/pigs"
+          prefetch={false}
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-[#FF8A00] transition-colors block"
+        >
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-[#FF8A00]">
+            <PiggyBank className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium text-slate-500">Total Livestock Investment</p>
+          <p className="mt-2 break-words text-2xl font-bold leading-tight text-[#101827]">
+            {formatRwf(totalLivestockInvestment)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {livestockData?.totalPigsCount ?? 0} pig(s) · {livestockData?.totalBatchesCount ?? 0} batch(es)
+          </p>
+        </Link>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-[#101827]">
             <Wallet className="h-5 w-5 text-[#FF8A00]" />
           </div>
           <p className="text-sm font-medium text-slate-500">Current Fund Balance</p>
-          <p className="mt-2 break-words text-3xl font-bold leading-tight text-[#101827]">
+          <p className="mt-2 break-words text-2xl font-bold leading-tight text-[#101827]">
             {formatRwf(balance)}
           </p>
         </div>
       </div>
 
-      {/* Livestock Stock-In, MoMo Code & Distribution Audit */}
+      {/* MoMo Merchant Code Configuration */}
       {livestockData && (
-        <FinanceStockAndAuditClient
-          momoMerchantCode={livestockData.momoMerchantCode}
-          stockedPigs={livestockData.stockedPigs}
-          memberPayments={livestockData.memberPayments}
-          auditRows={livestockData.auditRows}
-          tableMissing={livestockData.schemaMissing}
-        />
+        <FinanceMoMoSettingsCard momoMerchantCode={livestockData.momoMerchantCode} />
       )}
 
+      {/* Quick Actions */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
         <h2 className="text-xl font-bold text-[#101827]">Quick actions</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {quickActions.map(({ label, href, icon: Icon }) => (
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {quickActions.map(({ label, description, href, icon: Icon }) => (
             <Link
               key={label}
               href={href}
               prefetch={false}
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:border-[#FF8A00] hover:bg-orange-50/40 transition-colors"
             >
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white border border-slate-200 text-[#FF8A00]">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white border border-slate-200 text-[#FF8A00]">
                 <Icon className="h-4 w-4" />
               </div>
               <p className="text-sm font-semibold text-[#101827]">{label}</p>
+              <p className="mt-1 text-xs text-slate-500">{description}</p>
             </Link>
           ))}
         </div>

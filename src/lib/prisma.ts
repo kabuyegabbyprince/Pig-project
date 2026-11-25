@@ -112,6 +112,7 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     ownerMemberName: "owner_member_name",
     pigType: "pig_type",
     daysAge: "days_age",
+    batchCode: "batch_code",
     stockedByFinanceId: "stocked_by_finance_id",
     legacyHealthStatus: "healthStatusStr",
   },
@@ -247,6 +248,17 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     estimatedWeightKg: "estimated_weight_kg",
     leaderNotes: "leader_notes",
     reviewedAt: "reviewed_at",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
+  },
+  cooperativeMemberPayment: {
+    memberId: "member_id",
+    cooperativeId: "cooperative_id",
+    pigValueFee: "pig_value_fee",
+    taxFee: "tax_fee",
+    totalAmount: "total_amount",
+    momoReference: "momo_reference",
+    verifiedById: "verified_by_id",
     createdAt: "created_at",
     updatedAt: "updated_at",
   },
@@ -390,6 +402,9 @@ const RELATIONS: Record<string, Record<string, RelationSpec>> = {
     pig: { type: "one", targetModel: "pig", localField: "pigId", foreignField: "id" },
     beneficiary: { type: "one", targetModel: "beneficiary", localField: "beneficiaryId", foreignField: "id" },
     recordedBy: { type: "one", targetModel: "user", localField: "recordedById", foreignField: "id" },
+  },
+  revolvingCycle: {
+    beneficiary: { type: "one", targetModel: "beneficiary", localField: "beneficiaryId", foreignField: "id" },
   },
   fieldVisit: {
     beneficiary: { type: "one", targetModel: "beneficiary", localField: "beneficiaryId", foreignField: "id" },
@@ -539,6 +554,7 @@ function mapRowFromDb(model: string, row: Record<string, unknown>): Record<strin
     if (!("cooperativeId" in out)) out.cooperativeId = null;
     if (!("ownerMemberId" in out)) out.ownerMemberId = null;
     if (!("ownerMemberName" in out)) out.ownerMemberName = null;
+    if (!("batchCode" in out)) out.batchCode = null;
   }
 
   return out;

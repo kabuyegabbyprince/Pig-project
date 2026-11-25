@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
 import { getCooperativesWorkspaceData } from "@/app/actions/cooperative";
-import { MOMO_SETTING_KEY, DEFAULT_MOMO_CODE } from "@/lib/finance-types";
+import { MOMO_SETTING_KEY } from "@/lib/finance-types";
 import { prisma } from "@/lib/prisma";
 import { CooperativeDistributionClient } from "@/components/field/CooperativeDistributionClient";
 
@@ -23,7 +23,7 @@ export default async function NewDistributionPage() {
     redirect("/login");
   }
 
-  const momoMerchantCode = setting?.value ?? DEFAULT_MOMO_CODE;
+  const momoMerchantCode = setting?.value?.trim() || "Not configured by Finance Officer yet";
 
   return <CooperativeDistributionClient data={coopData} momoMerchantCode={momoMerchantCode} />;
 }

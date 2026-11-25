@@ -213,17 +213,23 @@ ALTER TABLE "users"
 
 CREATE INDEX IF NOT EXISTS "users_cooperative_id_idx" ON "users"("cooperative_id");
 
--- Link Pig to cooperative and member owner
+-- Link Pig to cooperative, finance batch collection, purchase price (default 80,000 RWF), and member owner
 ALTER TABLE "Pig"
   ADD COLUMN IF NOT EXISTS "cooperative_id" TEXT REFERENCES "cooperatives"("id") ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS "owner_member_id" TEXT,
   ADD COLUMN IF NOT EXISTS "owner_member_name" TEXT,
   ADD COLUMN IF NOT EXISTS "pig_type" TEXT,
   ADD COLUMN IF NOT EXISTS "days_age" INTEGER,
-  ADD COLUMN IF NOT EXISTS "stocked_by_finance_id" TEXT;
+  ADD COLUMN IF NOT EXISTS "batch_code" TEXT,
+  ADD COLUMN IF NOT EXISTS "stocked_by_finance_id" TEXT,
+  ADD COLUMN IF NOT EXISTS "purchasePrice" NUMERIC(10, 2) DEFAULT 80000.00;
+
+ALTER TABLE "Pig" ALTER COLUMN "purchasePrice" SET DEFAULT 80000.00;
 
 CREATE INDEX IF NOT EXISTS "Pig_cooperative_id_idx" ON "Pig"("cooperative_id");
 CREATE INDEX IF NOT EXISTS "Pig_owner_member_id_idx" ON "Pig"("owner_member_id");
+CREATE INDEX IF NOT EXISTS "Pig_batch_code_idx" ON "Pig"("batch_code");
+CREATE INDEX IF NOT EXISTS "Pig_stocked_by_finance_idx" ON "Pig"("stocked_by_finance_id");
 
 -- Cooperative Member -> Cooperative Leader Reports
 CREATE TABLE IF NOT EXISTS "cooperative_member_reports" (
@@ -285,7 +291,7 @@ CREATE TRIGGER trg_enforce_cooperative_max_15
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS "cooperative_member_payments" (
   "id" TEXT PRIMARY KEY,
-  "member_id" TEXT NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "member_id" TEXT NOT NULL,
   "cooperative_id" TEXT NOT NULL REFERENCES "cooperatives"("id") ON DELETE CASCADE,
   "pig_value_fee" NUMERIC(10,2) NOT NULL DEFAULT 16000.00,
   "tax_fee" NUMERIC(10,2) NOT NULL DEFAULT 2800.00,
@@ -348,3 +354,36 @@ DO $$ BEGIN
     WITH CHECK (true);
 EXCEPTION WHEN undefined_table THEN null;
 END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Service role full access on cooperative_stock_reports" ON "cooperative_stock_reports";
+  CREATE POLICY "Service role full access on cooperative_stock_reports"
+    ON "cooperative_stock_reports" FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+EXCEPTION WHEN undefined_table THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Service role full access on cell_feed_sales" ON "cell_feed_sales";
+  CREATE POLICY "Service role full access on cell_feed_sales"
+    ON "cell_feed_sales" FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+EXCEPTION WHEN undefined_table THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Service role full access on cooperative_member_payments" ON "cooperative_member_payments";
+  CREATE POLICY "Service role full access on cooperative_member_payments"
+    ON "cooperative_member_payments" FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+EXCEPTION WHEN undefined_table THEN null;
+END $$;
+
+-- Refresh PostgREST schema cache immediately
+NOTIFY pgrst, 'reload schema';

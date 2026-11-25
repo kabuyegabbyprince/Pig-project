@@ -142,6 +142,7 @@ const vetNavigation: NavItem[] = [
 
 const financeNavigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard/finance", icon: LayoutDashboard },
+  { name: "Pig Stock & Cycles", href: "/dashboard/finance/pigs", icon: PiggyBank },
   { name: "Record Income", href: "/dashboard/finance/new?type=INCOME", icon: TrendingUp },
   { name: "Record Expense", href: "/dashboard/finance/new?type=EXPENSE", icon: TrendingDown },
   { name: "Financial Reports", href: "/dashboard/finance/reports", icon: FileText },

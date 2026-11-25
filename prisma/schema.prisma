@@ -366,6 +366,7 @@ model Pig {
   ownerMemberName      String?      @map("owner_member_name")
   pigType              String?      @map("pig_type")
   daysAge              Int?         @map("days_age")
+  batchCode            String?      @map("batch_code")
   stockedByFinanceId   String?      @map("stocked_by_finance_id")
 
   districtId String?
@@ -383,7 +384,7 @@ model Pig {
   // Legacy fields
   dateReceived       DateTime?
   source             String?
-  purchasePrice      Decimal?  @db.Decimal(10, 2)
+  purchasePrice      Decimal?  @default(80000.00) @db.Decimal(10, 2)
   currentLocation    String?
   legacyHealthStatus String?   @map("healthStatusStr")
   pregnancyStatus    String?
@@ -414,6 +415,7 @@ model Pig {
   legacyMortality MortalityRecord?     @relation("LegacyMortality")
 
   @@index([tagNumber])
+  @@index([batchCode])
   @@index([currentBeneficiaryId])
   @@index([districtId])
   @@index([sectorId])
