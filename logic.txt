@@ -1,0 +1,438 @@
+================================================================================
+PIG PROJECT RWANDA & GEBYIAN NETWORK — COMPLETE APPLICATION LOGIC SPECIFICATION
+================================================================================
+Stack: Next.js (App Router), TypeScript, Tailwind CSS, Prisma ORM,
+       Supabase PostgreSQL, NextAuth.js (JWT + Credentials & OTP)
+Live Database Architecture: All counts, dashboards, tables, and workflows read
+directly from live Supabase PostgreSQL tables (zero static/hardcoded demo data).
+
+--------------------------------------------------------------------------------
+1. ROLES, ISOLATION RULES, TASKS & DASHBOARD NAVIGATION
+--------------------------------------------------------------------------------
+Landing router after login: /dashboard (reads normalized Role and redirects).
+
+1) SUPER_ADMIN ("Super Administrator")
+   Landing Route: /dashboard/admin
+   Access Scope : Full global governance across all modules, users, settings,
+                  website content, audit trail, livestock, finance, and Gebyian.
+   Core Tasks   :
+     - Staff provisioning, role assignment, suspension/activation, analytics.
+     - Master oversight across Cooperatives, Beneficiaries, Pigs, Distributions,
+       Revolving Cycles, Veterinary reviews, Finance ledger, Locations, Reports.
+     - Transfer approvals, Mortality reviews, Overdue revolving alerts.
+     - Public Website Hero/CMS, Gallery posts, Our Team posts, System Settings.
+   Sidebar Links (/dashboard/admin/* & shared):
+     - Dashboard               -> /dashboard/admin
+     - Staff                   -> /dashboard/admin/users (+ /new, /analytics)
+     - Beneficiaries           -> /dashboard/admin/beneficiaries (+ /new, /[id])
+     - Pig Register            -> /dashboard/admin/pigs/new (+ /pigs, /pigs/[id])
+     - Distributions           -> /dashboard/admin/distributions
+     - Veterinary              -> /dashboard/admin/veterinary (+ /new)
+     - Finance                 -> /dashboard/admin/finance (+ /new)
+     - Gebyian Network         -> /dashboard/admin/ecommerce (+ /animals, /animal-food,
+                                  /animals-orders, /animal-food-orders, /[orderId])
+     - Post > Post Gallery     -> /dashboard/gallery (+ /new)
+     - Post > Post Our Team    -> /dashboard/team (+ /new, /[id]/edit)
+     - Reports                 -> /dashboard/admin/reports
+     - Historical Records      -> /dashboard/history
+     - Website Content         -> /dashboard/admin/website
+     - System Settings         -> /dashboard/admin/settings
+     - Personal Settings       -> /dashboard/settings
+   Additional Admin Control Routes:
+     - Transfers               -> /dashboard/admin/transfers
+     - Returns & Revolving     -> /dashboard/admin/returns (+ /new), /dashboard/admin/revolving
+     - Litters, Visits, Tasks  -> /dashboard/admin/litters/new (+ /[id]),
+                                  /dashboard/admin/visits (+ /new),
+                                  /dashboard/admin/tasks (+ /new)
+     - Rwanda Locations        -> /dashboard/admin/locations (+ /districts/[id],
+                                  /sectors/[id], /cells/[id])
+     - Notifications & Audit   -> /dashboard/admin/notifications, /dashboard/admin/audit,
+                                  /dashboard/admin/security
+
+2) PROJECT_MANAGER ("Project Manager (Gebyian)")
+   Landing Route: /dashboard/gebyian
+   Access Scope : Full control of Gebyian Network e-commerce marketplace
+                  (Animals & Animal Food SKUs, discounts, cooperative surplus
+                  pricing, buyer orders, and Cell feed sales overview).
+   Core Tasks   :
+     - Manage Animal and Animal Food catalog (CRUD, stock, low-stock alerts,
+       negotiable flag, time-bounded discounts).
+     - Review Pending Cooperative Stock Reports submitted by Cell Managers,
+       verify Veterinary Clearance for Pigs, set marketplace price, and publish
+       to public /store.
+     - Process public Store Orders (PENDING -> PAID -> PROCESSING -> DISPATCHED
+       -> COMPLETED / CANCELLED), print receipts, decrement stock, sync finance.
+   Sidebar Links:
+     - Dashboard                              -> /dashboard/gebyian
+     - Gebyian Stock > Animal                 -> /dashboard/admin/ecommerce/animals
+     - Gebyian Stock > Animal Food            -> /dashboard/admin/ecommerce/animal-food
+     - Order & Stock Alerts > Animals Order   -> /dashboard/admin/ecommerce/animals-orders
+     - Order & Stock Alerts > Animal Foods    -> /dashboard/admin/ecommerce/animal-food-orders
+     - Activity History                       -> /dashboard/history
+     - Personal Settings                      -> /dashboard/settings
+
+3) CELL_MANAGER ("Cell Manager")
+   Landing Route: /dashboard/field
+   Access Scope : STRICTLY SCOPED to cooperatives created by this Cell Manager
+                  (cooperatives.created_by_id = currentUser.id) and members/pigs/
+                  payments/reports inside those owned cooperatives only. Cannot
+                  view, edit, or distribute to members in another Cell Manager's
+                  cooperatives or browse global unassigned users.
+   Onboarding Gate:
+     - Must complete profile duty address (Phone + Rwanda District, Sector,
+       Cell, Village, Street/Landmark from static rwanda-geo cascade) stored on
+       users table (district_name, sector_name, cell_name, village_name, address).
+   Core Tasks   :
+     - Create Cooperatives (hard limit: 15 members max per cooperative, enforced
+       both in app logic and PostgreSQL trigger).
+     - Enroll Cooperative Leaders (COOPERATIVE_LEADER) and Cooperative Members
+       (COOPERATIVE_MEMBER) into owned cooperatives using a static initial
+       password (mustChangePassword = true until user changes password).
+     - Verify on-site that a Cooperative Member paid both qualification fees
+       (16,000 RWF Pig Value + 2,800 RWF Tax = 18,800 RWF) to Finance MoMo
+       Merchant Code, enter MoMo reference, and submit member to Finance
+       Approval Queue (status = PENDING).
+     - Hand over a vet-cleared stock pig ONLY to a Finance-VERIFIED member inside
+       an owned cooperative (/dashboard/field/distributions/new).
+     - Record Piglet Returns (/dashboard/field/returns/new), Escalations, Surplus
+       Animal Stock Reports to Gebyian (/dashboard/field/stock-reports), Cell
+       Animal Food Sales (/dashboard/field/feed-sales), and Operational Reports.
+   Sidebar Links:
+     - Dashboard               -> /dashboard/field
+     - Cooperatives (Max 15)   -> /dashboard/field/cooperative
+     - Member & Coop Animals   -> /dashboard/field/my-animals
+     - Coop Escalations        -> /dashboard/field/member-reports
+     - Report Animal Stock     -> /dashboard/field/stock-reports
+     - Animal Food Sales       -> /dashboard/field/feed-sales
+     - Pig Register            -> /dashboard/field/pigs/new (+ /pigs, /pigs/[id])
+     - Beneficiaries           -> /dashboard/field/beneficiaries (COOP-* members/leaders only)
+     - Enroll Member/Beneficiary -> /dashboard/field/beneficiaries/new (+ /[id])
+     - Pig Distribution        -> /dashboard/field/distributions (+ /new)
+     - Piglet Returns          -> /dashboard/field/returns (+ /new)
+     - Operational Reports     -> /dashboard/field/reports (+ /new)
+     - Historical Records      -> /dashboard/history
+     - Personal Settings       -> /dashboard/settings
+
+4) COOPERATIVE_LEADER ("Cooperative Manager")
+   Landing Route: /dashboard/field
+   Access Scope : Scoped strictly to their assigned cooperative (users.cooperative_id
+                  or cooperatives.leader_user_id).
+   Core Tasks   :
+     - View cooperative roster (up to 15 members) and cooperative animals.
+     - Review incoming member health/weight/litter/incident reports; mark
+       REVIEWED, RESOLVED, or ESCALATED_TO_CELL (notifies owning Cell Manager).
+     - Track cooperative beneficiaries, distributions, returns, daily reports.
+   Sidebar Links:
+     - Dashboard               -> /dashboard/field
+     - My Cooperative          -> /dashboard/field/cooperative
+     - Member Reports          -> /dashboard/field/member-reports
+     - Cooperative Animals     -> /dashboard/field/my-animals
+     - Beneficiaries           -> /dashboard/field/beneficiaries
+     - Pig Distribution        -> /dashboard/field/distributions
+     - Piglet Returns          -> /dashboard/field/returns
+     - Daily Reports           -> /dashboard/field/reports (+ /new)
+     - Historical Records      -> /dashboard/history
+     - Personal Settings       -> /dashboard/settings
+
+5) COOPERATIVE_MEMBER ("Cooperative Member")
+   Landing Route: /dashboard/field
+   Access Scope : Scoped strictly to their own cooperative, personal pigs,
+                  and personal reports. Prompted if mustChangePassword = true.
+   Core Tasks   :
+     - Pay 2 qualification fees (16,000 RWF Pig Value + 2,800 RWF Tax =
+       18,800 RWF) to Project MoMo Merchant Code and show receipt on-site to
+       their Cell Manager.
+     - After Finance manual verification and Cell Manager pig handover, log
+       personal animal updates (/dashboard/field/my-animals) and
+       submit reports to Cooperative Manager (/dashboard/field/member-reports).
+   Sidebar Links:
+     - Dashboard               -> /dashboard/field
+     - My Animals & Records    -> /dashboard/field/my-animals
+     - Report to Manager       -> /dashboard/field/member-reports
+     - Personal Settings       -> /dashboard/settings
+
+6) VETERINARIAN ("Veterinarian")
+   Landing Route: /dashboard/vet
+   Access Scope : Clinical examination, quarantine clearance, treatment, and
+                  vaccination across all project pigs and returned piglets.
+   Core Tasks   :
+     - Log Individual Pig Examination (/dashboard/vet/veterinary/new):
+       * Dropdown selects any pig registered in the system by Pig Tag Number.
+       * Record tests conducted / clinical findings.
+       * Set health status (HEALTHY, SICK, UNDER_TREATMENT, CRITICAL, RECOVERED).
+       * Prescribe medication (mandatory when marked Sick / Bad Status).
+       * Follow-up date fields removed; direct date of examination recorded.
+     - Bad Status (Sick / On Medication) Registry (/dashboard/vet/veterinary):
+       * Automatic list of all pigs identified with SICK, UNDER_TREATMENT, or
+         CRITICAL status with their latest diagnosis, prescribed medication, and date.
+       * Once the animal recovers, the Veterinarian clicks "Mark Recovered / Healthy"
+         which updates the pig status to HEALTHY and immediately removes it from the list.
+     - Date-based Veterinary Reports (/dashboard/vet/veterinary & /reports):
+       * Summary by date: Pigs tested, remaining unexamined pigs, sick count,
+         disease description, and treatments administered.
+     - Returned Piglets Clearance (/dashboard/vet/returned):
+       * Inspects returned piglets from revolving cycles; healthy inspection
+         sets veterinaryVerified = true, unlocking them for redistribution.
+   Sidebar Links:
+     - Dashboard               -> /dashboard/vet
+     - Veterinary Records      -> /dashboard/vet/veterinary (+ /new)
+     - Returned Piglets        -> /dashboard/vet/returned
+     - Veterinary Reports      -> /dashboard/vet/reports
+     - Historical Records      -> /dashboard/history
+     - Personal Settings       -> /dashboard/settings
+
+7) FINANCE_OFFICER ("Finance Officer")
+   Landing Route: /dashboard/finance
+   Access Scope : Full financial accounting, individual pig intake & price management,
+                  MoMo Merchant Code configuration, manual approval of Member
+                  2-Fee Qualification Payments, and Cell Feed Sales verification.
+   Core Tasks   :
+     - Configure official MoMo Merchant Code in SystemSetting
+       (key = FINANCE_MOMO_MERCHANT_CODE) for member fee payments.
+     - Register Individual Pigs on /dashboard/finance/pigs:
+       * Form strictly requires: Pig Tag Number (auto or manual), Health Status,
+         Sex, and Purchase Price (auto-filled to 80,000 RWF).
+       * Batch concepts, batch codes, quantities, age, weight, breed, and supplier
+         inputs have been removed.
+       * Automatically posts an APPROVED EXPENSE FinanceTransaction ("Pig Purchase")
+         and updates livestock investment metrics.
+     - Manually verify or reject Cooperative Member 2-Fee Payment submissions
+       sent by Cell Managers (Dashboard + /dashboard/finance/pigs "Member
+       Payment Approvals" tab):
+         * VERIFIED -> posts approved INCOME FinanceTransaction (18,800 RWF:
+           "Member Qualification Fee & Tax") and unlocks member for pig handover.
+         * REJECTED -> blocks pig distribution and alerts the Cell Manager.
+     - Monitor Vet Inspection & Clearance Tab on /dashboard/finance/pigs:
+       * Direct visibility into all examined pigs, clinical health status,
+         latest diagnosis/medication, and handover readiness.
+       * Identifies reserve stock vs pigs in Bad Status vs already distributed.
+     - Track live Recipient & Revolving Cycle Audit Matrix (which member received
+       which pig, revolving cycle status, and returns progress).
+     - Verify Cell Manager Animal Food Sales and pending FinanceTransactions.
+   Sidebar Links:
+     - Dashboard               -> /dashboard/finance
+     - Pig Stock & Cycles      -> /dashboard/finance/pigs
+     - Record Income           -> /dashboard/finance/new?type=INCOME
+     - Record Expense          -> /dashboard/finance/new?type=EXPENSE
+     - Financial Reports       -> /dashboard/finance/reports
+     - Historical Records      -> /dashboard/history
+     - Personal Settings       -> /dashboard/settings
+
+Public Routes (Unauthenticated):
+   - /              Homepage (dynamic WebsiteContent hero + live KPI stats)
+   - /store         Gebyian Network Public Marketplace (Animals & Animal Food)
+   - /store/track   Public Order Tracker by orderNumber + email/phone
+   - /gallery       Public Gallery
+   - /team          Public Our Team & /[id] member profile
+   - /contact       Public Contact Page
+   - /login         Role-aware Sign-In (Super Admin signs in directly; staff roles
+                    select their matching role)
+   - /signup        Public / Staff registration (when enabled)
+
+--------------------------------------------------------------------------------
+2. CORE END-TO-END WORKFLOWS & DATABASE STATE FLOW
+--------------------------------------------------------------------------------
+FLOW A: CELL MANAGER ONBOARDING & COOPERATIVE SETUP
+  1. Super Admin creates active Cell Manager account -> Cell Manager logs in to
+     /dashboard/field.
+  2. CellManagerProfileCard prompts Cell Manager to save Phone + Rwanda Geo Duty
+     Address (Province/District/Sector/Cell/Village from rwanda-geo + street
+     details) directly onto users.* columns.
+  3. Cell Manager creates a Cooperative in /dashboard/field/cooperative
+     (cooperatives.created_by_id = cellManager.id, max_members = 15).
+  4. Cell Manager enrolls Cooperative Leaders (COOPERATIVE_LEADER) and
+     Cooperative Members (COOPERATIVE_MEMBER) via /dashboard/field/cooperative
+     or /dashboard/field/beneficiaries/new (or /dashboard/admin/beneficiaries/new):
+       - Every Beneficiary (pig receiver) MUST be an active Cooperative Member
+         or Cooperative Leader in a cooperative (standalone non-cooperative
+         beneficiary registration is disabled).
+       - Updates/creates users rows with cooperative_id, district/sector/cell/
+         village copied from Cell Manager or coop, must_change_password = true,
+         and automatically syncs a linked Beneficiary row ("COOP-" + users.id).
+       - SQL trigger + server validation block adding a 16th active member.
+
+FLOW B: INDIVIDUAL PIG INTAKE & INVESTMENT ACCOUNTING
+  1. Finance Officer opens /dashboard/finance/pigs -> "Register Individual Pig".
+  2. Enters:
+       - Pig Tag ID (auto-generated e.g. PF-RW-2026-00001 or custom)
+       - Health Status (Healthy, Sick, Under Treatment, Recovered)
+       - Sex (Female / Male)
+       - Price (defaults to 80,000 RWF)
+     (Batch grouping, quantities, age, weight, breed, and supplier fields removed).
+  3. Atomic transaction creates:
+       - 1 row in Pig (status = REGISTERED, healthStatus, sex,
+         purchasePrice = 80000 RWF, stockedByFinanceId = financeUser.id).
+       - 1 row in FinanceTransaction (type = EXPENSE, status = APPROVED,
+         amount = 80000 RWF, reference = "Pig Purchase").
+  4. Field & Admin Pig Registers (/dashboard/admin/pigs/new and /dashboard/field/pigs/new)
+     use the exact same streamlined 4-field individual pig registration schema.
+
+FLOW C: VETERINARY EXAMINATION, BAD STATUS LIST & CLEARANCE GATEKEEPER
+  1. Veterinarian logs in to /dashboard/vet -> opens /dashboard/vet/veterinary/new:
+       - Dropdown selects any individual pig from the entire system registry.
+       - Inputs test done / clinical findings.
+       - Sets health status (HEALTHY, SICK, UNDER_TREATMENT, CRITICAL, RECOVERED).
+       - Prescribes medication (required when marking animal Sick / Bad Status).
+       - Follow-up dates are removed; direct date of examination is recorded.
+  2. Bad Status (Sick / On Medication) Management:
+       - Any pig marked SICK, UNDER_TREATMENT, or CRITICAL automatically enters
+         the Bad Status Registry on /dashboard/vet/veterinary.
+       - Veterinarian treats the pig; when recovered, veterinarian clicks
+         "Mark Recovered / Healthy", updating healthStatus to HEALTHY and immediately
+         removing the pig from the Bad Status list.
+  3. Date-based Veterinary Reports:
+       - Summary reports by examination date detailing pigs tested, remaining
+         unexamined animals, sick count, diseases observed, and treatments administered.
+  4. Handover Gatekeeper checkPigVetClearance(pigId, "DISTRIBUTION"):
+       - Pig must NOT be deleted, DECEASED, SOLD, INACTIVE, or already DISTRIBUTED.
+       - Pig has currentBeneficiaryId = null.
+       - Pig healthStatus must be HEALTHY (cannot be in Bad Status / Sick / Meds).
+       - Zero unverified PigReturn records (veterinaryVerified = false).
+       - Latest VeterinaryRecord must not be SICK/CRITICAL/UNDER_TREATMENT/PENDING.
+  5. Finance Officer & Cell Manager Integration:
+       - Finance Officer views live "Vet Inspection & Clearance" tab on
+         /dashboard/finance/pigs to see all examined pigs and handover eligibility.
+       - Cell Manager distribution pig selector filters strictly to vet-cleared,
+         healthy stock pigs with no bad status.
+
+FLOW D: 2-FEE QUALIFICATION PAYMENT -> FINANCE APPROVAL -> SCOPED PIG HANDOVER
+  Step 1 — Member Pays Two Fees Off-System / MoMo:
+    - Cooperative Member pays two mandatory qualification fees to Finance MoMo
+      Merchant Code (read from SystemSetting key FINANCE_MOMO_MERCHANT_CODE):
+        (a) Pig Value Contribution : 16,000 RWF
+        (b) Program Tax / Admin Fee:  2,800 RWF
+        Total Qualification Payment: 18,800 RWF
+    - Member presents MoMo transaction receipt on-site to their Cell Manager.
+
+  Step 2 — Cell Manager Submits Member to Finance Approval List:
+    - Cell Manager opens /dashboard/field/distributions/new ("Step 1").
+    - Cell Manager can ONLY select cooperatives they created (created_by_id =
+      actor.id) and active members belonging to those cooperatives.
+    - Enters MoMo Reference and submits submitMemberPaymentForApproval():
+        * Upserts cooperative_member_payments with:
+          pig_value_fee = 16000.00, tax_fee = 2800.00, total_amount = 18800.00,
+          momo_reference, status = "PENDING", verified_by_id = null.
+        * Logs AuditLog (PAYMENT_SUBMITTED_FOR_APPROVAL).
+        * Sends Notification (type = APPROVAL) to all active FINANCE_OFFICERs.
+    - IMPORTANT: Pig distribution remains STRICTLY BLOCKED while status is PENDING.
+
+  Step 3 — Finance Manager Manually Verifies & Approves:
+    - Finance Officer views Pending queue on /dashboard/finance OR
+      /dashboard/finance/pigs ("Member Payment Approvals" tab).
+    - Inspects Member name, Cooperative, submitting Cell Manager, 18,800 RWF
+      split (16,000 + 2,800), and MoMo Reference.
+    - Action 3A — Verify & Approve (verifyMemberQualificationPayment):
+        * Sets cooperative_member_payments.status = "VERIFIED",
+          verified_by_id = financeOfficer.id.
+        * Automatically posts an APPROVED INCOME FinanceTransaction for
+          18,800 RWF (reference = "Member Qualification Fee & Tax") once per payment.
+        * Logs AuditLog (PAYMENT_VERIFIED).
+        * Notifies the owning Cell Manager and Cooperative Member that the
+          member is cleared to receive a pig.
+    - Action 3B — Reject (rejectMemberQualificationPayment):
+        * Sets status = "REJECTED" with reason, logs AuditLog, notifies owning
+          Cell Manager to resolve receipt discrepancy.
+
+  Step 4 — Scoped Cell Manager Distributes Pig & Starts Revolving Cycle:
+    - On /dashboard/field/distributions/new ("Step 2"):
+        * Stock Pig selector displays ONLY unallocated, vet-cleared pigs.
+        * Receiver selector displays ONLY active Cooperative Members and
+          Cooperative Leaders inside the Cell Manager's own cooperatives whose
+          cooperative_member_payments.status = "VERIFIED".
+    - On submit (distributePigToCooperativeMember / distributePig):
+        * Re-verifies cooperative ownership (coop.createdById === actor.id for
+          CELL_MANAGER), active COOPERATIVE_MEMBER / COOPERATIVE_LEADER status,
+          payment status === "VERIFIED", and checkPigVetClearance(pigId, "DISTRIBUTION").
+        * Inside prisma.$transaction:
+            1. Finds or creates a synced Beneficiary row with
+               beneficiaryNumber = "COOP-" + member.id (preserving PostgreSQL FK
+               integrity on PigDistribution, RevolvingCycle, and PigReturn).
+            2. Updates Pig: status = DISTRIBUTED, currentBeneficiaryId =
+               beneficiary.id, cooperativeId, ownerMemberId = member.id,
+               ownerMemberName = member.name.
+            3. Inserts PigDistribution linking pigId, beneficiaryId,
+               distributedById = cellManager.id.
+            4. Creates RevolvingCycle (cycleNumber = 1, expectedReturn = 2 piglets,
+               dueDate = +12 months, status = ACTIVE).
+            5. Creates Notification to Member & AuditLog (DISTRIBUTE_COOP_PIG).
+
+FLOW E: REVOLVING RETURNS, LITTERS & SURPLUS GEBYIAN MARKETPLACE
+  1. Litters & Piglets: Staff record births in Litter and Piglet rows.
+  2. Piglet Return: Cell Manager / Coop Leader records returned piglets
+     (/dashboard/field/returns/new -> PigReturn with veterinaryVerified = false)
+     and updates RevolvingCycle status (PARTIALLY_COMPLETED / COMPLETED when >=2).
+  3. Vet Clearance on Returns: Veterinarian checks PigReturn on /dashboard/vet/returned
+     -> sets veterinaryVerified = true and piglet/pig HEALTHY.
+  4. Next Cycle OR Gebyian Surplus:
+       - Returned healthy piglets can be redistributed to the next verified member.
+       - Cell Manager can report surplus cooperative/member animals on
+         /dashboard/field/stock-reports -> CooperativeStockReport (PENDING).
+       - Project Manager (Gebyian) verifies vet clearance, sets final price on
+         /dashboard/admin/ecommerce/animals, and publishes to /store.
+       - Public buyers order on /store -> StoreOrder + StoreOrderItem ->
+         Project Manager confirms payment & dispatches -> stock decrements &
+         FinanceTransaction INCOME posts cleanly.
+
+--------------------------------------------------------------------------------
+3. DATABASE ARCHITECTURE & KEY TABLES (SUPABASE POSTGRESQL)
+--------------------------------------------------------------------------------
+Auth, Staff & System:
+  - users                  Core accounts (email, phone, bcrypt password, role,
+                           active, cooperative_id, must_change_password,
+                           district_name, sector_name, cell_name, village_name,
+                           address).
+  - UserLocationAccess     Granular geographic scopes for users.
+  - OTP                    Hashed one-time codes for login/verification.
+  - SystemSetting          Key/value platform config (e.g. FINANCE_MOMO_MERCHANT_CODE).
+  - AuditLog               Immutable action history (userId, role, action, entity,
+                           entityId, oldValue, newValue).
+  - Notification           Per-user inbox notifications by NotificationType.
+
+Geography & Cooperatives:
+  - District / Sector / Cell / Village   Relational Rwanda geo tables.
+  - cooperatives           name, cell_name, max_members (default 15), leader_user_id,
+                           created_by_id (owning Cell Manager).
+                           SQL Trigger enforces <= 15 active members/leaders.
+  - cooperative_member_reports   Member -> Cooperative Leader -> Cell Manager escalation.
+  - cooperative_member_payments  member_id, cooperative_id, pig_value_fee (16000),
+                           tax_fee (2800), total_amount (18800), momo_reference,
+                           status (PENDING | VERIFIED | REJECTED), verified_by_id.
+
+Livestock & Revolving Core:
+  - Beneficiary            Program pig receivers — strictly synced 1:1 with
+                           active COOPERATIVE_MEMBER and COOPERATIVE_LEADER
+                           accounts via beneficiaryId = "COOP-" + users.id.
+  - Pig                    tagNumber (pigId), sex, purchasePrice (80000 RWF),
+                           healthStatus, status, beneficiaryId (FK -> Beneficiary),
+                           cooperative_id, owner_member_id, owner_member_name.
+  - PigDistribution        FK pigId -> Pig, beneficiaryId -> Beneficiary,
+                           distributedById -> users.
+  - PigReturn              FK pigId -> Pig, beneficiaryId -> Beneficiary,
+                           recordedById -> users, veterinaryVerified, verifiedByVetId.
+  - RevolvingCycle         FK beneficiaryId -> Beneficiary, expectedReturn (2), dueDate, status.
+  - PigTransfer            Inter-beneficiary pig transfer requests & approvals.
+  - Litter / Piglet        Farrowing litters and individual piglet tracking.
+  - MortalityRecord        Deceased pig reporting + Vet cause + Admin review.
+
+Veterinary & Field Operations:
+  - VeterinaryRecord       Clinical examination logs, test findings, prescribed medication,
+                           status (COMPLETED / UNDER_TREATMENT).
+  - VeterinaryExamination  Pig health inspection reports.
+  - Vaccination            Vaccine logs & next due dates.
+  - Treatment              Ongoing/completed medical treatments.
+  - VeterinaryVisit / FieldVisit / Task / EmployeeReport / Document / Comment.
+
+Finance & Gebyian E-Commerce:
+  - FinanceTransaction     Ledger entries (transactionId, type INCOME/EXPENSE,
+                           amount, status SUBMITTED/APPROVED/REJECTED, pigId, beneficiaryId).
+  - store_products         ANIMALS / ANIMAL_FOOD catalog (linked optionally to pig_id).
+  - store_orders           Buyer checkout orders (order_number, status, total_amount).
+  - store_order_items      Line items with quantity, original_price, discount_amount, price.
+  - cooperative_stock_reports  Surplus pigs reported by Cell Manager -> Gebyian pricing.
+  - cell_feed_sales        Cell Manager field feed sales -> Finance Officer verification.
+
+Public CMS:
+  - website_content        Homepage hero copy, buttons, image.
+  - team_members           Public team directory & profile detail pages.
+  - gallery_items          Public gallery items & categories.
+================================================================================

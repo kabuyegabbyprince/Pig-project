@@ -3,359 +3,231 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { 
-  ArrowLeft, Save, CheckCircle2, AlertTriangle, Stethoscope, 
-  HeartPulse, Activity, ShieldCheck, AlertCircle, Loader2
-} from "lucide-react";
-import { recordVeterinaryBatchExamination } from "@/app/actions/veterinary";
+import { ArrowLeft, Stethoscope, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { PigHealthStatus } from "@prisma/client";
+import { recordIndividualPigExamination } from "@/app/actions/veterinary";
+
+interface PigOption {
+  id: string;
+  tagNumber: string;
+  healthStatus: PigHealthStatus;
+  breed: string | null;
+}
 
 interface VeterinaryExaminationFormProps {
+  pigs: PigOption[];
   backHref?: string;
 }
 
-export function VeterinaryExaminationForm({ backHref = "/dashboard/vet" }: VeterinaryExaminationFormProps) {
+export function VeterinaryExaminationForm({ pigs, backHref = "/dashboard/vet" }: VeterinaryExaminationFormProps) {
   const router = useRouter();
   const today = new Date().toISOString().split("T")[0];
 
-  const [totalExamined, setTotalExamined] = useState<string>("");
-  const [examinationDate, setExaminationDate] = useState<string>(today);
-  const [sickPigs, setSickPigs] = useState<string>("0");
-  const [diseaseDescription, setDiseaseDescription] = useState<string>("");
-  const [treatmentDescription, setTreatmentDescription] = useState<string>("");
+  const [pigId, setPigId] = useState<string>("");
+  const [diagnosis, setDiagnosis] = useState<string>("");
+  const [healthStatus, setHealthStatus] = useState<string>(PigHealthStatus.HEALTHY);
+  const [medication, setMedication] = useState<string>("");
+  const [examDate, setExamDate] = useState<string>(today);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const numTotal = parseInt(totalExamined, 10) || 0;
-  const numSick = parseInt(sickPigs, 10) || 0;
-  const isInvalidSick = numTotal > 0 && numSick > numTotal;
-  const numHealthy = Math.max(0, numTotal - numSick);
+  const isSickOrTreatment =
+    healthStatus === PigHealthStatus.SICK ||
+    healthStatus === PigHealthStatus.UNDER_TREATMENT ||
+    healthStatus === PigHealthStatus.CRITICAL;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    if (numTotal < 1) {
-      setErrorMessage("Please enter the number of pigs examined (at least 1).");
+    if (!pigId) {
+      setErrorMessage("Please select a pig from the dropdown.");
       return;
     }
 
-    if (numSick > numTotal) {
-      setErrorMessage("The number of sick pigs cannot exceed the total pigs examined.");
-      return;
-    }
-
-    if (numSick < 0) {
-      setErrorMessage("The number of sick pigs cannot be negative.");
+    if (!diagnosis.trim()) {
+      setErrorMessage("Please enter the test done / clinical findings.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.set("totalExamined", String(numTotal));
-      formData.set("examinationDate", examinationDate);
-      formData.set("sickPigs", String(numSick));
-      formData.set("healthyPigs", String(numHealthy));
-      formData.set("diseaseDescription", diseaseDescription);
-      formData.set("treatmentDescription", treatmentDescription);
+      const fd = new FormData();
+      fd.set("pigId", pigId);
+      fd.set("diagnosis", diagnosis);
+      fd.set("healthStatus", healthStatus);
+      fd.set("medication", medication);
+      fd.set("date", examDate);
 
-      const result = await recordVeterinaryBatchExamination(formData);
-      if (result && !result.success) {
-        setErrorMessage(result.error || "Failed to save examination record.");
+      const res = await recordIndividualPigExamination(fd);
+      if (res && !res.success) {
+        setErrorMessage(res.error || "Failed to record examination.");
         setIsSubmitting(false);
       } else {
-        setSuccessMessage(
-          `Examination recorded successfully! Examined: ${numTotal} (${numHealthy} Healthy, ${numSick} Sick). Updating dashboard...`
-        );
+        setSuccessMessage("Examination recorded successfully! Redirecting...");
         setTimeout(() => {
           router.push(backHref);
           router.refresh();
-        }, 1200);
+        }, 1000);
       }
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred while saving.");
+      setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred.");
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+    <div className="max-w-3xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
       <div className="flex items-center gap-4">
-        <Link 
+        <Link
           href={backHref}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfe7df] bg-white text-[#5d6e64] hover:bg-[#e4ede6] transition-colors"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Veterinary Examination</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            Log Individual Pig Examination
+          </h1>
           <p className="mt-1 text-xs text-slate-500">
-            Record clinical examinations, identify illnesses, and administer medical treatments.
+            Select a pig, record test findings, set health status, and prescribe medication.
           </p>
         </div>
       </div>
 
-      {/* Success Notification */}
       {successMessage && (
-        <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-xs flex items-start gap-3">
-          <CheckCircle2 className="h-5 w-5 text-[#FF8A00] shrink-0 mt-0.5" />
-          <div>
-            <h4 className="text-xs font-bold text-[#101827]">Saved Successfully</h4>
-            <p className="text-xs text-[#FF8A00] mt-0.5">{successMessage}</p>
-          </div>
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-xs flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-[#FF8A00] shrink-0" />
+          <p className="text-xs font-bold text-[#101827]">{successMessage}</p>
         </div>
       )}
 
-      {/* Error / Validation Notification */}
       {errorMessage && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 shadow-xs flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-rose-700 shrink-0 mt-0.5" />
-          <div>
-            <h4 className="text-xs font-bold text-rose-800">Validation Error</h4>
-            <p className="text-xs text-rose-700 mt-0.5">{errorMessage}</p>
-          </div>
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 shadow-xs flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-rose-700 shrink-0" />
+          <p className="text-xs font-bold text-rose-800">{errorMessage}</p>
         </div>
       )}
 
-      {/* Main Examination Form Card */}
-      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
-        <div className="border-b border-[#dfe7df] bg-[#f8faf8] px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Stethoscope className="h-5 w-5 text-[#2c5a43]" />
-            <h2 className="text-base font-bold text-[#1b2d24]">Clinical Examination Details</h2>
-          </div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#5d6e64] bg-[#e4ede6] px-2.5 py-1 rounded-full">
-            Batch Entry
-          </span>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="border-b border-slate-100 bg-slate-50 px-6 py-4 flex items-center gap-2.5">
+          <Stethoscope className="h-5 w-5 text-[#FF8A00]" />
+          <h2 className="text-base font-bold text-[#101827]">Clinical Examination Form</h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-8">
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            
-            {/* 1. Number of Pigs Examined */}
-            <div>
-              <label htmlFor="totalExamined" className="block text-sm font-semibold text-[#1c2b23]">
-                Number of Pigs Examined <span className="text-red-500">*</span>
+            {/* Pig Dropdown */}
+            <div className="sm:col-span-2">
+              <label htmlFor="pigId" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Select Pig (Tag Number) *
               </label>
-              <input
-                type="number"
-                id="totalExamined"
-                name="totalExamined"
-                min="1"
+              <select
+                id="pigId"
                 required
-                value={totalExamined}
-                onChange={(e) => setTotalExamined(e.target.value)}
-                placeholder="e.g. 20"
-                className="mt-2 block w-full rounded-xl border border-[#d9e1d8] bg-white px-3.5 py-2.5 text-[#1c2b23] shadow-sm placeholder:text-[#9db0a4] focus:border-[#2c5a43] focus:outline-none focus:ring-2 focus:ring-[#2c5a43]/20 sm:text-sm font-medium"
-              />
-              <p className="mt-1.5 text-xs text-[#5d6e64]">
-                Enter the total number of pigs inspected in this session.
-              </p>
+                value={pigId}
+                onChange={(e) => setPigId(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-mono text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+              >
+                <option value="">-- Choose Pig from System Registry ({pigs.length} available) --</option>
+                {pigs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    Tag: {p.tagNumber} {p.breed ? `(${p.breed})` : ""} — Status: {p.healthStatus}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* 2. Examination Date */}
+            {/* Examination Date */}
             <div>
-              <label htmlFor="examinationDate" className="block text-sm font-semibold text-[#1c2b23]">
-                Examination Date <span className="text-red-500">*</span>
+              <label htmlFor="examDate" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Examination Date *
               </label>
               <input
                 type="date"
-                id="examinationDate"
-                name="examinationDate"
+                id="examDate"
                 required
-                value={examinationDate}
-                onChange={(e) => setExaminationDate(e.target.value)}
-                className="mt-2 block w-full rounded-xl border border-[#d9e1d8] bg-white px-3.5 py-2.5 text-[#1c2b23] shadow-sm focus:border-[#2c5a43] focus:outline-none focus:ring-2 focus:ring-[#2c5a43]/20 sm:text-sm font-medium"
+                value={examDate}
+                onChange={(e) => setExamDate(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
               />
-              <p className="mt-1.5 text-xs text-[#5d6e64]">
-                Today is selected by default. You can choose a previous date if needed.
-              </p>
             </div>
 
-            {/* 3. Number of Sick Pigs */}
+            {/* Health Status */}
             <div>
-              <label htmlFor="sickPigs" className="block text-sm font-semibold text-[#1c2b23]">
-                Number of Sick Pigs <span className="text-red-500">*</span>
+              <label htmlFor="healthStatus" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Health Status *
+              </label>
+              <select
+                id="healthStatus"
+                value={healthStatus}
+                onChange={(e) => setHealthStatus(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+              >
+                <option value={PigHealthStatus.HEALTHY}>Healthy (Cleared)</option>
+                <option value={PigHealthStatus.SICK}>Sick (Bad Status)</option>
+                <option value={PigHealthStatus.UNDER_TREATMENT}>Under Treatment (Bad Status)</option>
+                <option value={PigHealthStatus.CRITICAL}>Critical (Bad Status)</option>
+                <option value={PigHealthStatus.RECOVERED}>Recovered</option>
+              </select>
+            </div>
+
+            {/* Test Done (Diagnosis) */}
+            <div className="sm:col-span-2">
+              <label htmlFor="diagnosis" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Test Done / Clinical Diagnosis *
+              </label>
+              <textarea
+                id="diagnosis"
+                required
+                rows={3}
+                value={diagnosis}
+                onChange={(e) => setDiagnosis(e.target.value)}
+                placeholder="Enter diagnostic tests performed, clinical findings, symptoms..."
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+              />
+            </div>
+
+            {/* Medication (if sick / under treatment) */}
+            <div className="sm:col-span-2">
+              <label htmlFor="medication" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Medication Prescribed {isSickOrTreatment ? "(Required for Bad Status)" : "(Optional)"}
               </label>
               <input
-                type="number"
-                id="sickPigs"
-                name="sickPigs"
-                min="0"
-                required
-                value={sickPigs}
-                onChange={(e) => setSickPigs(e.target.value)}
-                placeholder="0"
-                className={`mt-2 block w-full rounded-xl border px-3.5 py-2.5 text-[#1c2b23] shadow-sm placeholder:text-[#9db0a4] sm:text-sm font-medium focus:outline-none focus:ring-2 ${
-                  isInvalidSick 
-                    ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-200" 
-                    : "border-[#d9e1d8] bg-white focus:border-[#2c5a43] focus:ring-[#2c5a43]/20"
-                }`}
+                type="text"
+                id="medication"
+                required={isSickOrTreatment}
+                value={medication}
+                onChange={(e) => setMedication(e.target.value)}
+                placeholder="e.g. Antibiotics, Iron injections, Dewormer..."
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
               />
-              <p className={`mt-1.5 text-xs ${isInvalidSick ? "text-red-600 font-medium" : "text-[#5d6e64]"}`}>
-                {isInvalidSick
-                  ? "⚠ Sick pigs cannot exceed the total pigs examined!"
-                  : "Enter how many pigs were found sick or in need of treatment."}
-              </p>
-            </div>
-
-            {/* 4. Number of Healthy Pigs (Automatically calculated) */}
-            <div>
-              <label htmlFor="healthyPigs" className="block text-sm font-semibold text-[#101827]">
-                Number of Healthy Pigs <span className="text-xs font-normal text-slate-500">(Auto-calculated)</span>
-              </label>
-              <div className="relative mt-2">
-                <input
-                  type="number"
-                  id="healthyPigs"
-                  name="healthyPigs"
-                  readOnly
-                  value={numHealthy}
-                  className="block w-full rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-2.5 text-[#101827] font-bold shadow-sm sm:text-sm cursor-not-allowed"
-                />
-                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-[#FF8A00]">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-              </div>
-              <p className="mt-1.5 text-xs text-slate-500">
-                Automatically calculated as: <span className="font-semibold text-[#FF8A00]">Total Examined ({numTotal}) − Sick Pigs ({numSick})</span>.
-              </p>
-            </div>
-
-            {/* 5. Disease Description */}
-            <div className="sm:col-span-2">
-              <label htmlFor="diseaseDescription" className="block text-sm font-semibold text-[#1c2b23]">
-                Disease Description
-              </label>
-              <textarea
-                id="diseaseDescription"
-                name="diseaseDescription"
-                rows={3}
-                value={diseaseDescription}
-                onChange={(e) => setDiseaseDescription(e.target.value)}
-                placeholder="Describe illnesses, symptoms, or health problems identified (e.g., fever, respiratory symptoms, parasites)..."
-                className="mt-2 block w-full rounded-xl border border-[#d9e1d8] bg-white px-3.5 py-2.5 text-[#1c2b23] shadow-sm placeholder:text-[#9db0a4] focus:border-[#2c5a43] focus:outline-none focus:ring-2 focus:ring-[#2c5a43]/20 sm:text-sm"
-              />
-              <p className="mt-1.5 text-xs text-[#5d6e64]">
-                Provide clinical details for any health conditions observed during examination.
-              </p>
-            </div>
-
-            {/* 6. Treatment Description */}
-            <div className="sm:col-span-2">
-              <label htmlFor="treatmentDescription" className="block text-sm font-semibold text-[#1c2b23]">
-                Treatment Description
-              </label>
-              <textarea
-                id="treatmentDescription"
-                name="treatmentDescription"
-                rows={3}
-                value={treatmentDescription}
-                onChange={(e) => setTreatmentDescription(e.target.value)}
-                placeholder="Describe treatments provided to sick pigs (e.g., antibiotic injection, dewormer, isolation)..."
-                className="mt-2 block w-full rounded-xl border border-[#d9e1d8] bg-white px-3.5 py-2.5 text-[#1c2b23] shadow-sm placeholder:text-[#9db0a4] focus:border-[#2c5a43] focus:outline-none focus:ring-2 focus:ring-[#2c5a43]/20 sm:text-sm"
-              />
-              <p className="mt-1.5 text-xs text-[#5d6e64]">
-                Specify medications, therapies, or recovery steps administered to affected animals.
-              </p>
+              {isSickOrTreatment && (
+                <p className="mt-1 text-[11px] font-medium text-amber-700">
+                  This pig will be added to the Bad Status list until its status is updated to Healthy/Recovered.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Real-time Validation Error Banner */}
-          {isInvalidSick && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
-              <p className="text-sm font-medium text-red-800">
-                Invalid numbers: The number of sick pigs (<strong>{numSick}</strong>) cannot exceed the total pigs examined (<strong>{numTotal}</strong>). Please adjust your counts.
-              </p>
-            </div>
-          )}
-
-          {/* Automatic Summary Section */}
-          <div className="rounded-[20px] border border-[#dfe7df] bg-[#f8faf8] p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-[#2c5a43]" />
-                <h3 className="text-base font-bold text-[#1b2d24]">Automatic Summary</h3>
-              </div>
-              <span className="text-xs text-[#5d6e64] font-medium">
-                Live Calculation
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {/* Total Pigs Examined */}
-              <div className="rounded-2xl border border-[#dfe7df] bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[#5d6e64]">
-                    Total Pigs Examined
-                  </span>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e3efe7] text-[#173d2e]">
-                    <Stethoscope className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="mt-3 text-3xl font-bold text-[#1b2d24]">{numTotal}</p>
-                <p className="mt-1 text-xs text-[#7a8a82]">Inspected livestock</p>
-              </div>
-
-              {/* Total Sick Pigs */}
-              <div className="rounded-2xl border border-[#fed7aa] bg-[#fffaf5] p-5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[#c2410c]">
-                    Total Sick Pigs
-                  </span>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ffedd5] text-[#ea580c]">
-                    <HeartPulse className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="mt-3 text-3xl font-bold text-[#c2410c]">{numSick}</p>
-                <p className="mt-1 text-xs text-[#9a3412]">Under therapy / quarantine</p>
-              </div>
-
-              {/* Total Healthy Pigs */}
-              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[#FF8A00]">
-                    Total Healthy Pigs
-                  </span>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#FF8A00]">
-                    <CheckCircle2 className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="mt-3 text-3xl font-bold text-[#101827]">{numHealthy}</p>
-                <p className="mt-1 text-xs text-slate-600">Cleared for distribution</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="pt-4 flex items-center justify-end gap-4 border-t border-[#d9e1d8]">
-            <Link 
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <Link
               href={backHref}
-              className="px-5 py-2.5 text-sm font-medium text-[#5d6e64] hover:text-[#1c2b23] hover:bg-[#e4ede6] rounded-xl transition-colors"
+              className="rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
               Cancel
             </Link>
             <button
               type="submit"
-              disabled={isSubmitting || isInvalidSick || numTotal < 1}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2c5a43] px-7 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1c2b23] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#FF8A00] px-6 py-2.5 text-xs font-bold text-[#101827] hover:bg-[#e57c00] disabled:opacity-60 transition cursor-pointer"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Saving Record...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  <span>Save Record</span>
-                </>
-              )}
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>Save Examination Record</span>
             </button>
           </div>
         </form>

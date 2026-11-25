@@ -4,6 +4,14 @@ import * as rg from "rwanda-geo";
 const prisma = new PrismaClient();
 
 async function main() {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_SEED_IN_PRODUCTION !== "true"
+  ) {
+    throw new Error(
+      "Refusing to run demo seed script in production. Set ALLOW_SEED_IN_PRODUCTION=true only if intentional."
+    );
+  }
   console.log("Seeding Rwanda administrative divisions...");
 
   const districts = rg.getAllDistricts().map((d) => ({

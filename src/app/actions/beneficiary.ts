@@ -1,140 +1,236 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { Role } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { NotificationType, Role } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
+import { normalizePhone } from "@/lib/phone-utils";
+import { syncSupabaseAuthUser } from "@/lib/supabase-auth";
+import { normalizeRoleValue } from "@/lib/roles";
+import { getUserAddressProfile } from "@/lib/user-profile-address";
+import { syncBeneficiaryRecordForCoopUser } from "@/app/actions/cooperative";
 
-export async function createBeneficiary(formData: FormData) {
-  const user = await getActiveUser([
-    Role.SUPER_ADMIN,
-    Role.PROJECT_MANAGER,
-    Role.CELL_MANAGER,
-    Role.COOPERATIVE_LEADER,
-  ]);
-  if (!user) {
-    throw new Error("Unauthorized");
+const MAX_COOPERATIVE_MEMBERS = 15;
+
+export async function enrollCooperativeBeneficiary(formData: FormData): Promise<{
+  success: boolean;
+  error?: string;
+  redirectUrl?: string;
+}> {
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.CELL_MANAGER]);
+  if (!actor) {
+    return {
+      success: false,
+      error: "Unauthorized: Only Cell Managers or Super Admins can enroll cooperative beneficiaries.",
+    };
   }
 
+  const actorRole = normalizeRoleValue(actor.role) || actor.role;
+  const cooperativeId = String(formData.get("cooperativeId") || "").trim();
   const fullName = String(formData.get("fullName") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const rawPhone = String(formData.get("phone") || "").trim();
   const nationalId = String(formData.get("nationalId") || "").trim() || null;
-  const gender = String(formData.get("gender") || "").trim() || null;
-  const householdSizeStr = formData.get("householdSize");
-  const householdSize = householdSizeStr ? parseInt(String(householdSizeStr), 10) : null;
-  const notes = String(formData.get("notes") || "").trim() || null;
-  const districtId = String(formData.get("districtId") || "") || null;
-  const sectorId = String(formData.get("sectorId") || "") || null;
-  const cellId = String(formData.get("cellId") || "") || null;
-  const villageId = String(formData.get("villageId") || "") || null;
-  const phone = String(formData.get("phone") || "").trim() || null;
-  const savingsGroup = String(formData.get("savingsGroup") || "").trim() || null;
+  const requestedRoleRaw = String(formData.get("role") || Role.COOPERATIVE_MEMBER).trim();
+  const staticPassword = String(formData.get("staticPassword") || "").trim();
 
-  if (!fullName) {
-    throw new Error("Full name is required");
+  if (!cooperativeId || !fullName || !email || !staticPassword) {
+    return {
+      success: false,
+      error:
+        "Pig receivers (beneficiaries) must belong to a cooperative. Cooperative, Full Name, Email, and Static Initial Password are required.",
+    };
   }
 
-  const [district, sector, cell, village] = await Promise.all([
-    districtId
-      ? prisma.district.findFirst({
-          where: {
-            OR: [
-              { id: districtId },
-              { code: districtId },
-              { name: { equals: districtId, mode: "insensitive" } },
-            ],
-          },
-        })
-      : null,
-    sectorId
-      ? prisma.sector.findFirst({
-          where: {
-            OR: [
-              { id: sectorId },
-              { code: sectorId },
-              { name: { equals: sectorId, mode: "insensitive" } },
-            ],
-          },
-        })
-      : null,
-    cellId
-      ? prisma.cell.findFirst({
-          where: {
-            OR: [
-              { id: cellId },
-              { code: cellId },
-              { name: { equals: cellId, mode: "insensitive" } },
-            ],
-          },
-        })
-      : null,
-    villageId
-      ? prisma.village.findFirst({
-          where: {
-            OR: [
-              { id: villageId },
-              { code: villageId },
-              { name: { equals: villageId, mode: "insensitive" } },
-            ],
-          },
-        })
-      : null,
-  ]);
+  if (staticPassword.length < 6) {
+    return {
+      success: false,
+      error: "Static initial password must be at least 6 characters.",
+    };
+  }
 
-  const districtStr = district?.name || (formData.get("district") as string) || null;
-  const sectorStr = sector?.name || (formData.get("sector") as string) || null;
-  const cellStr = cell?.name || (formData.get("cell") as string) || null;
-  const villageStr = village?.name || (formData.get("village") as string) || null;
-  
-  // Generate unique ID for the beneficiary
-  const count = await prisma.beneficiary.count();
-  const beneficiaryNumber = `BEN-${String(count + 1).padStart(6, "0")}`;
+  const assignedRole =
+    requestedRoleRaw === Role.COOPERATIVE_LEADER
+      ? Role.COOPERATIVE_LEADER
+      : Role.COOPERATIVE_MEMBER;
 
-  const beneficiary = await prisma.beneficiary.create({
-    data: {
-      beneficiaryNumber,
-      fullName,
-      nationalId,
-      gender,
-      householdSize: householdSize && !Number.isNaN(householdSize) ? householdSize : null,
-      notes,
-      districtStr,
-      sectorStr,
-      cellStr,
-      villageStr,
-      districtId: district ? district.id : null,
-      sectorId: sector ? sector.id : null,
-      cellId: cell ? cell.id : null,
-      villageId: village ? village.id : null,
-      phone,
-      savingsGroup,
-      registrationDate: new Date(),
-      createdById: user.id,
-    },
-  });
+  const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
 
-  await prisma.auditLog.create({
-    data: {
-      userId: user.id,
-      role: user.role,
-      action: "CREATED",
-      entity: "BENEFICIARY",
-      entityId: beneficiary.id,
-      newValue: {
-        beneficiaryNumber: beneficiary.beneficiaryNumber,
-        fullName: beneficiary.fullName,
+  try {
+    const coop = await prisma.cooperative.findUnique({
+      where: { id: cooperativeId },
+    });
+    if (!coop) {
+      return { success: false, error: "Selected cooperative was not found." };
+    }
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(actor.id)) {
+      return {
+        success: false,
+        error: "Access denied: You can only enroll beneficiaries into cooperatives you created.",
+      };
+    }
+
+    const currentMembers = await prisma.user.findMany({
+      where: {
+        cooperativeId,
+        deletedAt: null,
       },
-    },
-  });
+    });
 
-  revalidatePath("/dashboard/admin/beneficiaries");
-  revalidatePath("/dashboard/field/beneficiaries");
-  revalidatePath("/");
-  redirect(
-    user.role === Role.CELL_MANAGER ||
-      user.role === Role.COOPERATIVE_LEADER ||
-      user.role === Role.COOPERATIVE_MEMBER
-      ? "/dashboard/field/beneficiaries"
-      : "/dashboard/admin/beneficiaries"
-  );
+    if (currentMembers.length >= MAX_COOPERATIVE_MEMBERS) {
+      return {
+        success: false,
+        error: `Cooperative "${coop.name}" is already at maximum capacity of ${MAX_COOPERATIVE_MEMBERS} members (including Cooperative Leader).`,
+      };
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+        ],
+      },
+    });
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return { success: false, error: "A user with this email already exists." };
+      }
+      if (normalizedPhone && existingUser.phone === normalizedPhone) {
+        return { success: false, error: "A user with this phone number already exists." };
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(staticPassword, 10);
+    const actorAddress = await getUserAddressProfile(actor.id);
+
+    const previousLeader =
+      assignedRole === Role.COOPERATIVE_LEADER
+        ? currentMembers.find((m) => normalizeRoleValue(m.role) === Role.COOPERATIVE_LEADER)
+        : undefined;
+
+    if (previousLeader) {
+      await prisma.user.update({
+        where: { id: String(previousLeader.id) },
+        data: { role: Role.COOPERATIVE_MEMBER },
+      });
+      await syncSupabaseAuthUser({
+        email: previousLeader.email,
+        role: Role.COOPERATIVE_MEMBER,
+      });
+      await syncBeneficiaryRecordForCoopUser({
+        userId: String(previousLeader.id),
+        name: previousLeader.name,
+        phone: previousLeader.phone ?? null,
+        role: Role.COOPERATIVE_MEMBER,
+        isActive: Boolean(previousLeader.isActive),
+        cooperativeName: coop.name,
+        cellName: coop.cellName,
+        createdById: actor.id,
+      });
+    }
+
+    const createdUser = await prisma.user.create({
+      data: {
+        name: fullName,
+        email,
+        phone: normalizedPhone,
+        password: hashedPassword,
+        role: assignedRole,
+        cooperativeId,
+        mustChangePassword: true,
+        isActive: true,
+        districtName: actorAddress.districtName || null,
+        sectorName: actorAddress.sectorName || null,
+        cellName: actorAddress.cellName || coop.cellName,
+        villageName: actorAddress.villageName || null,
+      },
+    });
+
+    await syncSupabaseAuthUser({
+      email,
+      password: staticPassword,
+      name: fullName,
+      role: assignedRole,
+      phone: normalizedPhone,
+      publicUserId: String(createdUser.id),
+      isActive: true,
+    });
+
+    const beneficiary = await syncBeneficiaryRecordForCoopUser({
+      userId: String(createdUser.id),
+      name: fullName,
+      phone: normalizedPhone,
+      nationalId,
+      role: assignedRole,
+      isActive: true,
+      cooperativeName: coop.name,
+      cellName: actorAddress.cellName || coop.cellName,
+      districtName: actorAddress.districtName || null,
+      sectorName: actorAddress.sectorName || null,
+      villageName: actorAddress.villageName || null,
+      createdById: actor.id,
+    });
+
+    if (assignedRole === Role.COOPERATIVE_LEADER) {
+      await prisma.cooperative.update({
+        where: { id: cooperativeId },
+        data: {
+          leaderUserId: String(createdUser.id),
+          leaderName: createdUser.name,
+        },
+      });
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: "CREATED",
+        entity: "BENEFICIARY",
+        entityId: beneficiary.id,
+        newValue: {
+          beneficiaryNumber: beneficiary.beneficiaryNumber,
+          fullName: beneficiary.fullName,
+          userId: String(createdUser.id),
+          role: assignedRole,
+          cooperativeId,
+          cooperativeName: coop.name,
+        },
+      },
+    });
+
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: String(createdUser.id),
+          type: NotificationType.INFO,
+          title: `Enrolled in ${coop.name}`,
+          message: `You have been registered as a ${assignedRole === Role.COOPERATIVE_LEADER ? "Cooperative Leader" : "Cooperative Member"} and eligible beneficiary in ${coop.name} (${coop.cellName}).`,
+          relatedEntity: "BENEFICIARY",
+          relatedEntityId: beneficiary.id,
+        },
+      });
+    } catch {
+      // Non-blocking
+    }
+
+    revalidatePath("/dashboard/admin/beneficiaries");
+    revalidatePath("/dashboard/field/beneficiaries");
+    revalidatePath("/dashboard/field/cooperative");
+    revalidatePath("/dashboard/field/distributions/new");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      redirectUrl:
+        actorRole === Role.SUPER_ADMIN
+          ? "/dashboard/admin/beneficiaries"
+          : "/dashboard/field/beneficiaries",
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to enroll cooperative beneficiary.";
+    return { success: false, error: message };
+  }
 }

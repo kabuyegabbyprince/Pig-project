@@ -3,139 +3,144 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { 
-  ArrowLeft, Calendar, CheckCircle2, Edit2, Loader2, Package, Plus, Save, 
-  Search, Tag, Trash2, X, AlertTriangle 
+  ArrowLeft, CheckCircle2, Edit2, Loader2, Package, Plus, Save, 
+  Search, Tag, Trash2, X, AlertTriangle, HeartPulse, DollarSign 
 } from "lucide-react";
 import { 
-  registerPigBatch, updatePigBatch, deletePigBatch, PigReceivedBatch 
+  registerIndividualPig, updateIndividualPig, deleteIndividualPig, SerializedPigInventoryItem 
 } from "@/app/actions/pig";
+import { PigHealthStatus, PigSex } from "@prisma/client";
 
 interface PigRegisterManagerProps {
-  initialBatches: PigReceivedBatch[];
+  initialPigs: SerializedPigInventoryItem[];
   initialTotalAvailable: number;
   backHref?: string;
 }
 
 export function PigRegisterManager({
-  initialBatches,
+  initialPigs,
   initialTotalAvailable,
   backHref = "/dashboard/field/pigs",
 }: PigRegisterManagerProps) {
-  const [batches, setBatches] = useState<PigReceivedBatch[]>(initialBatches);
+  const [pigs, setPigs] = useState<SerializedPigInventoryItem[]>(initialPigs);
   const [totalAvailable, setTotalAvailable] = useState<number>(initialTotalAvailable);
 
-  // Filter state
-  const [searchDate, setSearchDate] = useState<string>("");
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [healthFilter, setHealthFilter] = useState<string>("ALL");
 
   // Create Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createDate, setCreateDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
-  const [createQuantity, setCreateQuantity] = useState<number>(1);
+  const [createTag, setCreateTag] = useState<string>("");
+  const [createHealth, setCreateHealth] = useState<PigHealthStatus>(PigHealthStatus.HEALTHY);
+  const [createSex, setCreateSex] = useState<PigSex>(PigSex.FEMALE);
+  const [createPrice, setCreatePrice] = useState<number>(80000);
 
   // Edit Modal State
-  const [editingBatch, setEditingBatch] = useState<PigReceivedBatch | null>(null);
-  const [editDate, setEditDate] = useState<string>("");
-  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editingPig, setEditingPig] = useState<SerializedPigInventoryItem | null>(null);
+  const [editTag, setEditTag] = useState<string>("");
+  const [editHealth, setEditHealth] = useState<PigHealthStatus>(PigHealthStatus.HEALTHY);
+  const [editSex, setEditSex] = useState<PigSex>(PigSex.FEMALE);
+  const [editPrice, setEditPrice] = useState<number>(80000);
 
   // Delete Confirmation State
-  const [deletingBatch, setDeletingBatch] = useState<PigReceivedBatch | null>(null);
+  const [deletingPig, setDeletingPig] = useState<SerializedPigInventoryItem | null>(null);
 
   // Transitions & Feedback
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // Filter batches by searchDate
-  const filteredBatches = useMemo(() => {
-    if (!searchDate.trim()) return batches;
-    return batches.filter((b) => b.dateReceived === searchDate.trim());
-  }, [batches, searchDate]);
+  // Filtered pigs
+  const filteredPigs = useMemo(() => {
+    return pigs.filter((p) => {
+      const matchSearch =
+        !searchQuery.trim() ||
+        p.tagNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.currentBeneficiaryName ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.currentBeneficiaryNumber ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchHealth = healthFilter === "ALL" || p.healthStatus === healthFilter;
 
-  // Handle Create Pig Batch
+      return matchSearch && matchHealth;
+    });
+  }, [pigs, searchQuery, healthFilter]);
+
+  // Handle Create Individual Pig
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (createQuantity < 1) {
-      setFeedback({ type: "error", message: "Please enter at least 1 pig." });
-      return;
-    }
-
     setFeedback(null);
     startTransition(async () => {
       try {
-        const result = await registerPigBatch({
-          dateReceived: createDate,
-          quantity: Number(createQuantity),
+        const result = await registerIndividualPig({
+          tagNumber: createTag,
+          healthStatus: createHealth,
+          sex: createSex,
+          purchasePrice: createPrice,
         });
 
-        if (result.success && result.batch) {
-          setBatches((prev) => [result.batch, ...prev]);
+        if (result.success && result.pig) {
+          setPigs((prev) => [result.pig!, ...prev]);
           setTotalAvailable(result.totalAvailable);
           setIsCreateOpen(false);
           setFeedback({
             type: "success",
-            message: `Successfully saved ${createQuantity} pig${createQuantity > 1 ? "s" : ""} received on ${createDate}.`,
+            message: `Successfully registered pig "${result.pig.tagNumber}" (Health: ${result.pig.healthStatus}).`,
           });
-          setCreateQuantity(1);
-          setCreateDate(new Date().toISOString().split("T")[0]);
+          setCreateTag("");
+          setCreateHealth(PigHealthStatus.HEALTHY);
+          setCreateSex(PigSex.FEMALE);
+          setCreatePrice(80000);
         }
       } catch (err: unknown) {
         setFeedback({
           type: "error",
-          message: err instanceof Error ? err.message : "Failed to register pigs. Please try again.",
+          message: err instanceof Error ? err.message : "Failed to register pig. Please try again.",
         });
       }
     });
   };
 
   // Open Edit Modal
-  const openEdit = (batch: PigReceivedBatch) => {
-    setEditingBatch(batch);
-    setEditDate(batch.dateReceived);
-    setEditQuantity(batch.quantity);
+  const openEdit = (pig: SerializedPigInventoryItem) => {
+    setEditingPig(pig);
+    setEditTag(pig.tagNumber);
+    setEditHealth(pig.healthStatus);
+    setEditSex(pig.sex ?? PigSex.FEMALE);
+    setEditPrice(pig.purchasePrice || 80000);
     setFeedback(null);
   };
 
   // Handle Edit Submit
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingBatch) return;
-    if (editQuantity < 1) {
-      setFeedback({ type: "error", message: "Number of pigs must be at least 1." });
-      return;
-    }
+    if (!editingPig) return;
 
     setFeedback(null);
     startTransition(async () => {
       try {
-        const result = await updatePigBatch({
-          currentTags: editingBatch.tags,
-          newDateReceived: editDate,
-          newQuantity: Number(editQuantity),
+        const result = await updateIndividualPig({
+          pigId: editingPig.id,
+          tagNumber: editTag,
+          healthStatus: editHealth,
+          sex: editSex,
+          purchasePrice: editPrice,
         });
 
-        if (result.success && result.batch) {
-          setBatches((prev) =>
-            prev.map((b) =>
-              b.id === editingBatch.id
-                ? {
-                    ...b,
-                    dateReceived: result.batch.dateReceived,
-                    quantity: result.batch.quantity,
-                    tags: result.batch.tags,
-                  }
-                : b
-            )
+        if (result.success && result.pig) {
+          setPigs((prev) =>
+            prev.map((p) => (p.id === editingPig.id ? result.pig! : p))
           );
           setTotalAvailable(result.totalAvailable);
-          setEditingBatch(null);
+          setEditingPig(null);
           setFeedback({
             type: "success",
-            message: `Receipt record updated successfully (${result.batch.quantity} pigs on ${result.batch.dateReceived}).`,
+            message: `Pig "${result.pig.tagNumber}" updated successfully.`,
           });
         }
       } catch (err: unknown) {
         setFeedback({
           type: "error",
-          message: err instanceof Error ? err.message : "Failed to update record. Please try again.",
+          message: err instanceof Error ? err.message : "Failed to update pig record. Please try again.",
         });
       }
     });
@@ -143,27 +148,27 @@ export function PigRegisterManager({
 
   // Handle Delete Confirm
   const handleDeleteConfirm = () => {
-    if (!deletingBatch) return;
+    if (!deletingPig) return;
 
     setFeedback(null);
     startTransition(async () => {
       try {
-        const result = await deletePigBatch(deletingBatch.tags);
+        const result = await deleteIndividualPig(deletingPig.id);
         if (result.success) {
-          setBatches((prev) => prev.filter((b) => b.id !== deletingBatch.id));
+          setPigs((prev) => prev.filter((p) => p.id !== deletingPig.id));
           setTotalAvailable(result.totalAvailable);
           setFeedback({
             type: "success",
-            message: `Receipt record of ${deletingBatch.quantity} pig(s) on ${deletingBatch.dateReceived} deleted successfully.`,
+            message: `Pig "${deletingPig.tagNumber}" deleted successfully from inventory.`,
           });
-          setDeletingBatch(null);
+          setDeletingPig(null);
         }
       } catch (err: unknown) {
         setFeedback({
           type: "error",
-          message: err instanceof Error ? err.message : "Failed to delete record. Please try again.",
+          message: err instanceof Error ? err.message : "Failed to delete pig. Please try again.",
         });
-        setDeletingBatch(null);
+        setDeletingPig(null);
       }
     });
   };
@@ -182,23 +187,25 @@ export function PigRegisterManager({
           <div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Pig Register</h2>
             <p className="mt-1 text-xs text-slate-500">
-              View received pig history and record new incoming pigs into project inventory.
+              Register and manage individual pigs with their tag, health status, sex, and auto-filled price.
             </p>
           </div>
         </div>
 
-        {/* Register Pig / Save Pig button beside table header */}
+        {/* Register Individual Pig Button */}
         <button
           type="button"
           onClick={() => {
-            setCreateDate(new Date().toISOString().split("T")[0]);
-            setCreateQuantity(1);
+            setCreateTag("");
+            setCreateHealth(PigHealthStatus.HEALTHY);
+            setCreateSex(PigSex.FEMALE);
+            setCreatePrice(80000);
             setIsCreateOpen(true);
           }}
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-2 border border-transparent rounded-lg shadow-xs text-xs font-semibold text-white bg-[#101827] hover:bg-[#1f2937] transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 self-start sm:self-auto px-4 py-2.5 border border-transparent rounded-xl shadow-xs text-xs font-semibold text-white bg-[#101827] hover:bg-[#1f2937] transition-colors cursor-pointer"
         >
-          <Plus className="h-3.5 w-3.5 text-[#FF8A00]" />
-          Register Pig / Save Pig
+          <Plus className="h-4 w-4 text-[#FF8A00]" />
+          Register Individual Pig
         </button>
       </div>
 
@@ -218,7 +225,7 @@ export function PigRegisterManager({
               <AlertTriangle className="h-5 w-5 shrink-0 text-red-600 mt-0.5" />
             )}
             <div>
-              <p className="font-semibold">{feedback.type === "success" ? "Saved Successfully" : "Error"}</p>
+              <p className="font-semibold">{feedback.type === "success" ? "Success" : "Error"}</p>
               <p className="mt-0.5">{feedback.message}</p>
             </div>
           </div>
@@ -233,36 +240,32 @@ export function PigRegisterManager({
 
       {/* Main Table Card */}
       <div className="bg-white rounded-xl shadow-sm border border-[#d9e1d8] overflow-hidden">
-        {/* Table Toolbar: Search by Date & Register Pig button */}
+        {/* Table Toolbar */}
         <div className="px-6 py-4 border-b border-[#d9e1d8] bg-[#f8faf8] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h3 className="text-base font-bold font-serif text-[#1c2b23]">
-              Pigs Received History
+              Registered Pigs ({filteredPigs.length})
             </h3>
             <p className="text-xs text-[#5d6e64] mt-0.5">
-              Receipt log showing date received and number of pigs received
+              Showing pig tag, health status, sex, and price
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* 3. Search by Date field above the table */}
+            {/* Search Box */}
             <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-[#d9e1d8] rounded-lg shadow-sm">
               <Search className="h-4 w-4 text-[#7d8d84]" />
-              <label htmlFor="searchDate" className="text-xs font-medium text-[#5d6e64]">
-                Date:
-              </label>
               <input
-                type="date"
-                id="searchDate"
-                value={searchDate}
-                onChange={(e) => setSearchDate(e.target.value)}
-                className="text-xs text-[#1c2b23] bg-transparent focus:outline-none"
+                type="text"
+                placeholder="Search tag or beneficiary..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-xs text-[#1c2b23] bg-transparent focus:outline-none w-44"
               />
-              {searchDate && (
+              {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchDate("")}
-                  title="Clear date filter"
+                  onClick={() => setSearchQuery("")}
                   className="text-xs text-[#7d8d84] hover:text-red-600 p-0.5"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -270,32 +273,41 @@ export function PigRegisterManager({
               )}
             </div>
 
-            {/* Register Pig / Save Pig button beside table */}
-            <button
-              type="button"
-              onClick={() => {
-                setCreateDate(new Date().toISOString().split("T")[0]);
-                setCreateQuantity(1);
-                setIsCreateOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#2c5a43] bg-white text-xs font-semibold text-[#2c5a43] hover:bg-[#eef5f0] transition-colors"
+            {/* Health Filter */}
+            <select
+              value={healthFilter}
+              onChange={(e) => setHealthFilter(e.target.value)}
+              className="text-xs bg-white border border-[#d9e1d8] rounded-lg px-3 py-2 text-[#1c2b23] focus:outline-none"
             >
-              <Plus className="h-3.5 w-3.5" />
-              Register Pig / Save Pig
-            </button>
+              <option value="ALL">All Health Statuses</option>
+              <option value="HEALTHY">Healthy</option>
+              <option value="SICK">Sick</option>
+              <option value="UNDER_TREATMENT">Under Treatment</option>
+              <option value="RECOVERED">Recovered</option>
+              <option value="CRITICAL">Critical</option>
+            </select>
           </div>
         </div>
 
-        {/* History Table */}
+        {/* Pigs Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-[#d9e1d8]">
             <thead className="bg-[#fafcfa]">
               <tr>
                 <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-[#5d6e64] uppercase tracking-wider">
-                  Date Received
+                  Pig Tag
                 </th>
                 <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-[#5d6e64] uppercase tracking-wider">
-                  Number of Pigs Received
+                  Healthy Status
+                </th>
+                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-[#5d6e64] uppercase tracking-wider">
+                  Sex
+                </th>
+                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-[#5d6e64] uppercase tracking-wider">
+                  Price (RWF)
+                </th>
+                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold text-[#5d6e64] uppercase tracking-wider">
+                  Assignment Status
                 </th>
                 <th scope="col" className="px-6 py-3.5 text-right text-xs font-bold text-[#5d6e64] uppercase tracking-wider">
                   Actions
@@ -303,74 +315,96 @@ export function PigRegisterManager({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-[#eef2ee]">
-              {filteredBatches.length === 0 ? (
+              {filteredPigs.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center text-sm text-[#5d6e64]">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#5d6e64]">
                     <Package className="h-8 w-8 mx-auto text-[#9db0a4] mb-2" />
-                    {searchDate
-                      ? `No pig receipt records found on ${searchDate}.`
-                      : "No pig receipt records found yet. Click 'Register Pig / Save Pig' to add records."}
-                    {searchDate && (
-                      <div className="mt-2">
-                        <button
-                          onClick={() => setSearchDate("")}
-                          className="text-xs text-[#2c5a43] underline font-medium hover:text-[#1c2b23]"
-                        >
-                          Clear date filter
-                        </button>
-                      </div>
-                    )}
+                    {searchQuery || healthFilter !== "ALL"
+                      ? "No pigs match your search or filter criteria."
+                      : "No individual pigs registered yet. Click 'Register Individual Pig' to add pigs."}
                   </td>
                 </tr>
               ) : (
-                filteredBatches.map((batch) => {
-                  const displayDate = new Date(batch.dateReceived).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  });
+                filteredPigs.map((pig) => {
+                  const isDistributed = Boolean(pig.currentBeneficiaryName);
 
                   return (
-                    <tr key={batch.id} className="hover:bg-[#f6faf7] transition-colors">
-                      {/* Date Received */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#1c2b23]">
+                    <tr key={pig.id} className="hover:bg-[#f6faf7] transition-colors">
+                      {/* Pig Tag */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold font-mono text-[#1c2b23]">
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-[#2c5a43]" />
-                          <span>{displayDate}</span>
+                          <Tag className="h-4 w-4 text-[#2c5a43]" />
+                          <span>{pig.tagNumber}</span>
                         </div>
                       </td>
 
-                      {/* Number of Pigs Received */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#1c2b23]">
-                        <span className="font-bold text-base font-serif text-[#1c2b23] mr-1.5">
-                          {batch.quantity}
-                        </span>
-                        <span className="text-xs text-[#5d6e64]">
-                          {batch.quantity === 1 ? "pig" : "pigs"}
+                      {/* Healthy Status */}
+                      <td className="px-6 py-4 whitespace-nowrap text-xs">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold ${
+                            pig.healthStatus === "HEALTHY"
+                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              : pig.healthStatus === "UNDER_TREATMENT"
+                              ? "bg-amber-50 text-amber-800 border border-amber-200"
+                              : pig.healthStatus === "SICK" || pig.healthStatus === "CRITICAL"
+                              ? "bg-rose-50 text-rose-800 border border-rose-200"
+                              : "bg-blue-50 text-blue-800 border border-blue-200"
+                          }`}
+                        >
+                          <HeartPulse className="h-3.5 w-3.5" />
+                          {pig.healthStatus.replace(/_/g, " ")}
                         </span>
                       </td>
 
-                      {/* Actions: Edit & Delete */}
+                      {/* Sex */}
+                      <td className="px-6 py-4 whitespace-nowrap text-xs font-medium text-slate-700">
+                        {pig.sex ? pig.sex : "—"}
+                      </td>
+
+                      {/* Price (RWF) */}
+                      <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-900 font-mono">
+                        {pig.purchasePrice ? pig.purchasePrice.toLocaleString() : "80,000"} RWF
+                      </td>
+
+                      {/* Assignment Status */}
+                      <td className="px-6 py-4 whitespace-nowrap text-xs">
+                        {isDistributed ? (
+                          <div>
+                            <span className="font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                              Distributed: {pig.currentBeneficiaryName}
+                            </span>
+                            <span className="block text-[11px] text-slate-500 mt-0.5 font-mono">
+                              {pig.currentBeneficiaryNumber}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200">
+                            Available in Stock
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-2">
-                        {/* 1. Edit Button */}
                         <button
                           type="button"
-                          onClick={() => openEdit(batch)}
+                          onClick={() => openEdit(pig)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-[#2c5a43] bg-[#eef5f0] hover:bg-[#dfeade] transition-colors border border-[#cbe2d3]"
                         >
                           <Edit2 className="h-3 w-3" />
                           Edit
                         </button>
 
-                        {/* 2. Delete Button */}
-                        <button
-                          type="button"
-                          onClick={() => setDeletingBatch(batch)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Delete
-                        </button>
+                        {!isDistributed && (
+                          <button
+                            type="button"
+                            onClick={() => setDeletingPig(pig)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -396,7 +430,7 @@ export function PigRegisterManager({
                 Total Number of Pigs Available
               </h3>
               <p className="text-xs text-[#5d6e64]">
-                Total pigs currently in stock across the entire project inventory
+                Total available unallocated pigs in stock across project inventory
               </p>
             </div>
           </div>
@@ -417,7 +451,7 @@ export function PigRegisterManager({
           <div className="bg-white rounded-xl shadow-xl border border-[#d9e1d8] w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
             <div className="px-6 py-4 bg-[#f8faf8] border-b border-[#d9e1d8] flex items-center justify-between">
               <h3 className="text-lg font-bold font-serif text-[#1c2b23]">
-                Register Pig / Save Pig
+                Register Individual Pig
               </h3>
               <button
                 type="button"
@@ -428,39 +462,80 @@ export function PigRegisterManager({
               </button>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="p-6 space-y-5">
-              {/* Date Received — automatically set to today's date */}
+            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
+              {/* Pig Tag */}
               <div>
-                <label htmlFor="createDate" className="block text-sm font-medium text-[#1c2b23]">
-                  Date Received
+                <label htmlFor="createTag" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Pig Tag *
                 </label>
                 <input
-                  type="date"
-                  id="createDate"
-                  name="createDate"
-                  value={createDate}
-                  onChange={(e) => setCreateDate(e.target.value)}
-                  required
-                  className="mt-1 block w-full border border-[#d9e1d8] rounded-lg shadow-sm py-2 px-3 text-sm text-[#1c2b23] bg-white focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                  type="text"
+                  id="createTag"
+                  value={createTag}
+                  onChange={(e) => setCreateTag(e.target.value)}
+                  placeholder="e.g. PF-RW-2026-00125 (leave blank to auto-generate)"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
                 />
               </div>
 
-              {/* Number of Pigs Received — enter quantity */}
+              {/* Healthy Status */}
               <div>
-                <label htmlFor="createQuantity" className="block text-sm font-medium text-[#1c2b23]">
-                  Number of Pigs Received
+                <label htmlFor="createHealth" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Healthy Status *
                 </label>
-                <input
-                  type="number"
-                  id="createQuantity"
-                  name="createQuantity"
-                  min="1"
-                  value={createQuantity}
-                  onChange={(e) => setCreateQuantity(Math.max(1, parseInt(e.target.value || "1", 10)))}
+                <select
+                  id="createHealth"
+                  value={createHealth}
+                  onChange={(e) => setCreateHealth(e.target.value as PigHealthStatus)}
                   required
-                  placeholder="Enter number of pigs"
-                  className="mt-1 block w-full border border-[#d9e1d8] rounded-lg shadow-sm py-2 px-3 text-sm text-[#1c2b23] bg-white font-medium focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
-                />
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                >
+                  <option value="HEALTHY">Healthy</option>
+                  <option value="SICK">Sick</option>
+                  <option value="UNDER_TREATMENT">Under Treatment</option>
+                  <option value="RECOVERED">Recovered</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+
+              {/* Sex */}
+              <div>
+                <label htmlFor="createSex" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Sex *
+                </label>
+                <select
+                  id="createSex"
+                  value={createSex}
+                  onChange={(e) => setCreateSex(e.target.value as PigSex)}
+                  required
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                >
+                  <option value="FEMALE">Female</option>
+                  <option value="MALE">Male</option>
+                </select>
+              </div>
+
+              {/* Price (Auto-fills 80,000 RWF) */}
+              <div>
+                <label htmlFor="createPrice" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Price (RWF) *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <DollarSign className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="number"
+                    id="createPrice"
+                    value={createPrice}
+                    onChange={(e) => setCreatePrice(Number(e.target.value))}
+                    required
+                    className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Auto-fills to 80,000 RWF by default.
+                </p>
               </div>
 
               {/* Modal Buttons */}
@@ -468,23 +543,23 @@ export function PigRegisterManager({
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-[#5d6e64] hover:text-[#1c2b23]"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center px-5 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-xs font-semibold text-white bg-[#2c5a43] hover:bg-[#1c2b23] disabled:opacity-50 transition-colors"
                 >
                   {isPending ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                       Saving Pig...
                     </>
                   ) : (
                     <>
-                      <Save className="-ml-1 mr-2 h-4 w-4" />
+                      <Save className="-ml-1 mr-2 h-3.5 w-3.5" />
                       Save Pig
                     </>
                   )}
@@ -496,73 +571,107 @@ export function PigRegisterManager({
       )}
 
       {/* ===================== EDIT MODAL ===================== */}
-      {editingBatch && (
+      {editingPig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl border border-[#d9e1d8] w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
             <div className="px-6 py-4 bg-[#f8faf8] border-b border-[#d9e1d8] flex items-center justify-between">
               <h3 className="text-lg font-bold font-serif text-[#1c2b23]">
-                Edit Pig Receipt Record
+                Edit Pig Details
               </h3>
               <button
                 type="button"
-                onClick={() => setEditingBatch(null)}
+                onClick={() => setEditingPig(null)}
                 className="text-[#5d6e64] hover:text-[#1c2b23] p-1"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
               <div>
-                <label htmlFor="editDate" className="block text-sm font-medium text-[#1c2b23]">
-                  Date Received
+                <label htmlFor="editTag" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Pig Tag *
                 </label>
                 <input
-                  type="date"
-                  id="editDate"
-                  value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
+                  type="text"
+                  id="editTag"
+                  value={editTag}
+                  onChange={(e) => setEditTag(e.target.value)}
                   required
-                  className="mt-1 block w-full border border-[#d9e1d8] rounded-lg shadow-sm py-2 px-3 text-sm text-[#1c2b23] bg-white focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
                 />
               </div>
 
               <div>
-                <label htmlFor="editQuantity" className="block text-sm font-medium text-[#1c2b23]">
-                  Number of Pigs Received
+                <label htmlFor="editHealth" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Healthy Status *
+                </label>
+                <select
+                  id="editHealth"
+                  value={editHealth}
+                  onChange={(e) => setEditHealth(e.target.value as PigHealthStatus)}
+                  required
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                >
+                  <option value="HEALTHY">Healthy</option>
+                  <option value="SICK">Sick</option>
+                  <option value="UNDER_TREATMENT">Under Treatment</option>
+                  <option value="RECOVERED">Recovered</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="editSex" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Sex *
+                </label>
+                <select
+                  id="editSex"
+                  value={editSex}
+                  onChange={(e) => setEditSex(e.target.value as PigSex)}
+                  required
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                >
+                  <option value="FEMALE">Female</option>
+                  <option value="MALE">Male</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="editPrice" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Price (RWF) *
                 </label>
                 <input
                   type="number"
-                  id="editQuantity"
-                  min="1"
-                  value={editQuantity}
-                  onChange={(e) => setEditQuantity(Math.max(1, parseInt(e.target.value || "1", 10)))}
+                  id="editPrice"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(Number(e.target.value))}
                   required
-                  className="mt-1 block w-full border border-[#d9e1d8] rounded-lg shadow-sm py-2 px-3 text-sm text-[#1c2b23] bg-white font-medium focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#2c5a43]"
                 />
               </div>
 
               <div className="pt-3 border-t border-[#d9e1d8] flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setEditingBatch(null)}
-                  className="px-4 py-2 text-sm font-medium text-[#5d6e64] hover:text-[#1c2b23]"
+                  onClick={() => setEditingPig(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center px-5 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-xs font-semibold text-white bg-[#2c5a43] hover:bg-[#1c2b23] disabled:opacity-50 transition-colors"
                 >
                   {isPending ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                       Updating...
                     </>
                   ) : (
                     <>
-                      <Save className="-ml-1 mr-2 h-4 w-4" />
+                      <Save className="-ml-1 mr-2 h-3.5 w-3.5" />
                       Save Changes
                     </>
                   )}
@@ -574,32 +683,31 @@ export function PigRegisterManager({
       )}
 
       {/* ===================== DELETE CONFIRMATION MODAL ===================== */}
-      {deletingBatch && (
+      {deletingPig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl border border-red-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
             <div className="px-6 py-4 bg-red-50 border-b border-red-100 flex items-center gap-3">
               <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
               <h3 className="text-base font-bold text-red-900">
-                Confirm Record Deletion
+                Confirm Pig Deletion
               </h3>
             </div>
 
             <div className="p-6 space-y-3">
               <p className="text-sm text-[#1c2b23]">
-                Are you sure you want to delete this receipt record of{" "}
-                <span className="font-bold">{deletingBatch.quantity} pig(s)</span> received on{" "}
-                <span className="font-bold">{deletingBatch.dateReceived}</span>?
+                Are you sure you want to delete pig with tag{" "}
+                <span className="font-mono font-bold text-slate-900">{deletingPig.tagNumber}</span>?
               </p>
               <p className="text-xs text-red-600">
-                This will remove the registered pigs from stock inventory and recalculate available stock.
+                This will remove the pig from stock inventory and recalculate available stock.
               </p>
             </div>
 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setDeletingBatch(null)}
-                className="px-4 py-2 text-sm font-medium text-[#5d6e64] hover:text-[#1c2b23]"
+                onClick={() => setDeletingPig(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900"
               >
                 Cancel
               </button>
@@ -607,17 +715,17 @@ export function PigRegisterManager({
                 type="button"
                 disabled={isPending}
                 onClick={handleDeleteConfirm}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
                 {isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                     Deleting...
                   </>
                 ) : (
                   <>
-                    <Trash2 className="-ml-1 mr-2 h-4 w-4" />
-                    Yes, Delete Record
+                    <Trash2 className="-ml-1 mr-2 h-3.5 w-3.5" />
+                    Yes, Delete Pig
                   </>
                 )}
               </button>

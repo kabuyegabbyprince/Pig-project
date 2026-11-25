@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
 import { getCooperativesWorkspaceData } from "@/app/actions/cooperative";
+import { prisma } from "@/lib/prisma";
+import {
+  getUserAddressProfile,
+  isCellManagerProfileComplete,
+} from "@/lib/user-profile-address";
+import { CellManagerProfileCard } from "@/components/field/CellManagerProfileCard";
 import {
   ArrowLeftCircle,
   ArrowRightCircle,
@@ -22,18 +28,45 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function FieldDashboard() {
+export default async function FieldDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
   }
 
-  const data = await getCooperativesWorkspaceData();
+  const [data, params] = await Promise.all([
+    getCooperativesWorkspaceData(),
+    searchParams,
+  ]);
   const role = data?.actor.role ?? normalizeRoleValue(session.user?.role);
 
   const isMember = role === "COOPERATIVE_MEMBER";
   const isLeader = role === "COOPERATIVE_LEADER";
   const isCellOrAdmin = role === "CELL_MANAGER" || role === "SUPER_ADMIN";
+
+  const isCellManager = role === "CELL_MANAGER";
+  const [cellUserRow, cellAddressProfile] = isCellManager && session.user?.id
+    ? await Promise.all([
+        prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { name: true, phone: true },
+        }),
+        getUserAddressProfile(session.user.id),
+      ])
+    : [null, null];
+
+  const isCellProfileComplete =
+    isCellManager && cellAddressProfile
+      ? isCellManagerProfileComplete(cellUserRow?.phone, cellAddressProfile)
+      : true;
+
+  const profileSuccess = params.profileSuccess === "1";
+  const profileError =
+    typeof params.profileError === "string" ? params.profileError : null;
 
   const cooperatives = data?.cooperatives ?? [];
   const animals = data?.animals ?? [];
@@ -130,7 +163,7 @@ export default async function FieldDashboard() {
             icon: PiggyBank,
           },
           {
-            label: "Add Beneficiary",
+            label: "Enroll Member / Beneficiary",
             href: "/dashboard/field/beneficiaries/new",
             icon: Users,
           },
@@ -190,6 +223,18 @@ export default async function FieldDashboard() {
             <span>Change Password</span>
           </Link>
         </div>
+      )}
+
+      {/* Cell Manager Profile & Address Completion */}
+      {isCellManager && cellAddressProfile && (
+        <CellManagerProfileCard
+          userName={cellUserRow?.name || data?.actor.name || session.user?.name || ""}
+          userPhone={cellUserRow?.phone ?? ""}
+          addressProfile={cellAddressProfile}
+          isComplete={isCellProfileComplete}
+          profileSuccess={profileSuccess}
+          profileError={profileError}
+        />
       )}
 
       {/* KPI Summary Cards */}

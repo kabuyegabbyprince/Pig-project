@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
 import { PigHealthStatus, PigStatus, Role, RevolvingStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { ensureCooperativeBeneficiariesSynced } from "@/app/actions/cooperative";
+import { normalizeRoleValue } from "@/lib/roles";
 
 export type PigReturnDateSummary = {
   date: string;
@@ -15,17 +17,70 @@ export type PigReturnDateSummary = {
 };
 
 export async function getBeneficiaryReturnOptions() {
-  const beneficiaries = await prisma.beneficiary.findMany({
-    where: { deletedAt: null },
-    select: {
-      id: true,
-      fullName: true,
-      beneficiaryNumber: true,
-      districtStr: true,
-    },
-    orderBy: { fullName: "asc" },
+  await ensureCooperativeBeneficiariesSynced();
+
+  const actor = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.COOPERATIVE_MEMBER,
+    Role.VETERINARIAN,
+  ]);
+  if (!actor) return [];
+
+  const actorRole = normalizeRoleValue(actor.role) || actor.role;
+  const fullActor = await prisma.user.findUnique({
+    where: { id: actor.id },
+    select: { cooperativeId: true },
   });
-  return beneficiaries;
+
+  const [beneficiaries, members, cooperatives] = await Promise.all([
+    prisma.beneficiary.findMany({
+      where: { deletedAt: null, beneficiaryNumber: { startsWith: "COOP-" } },
+      select: {
+        id: true,
+        fullName: true,
+        beneficiaryNumber: true,
+        districtStr: true,
+        savingsGroup: true,
+      },
+      orderBy: { fullName: "asc" },
+    }),
+    prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        cooperativeId: { not: null },
+        role: { in: [Role.COOPERATIVE_MEMBER, Role.COOPERATIVE_LEADER] },
+      },
+      select: { id: true, role: true, cooperativeId: true },
+    }),
+    prisma.cooperative.findMany({
+      select: { id: true, createdById: true },
+    }),
+  ]);
+
+  const memberById = new Map(members.map((m) => [m.id, m]));
+  const coopById = new Map(cooperatives.map((c) => [c.id, c]));
+
+  return beneficiaries.filter((b) => {
+    const memberId = b.beneficiaryNumber.replace(/^COOP-/, "");
+    const member = memberById.get(memberId);
+    if (!member || !member.cooperativeId) return false;
+    const coop = coopById.get(member.cooperativeId);
+    if (!coop) return false;
+
+    if (actorRole === Role.CELL_MANAGER) {
+      return String(coop.createdById) === String(actor.id);
+    }
+    if (actorRole === Role.COOPERATIVE_LEADER) {
+      return String(coop.id) === String(fullActor?.cooperativeId ?? "");
+    }
+    if (actorRole === Role.COOPERATIVE_MEMBER) {
+      return String(member.id) === String(actor.id);
+    }
+    return true;
+  });
 }
 
 export async function recordBatchPigReturn(formData: FormData) {
@@ -64,21 +119,54 @@ export async function recordBatchPigReturn(formData: FormData) {
   const healthyPiglets = quantity - sickPiglets;
   const returnDate = returnDateRaw ? new Date(returnDateRaw) : new Date();
 
+  const actorRole = normalizeRoleValue(user.role) || user.role;
+
   await prisma.$transaction(async (tx) => {
-    let beneficiary = null;
-    if (beneficiaryIdRaw && beneficiaryIdRaw.trim()) {
-      beneficiary = await tx.beneficiary.findUnique({
-        where: { id: beneficiaryIdRaw.trim() },
-      });
+    if (!beneficiaryIdRaw || !beneficiaryIdRaw.trim()) {
+      throw new Error("Select a Cooperative Member or Cooperative Leader beneficiary.");
     }
+    const beneficiary = await tx.beneficiary.findFirst({
+      where: { id: beneficiaryIdRaw.trim(), deletedAt: null },
+    });
     if (!beneficiary) {
-      beneficiary = await tx.beneficiary.findFirst({
-        where: { deletedAt: null },
-        orderBy: { createdAt: "asc" },
-      });
+      throw new Error("Selected beneficiary was not found.");
     }
-    if (!beneficiary) {
-      throw new Error("No registered beneficiary found. Please ensure at least one beneficiary exists in the system.");
+    if (!beneficiary.beneficiaryNumber.startsWith("COOP-")) {
+      throw new Error("Piglet returns can only be recorded for enrolled Cooperative Members or Cooperative Leaders.");
+    }
+
+    const memberId = beneficiary.beneficiaryNumber.replace(/^COOP-/, "");
+    const member = await tx.user.findUnique({ where: { id: memberId } });
+    const memberRole = normalizeRoleValue(member?.role);
+    if (
+      !member ||
+      member.deletedAt ||
+      !member.cooperativeId ||
+      (memberRole !== Role.COOPERATIVE_MEMBER && memberRole !== Role.COOPERATIVE_LEADER)
+    ) {
+      throw new Error("Selected beneficiary is not linked to an active Cooperative Member or Cooperative Leader.");
+    }
+
+    const coop = await tx.cooperative.findUnique({ where: { id: member.cooperativeId } });
+    if (!coop) throw new Error("Cooperative for this beneficiary was not found.");
+
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(user.id)) {
+      throw new Error("Access denied: You can only record returns for cooperatives you created.");
+    }
+    if (actorRole === Role.COOPERATIVE_LEADER) {
+      const fullActor = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { cooperativeId: true },
+      });
+      if (
+        String(fullActor?.cooperativeId ?? "") !== String(coop.id) &&
+        String(coop.leaderUserId ?? "") !== String(user.id)
+      ) {
+        throw new Error("Access denied: You can only record returns within your own cooperative.");
+      }
+    }
+    if (actorRole === Role.COOPERATIVE_MEMBER && String(member.id) !== String(user.id)) {
+      throw new Error("Access denied: Cooperative Members can only record their own returns.");
     }
 
     const year = returnDate.getFullYear();

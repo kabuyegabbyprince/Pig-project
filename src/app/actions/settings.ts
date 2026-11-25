@@ -134,27 +134,15 @@ export async function resetUserPreferences() {
 
 export async function getSystemSettings(): Promise<SystemSettingItem[]> {
   try {
-    let settings = await prisma.systemSetting.findMany({
+    const settings = await prisma.systemSetting.findMany({
       where: {
-        NOT: { key: { startsWith: "user_pref:" } },
+        NOT: [
+          { key: { startsWith: "user_pref:" } },
+          { key: { startsWith: "user_address:" } },
+        ],
       },
       orderBy: { key: "asc" },
     });
-
-    // Auto-seed defaults if empty
-    if (settings.length === 0) {
-      await prisma.systemSetting.createMany({
-        data: DEFAULT_SYSTEM_SETTINGS,
-        skipDuplicates: true,
-      });
-
-      settings = await prisma.systemSetting.findMany({
-        where: {
-          NOT: { key: { startsWith: "user_pref:" } },
-        },
-        orderBy: { key: "asc" },
-      });
-    }
 
     return settings;
   } catch (err) {

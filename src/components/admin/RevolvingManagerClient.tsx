@@ -154,17 +154,21 @@ export function RevolvingManagerClient({
           {destination === "BENEFICIARY" ? (
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                Target Beneficiary *
+                Verified Coop Member / Leader *
               </label>
               <select
                 name="beneficiaryId"
                 required
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900"
               >
-                <option value="">-- Select Family --</option>
+                <option value="">
+                  {waitingBeneficiaries.length === 0
+                    ? "No Finance-verified Coop Member/Leader waiting"
+                    : "-- Select Coop Member / Leader --"}
+                </option>
                 {waitingBeneficiaries.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.fullName} ({b.beneficiaryNumber}) [{b.status}]
+                    {b.fullName} [{b.roleLabel}] · {b.cooperativeName}
                   </option>
                 ))}
               </select>

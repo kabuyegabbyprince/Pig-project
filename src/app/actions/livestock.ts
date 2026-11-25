@@ -2,9 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
-import { Prisma, Role, PigHealthStatus, PigStatus, RevolvingStatus } from "@prisma/client";
+import { BeneficiaryStatus, Prisma, Role, PigHealthStatus, PigStatus, RevolvingStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { checkPigVetClearance } from "@/lib/vet-clearance";
+import { normalizeRoleValue } from "@/lib/roles";
 
 export async function transferPig(data: {
   pigId: string;
@@ -28,11 +29,35 @@ export async function transferPig(data: {
 
   const fromLocation = pig.currentLocation || "Unknown";
   const toBeneficiary = await prisma.beneficiary.findFirst({
-    where: { id: toBeneficiaryId, status: "ACTIVE", deletedAt: null },
+    where: { id: toBeneficiaryId, status: { notIn: [BeneficiaryStatus.INACTIVE, BeneficiaryStatus.SUSPENDED, BeneficiaryStatus.WITHDRAWN] }, deletedAt: null },
   });
   if (!toBeneficiary) throw new Error("Target beneficiary not found");
+  if (!toBeneficiary.beneficiaryNumber.startsWith("COOP-")) {
+    throw new Error("Pig receivers (beneficiaries) must be enrolled Cooperative Members or Cooperative Leaders.");
+  }
 
-  const toLocation = `${toBeneficiary.districtStr ?? ""}, ${toBeneficiary.sectorStr ?? ""}, ${toBeneficiary.cellStr ?? ""}`.replace(/,\s*,/g, ",").replace(/^,\s*|,\s*$/g, "") || "Unknown";
+  const targetMemberId = toBeneficiary.beneficiaryNumber.replace(/^COOP-/, "");
+  const targetMember = await prisma.user.findUnique({ where: { id: targetMemberId } });
+  const targetMemberRole = normalizeRoleValue(targetMember?.role);
+  if (
+    !targetMember ||
+    targetMember.deletedAt ||
+    !targetMember.isActive ||
+    !targetMember.cooperativeId ||
+    (targetMemberRole !== Role.COOPERATIVE_MEMBER && targetMemberRole !== Role.COOPERATIVE_LEADER)
+  ) {
+    throw new Error("Target beneficiary must be an active Cooperative Member or Cooperative Leader.");
+  }
+
+  const targetCoop = await prisma.cooperative.findUnique({ where: { id: targetMember.cooperativeId } });
+  if (!targetCoop) throw new Error("Target beneficiary cooperative not found.");
+
+  const toLocation =
+    `${targetCoop.name} (${targetCoop.cellName})` ||
+    `${toBeneficiary.districtStr ?? ""}, ${toBeneficiary.sectorStr ?? ""}, ${toBeneficiary.cellStr ?? ""}`
+      .replace(/,\s*,/g, ",")
+      .replace(/^,\s*|,\s*$/g, "") ||
+    "Unknown";
 
   await prisma.$transaction(async (tx) => {
     await tx.pigTransfer.create({
@@ -50,10 +75,22 @@ export async function transferPig(data: {
       }
     });
 
+    await tx.beneficiary.update({
+      where: { id: toBeneficiaryId },
+      data: {
+        status: BeneficiaryStatus.PIGLET_RECEIVED,
+        savingsGroup: targetCoop.name,
+        cellStr: targetCoop.cellName,
+      },
+    });
+
     await tx.pig.update({
       where: { id: pig.id },
       data: {
         currentBeneficiaryId: toBeneficiaryId,
+        cooperativeId: targetCoop.id,
+        ownerMemberId: targetMember.id,
+        ownerMemberName: targetMember.name,
         currentLocation: toLocation,
         status: "REDISTRIBUTED"
       }
@@ -150,6 +187,8 @@ export async function distributePig(data: {
   if (notes && notes.length > 2000) throw new Error("Distribution notes are too long.");
   const distributionDate = new Date();
 
+  const actorRole = normalizeRoleValue(user.role) || user.role;
+
   await prisma.$transaction(async (tx) => {
     const beneficiary = await tx.beneficiary.findFirst({
       where: { id: beneficiaryId, deletedAt: null },
@@ -165,11 +204,71 @@ export async function distributePig(data: {
       },
     });
     if (!beneficiary) throw new Error("Selected beneficiary does not exist.");
+    if (!beneficiary.beneficiaryNumber.startsWith("COOP-")) {
+      throw new Error(
+        "Pig receivers (beneficiaries) must be enrolled Cooperative Members or Cooperative Leaders."
+      );
+    }
 
-    // Update beneficiary with nationalId and location if provided
+    const memberId = beneficiary.beneficiaryNumber.replace(/^COOP-/, "");
+    const member = await tx.user.findUnique({ where: { id: memberId } });
+    const memberRole = normalizeRoleValue(member?.role);
+    if (
+      !member ||
+      member.deletedAt ||
+      !member.isActive ||
+      !member.cooperativeId ||
+      (memberRole !== Role.COOPERATIVE_MEMBER && memberRole !== Role.COOPERATIVE_LEADER)
+    ) {
+      throw new Error(
+        "Pig receivers (beneficiaries) must be active Cooperative Members or Cooperative Leaders in a cooperative."
+      );
+    }
+
+    const coop = await tx.cooperative.findUnique({ where: { id: member.cooperativeId } });
+    if (!coop) {
+      throw new Error("Cooperative for this member/leader was not found.");
+    }
+
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(user.id)) {
+      throw new Error(
+        "Access denied: Only the Cell Manager who added this cooperative and member can distribute a pig to them."
+      );
+    }
+    if (actorRole === Role.COOPERATIVE_LEADER) {
+      const fullActor = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { cooperativeId: true },
+      });
+      if (
+        String(fullActor?.cooperativeId ?? "") !== String(coop.id) &&
+        String(coop.leaderUserId ?? "") !== String(user.id)
+      ) {
+        throw new Error(
+          "Access denied: Cooperative Leaders can only distribute within their own cooperative."
+        );
+      }
+    }
+
+    const payment = await tx.cooperativeMemberPayment.findFirst({
+      where: { memberId, cooperativeId: coop.id },
+    });
+    if (!payment || payment.status !== "VERIFIED") {
+      throw new Error(
+        payment?.status === "PENDING"
+          ? "Payment is still PENDING Finance Officer verification. Finance must verify this member's 18,800 RWF payment before pig distribution."
+          : payment?.status === "REJECTED"
+            ? "This member's 18,800 RWF payment submission was REJECTED by Finance. Resubmit a valid MoMo reference first."
+            : "This member has not been verified by Finance for the 18,800 RWF (16,000 + 2,800 RWF) qualification payment yet."
+      );
+    }
+
+    // Update beneficiary with nationalId, cooperative link, and location if provided
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateBeneficiaryData: Record<string, any> = {
-      status: "ACTIVE",
+      status: BeneficiaryStatus.PIGLET_RECEIVED,
+      savingsGroup: coop.name,
+      cellStr: data.cell || coop.cellName,
     };
     if (data.nationalId?.trim()) {
       updateBeneficiaryData.nationalId = data.nationalId.trim();
@@ -180,7 +279,6 @@ export async function distributePig(data: {
     if (data.villageId) updateBeneficiaryData.villageId = data.villageId;
     if (data.district) updateBeneficiaryData.districtStr = data.district;
     if (data.sector) updateBeneficiaryData.sectorStr = data.sector;
-    if (data.cell) updateBeneficiaryData.cellStr = data.cell;
     if (data.village) updateBeneficiaryData.villageStr = data.village;
 
     await tx.beneficiary.update({
@@ -199,6 +297,10 @@ export async function distributePig(data: {
         where: { id: targetPigId },
         data: {
           currentBeneficiaryId: beneficiaryId,
+          cooperativeId: coop.id,
+          ownerMemberId: member.id,
+          ownerMemberName: member.name,
+          currentLocation: `${coop.name} (${coop.cellName})`,
           status: PigStatus.DISTRIBUTED,
         },
       });
@@ -234,6 +336,10 @@ export async function distributePig(data: {
         where: { id: availablePig.id },
         data: {
           currentBeneficiaryId: beneficiaryId,
+          cooperativeId: coop.id,
+          ownerMemberId: member.id,
+          ownerMemberName: member.name,
+          currentLocation: `${coop.name} (${coop.cellName})`,
           status: PigStatus.DISTRIBUTED,
         },
       });

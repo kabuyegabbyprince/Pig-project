@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Plus, Search, Users, Shield, MapPin, Phone } from "lucide-react";
+import { Plus, Search, Users, Shield, MapPin, Phone, Crown } from "lucide-react";
 import { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { getActiveUser } from "@/lib/active-user";
+import { ensureCooperativeBeneficiariesSynced } from "@/app/actions/cooperative";
+import { normalizeRoleValue } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -26,17 +28,34 @@ export default async function BeneficiariesPage() {
 
   const isSuperAdmin = activeUser.role === Role.SUPER_ADMIN;
 
-  const beneficiaries = await prisma.beneficiary.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      distributions: {
-        select: { id: true },
+  await ensureCooperativeBeneficiariesSynced();
+
+  const [beneficiaries, coopUsers] = await Promise.all([
+    prisma.beneficiary.findMany({
+      where: {
+        deletedAt: null,
+        beneficiaryNumber: { startsWith: "COOP-" },
       },
-      returns: {
-        select: { quantity: true },
+      orderBy: { createdAt: "desc" },
+      include: {
+        distributions: {
+          select: { id: true },
+        },
+        returns: {
+          select: { quantity: true },
+        },
       },
-    },
-  });
+    }),
+    prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        role: { in: [Role.COOPERATIVE_MEMBER, Role.COOPERATIVE_LEADER] },
+      },
+      select: { id: true, role: true },
+    }),
+  ]);
+
+  const userRoleMap = new Map(coopUsers.map((u) => [String(u.id), normalizeRoleValue(u.role)]));
 
   return (
     <div className="space-y-6">
@@ -44,7 +63,7 @@ export default async function BeneficiariesPage() {
         <div>
           <h2 className="text-2xl font-bold font-serif text-[#1c2b23]">Beneficiaries</h2>
           <p className="mt-1 text-sm text-[#5d6e64]">
-            Manage eligible beneficiary families participating in the revolving livestock fund.
+            Pig receivers must be Cooperative Members (including Cooperative Leaders) enrolled in an active cooperative.
           </p>
         </div>
         <Link 
@@ -52,7 +71,7 @@ export default async function BeneficiariesPage() {
           className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#2c5a43] hover:bg-[#1c2b23] transition-colors"
         >
           <Plus className="-ml-1 mr-2 h-5 w-5" />
-          Add Beneficiary
+          Enroll Cooperative Beneficiary
         </Link>
       </div>
 
@@ -107,6 +126,9 @@ export default async function BeneficiariesPage() {
                   const distributedPigs = b.distributions.length;
                   const returnedCount = b.returns.reduce((sum, r) => sum + r.quantity, 0);
 
+                  const memberId = b.beneficiaryNumber.replace(/^COOP-/, "");
+                  const isLeader = userRoleMap.get(memberId) === Role.COOPERATIVE_LEADER;
+
                   return (
                     <tr key={b.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -115,8 +137,13 @@ export default async function BeneficiariesPage() {
                             {b.fullName.charAt(0)}
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-[#1c2b23]">{b.fullName}</div>
-                            <div className="text-xs font-mono text-[#5d6e64]">{b.beneficiaryNumber}</div>
+                            <div className="text-sm font-medium text-[#1c2b23] flex items-center gap-1.5">
+                              <span>{b.fullName}</span>
+                              {isLeader && <Crown className="h-3.5 w-3.5 text-[#FF8A00]" />}
+                            </div>
+                            <div className="text-xs font-mono text-[#5d6e64]">
+                              {isLeader ? "Cooperative Leader" : "Cooperative Member"} &bull; {b.savingsGroup || b.beneficiaryNumber}
+                            </div>
                             {b.phone && (
                               <div className="text-xs text-[#9db0a4] flex items-center mt-0.5">
                                 <Phone className="h-3 w-3 mr-1" />

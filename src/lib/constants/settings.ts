@@ -28,16 +28,6 @@ export const DEFAULT_SYSTEM_SETTINGS: {
     description: "Official institutional organization name displayed across official reports and receipts.",
   },
   {
-    key: "system_contact_email",
-    value: "admin@pigproject.rw",
-    description: "Primary notification and administrative contact email address for project operations.",
-  },
-  {
-    key: "system_contact_phone",
-    value: "+250 788 123 456",
-    description: "Hotline phone number for field operations and beneficiary support inquiries.",
-  },
-  {
     key: "currency",
     value: "RWF",
     description: "Primary transaction currency for financial records, budget receipts, and asset valuation.",

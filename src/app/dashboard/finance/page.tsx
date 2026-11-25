@@ -22,6 +22,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FeedSalesVerificationClient } from "@/components/finance/FeedSalesVerificationClient";
 import { getFinanceWorkspaceData } from "@/app/actions/livestock-finance";
 import { FinanceMoMoSettingsCard } from "@/components/finance/FinanceMoMoSettingsCard";
+import { MemberPaymentsApprovalCard } from "@/components/finance/MemberPaymentsApprovalCard";
 import type { SerializedCellFeedSale } from "@/app/actions/ecommerce";
 
 export const dynamic = "force-dynamic";
@@ -212,6 +213,11 @@ export default async function FinanceDashboard() {
       {/* MoMo Merchant Code Configuration */}
       {livestockData && (
         <FinanceMoMoSettingsCard momoMerchantCode={livestockData.momoMerchantCode} />
+      )}
+
+      {/* Cooperative Member Qualification Payments Manual Approval Queue */}
+      {livestockData && (
+        <MemberPaymentsApprovalCard memberPayments={livestockData.memberPayments} />
       )}
 
       {/* Quick Actions */}

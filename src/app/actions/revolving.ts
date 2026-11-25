@@ -13,6 +13,8 @@ import {
 import { prisma, isSupabaseTableMissingError } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
 import { checkPigVetClearance } from "@/lib/vet-clearance";
+import { ensureCooperativeBeneficiariesSynced } from "@/app/actions/cooperative";
+import { normalizeRoleValue } from "@/lib/roles";
 
 export type SerializedCycleRow = {
   id: string;
@@ -43,49 +45,98 @@ export type SerializedWaitingBeneficiary = {
   beneficiaryNumber: string;
   status: BeneficiaryStatus;
   districtStr: string | null;
+  cooperativeName: string;
+  roleLabel: string;
 };
 
 export async function getRevolvingManagementOverview() {
-  const [cycles, returnSums, stockPigs, waitingBeneficiaries] = await Promise.all([
-    prisma.revolvingCycle.findMany({
-      orderBy: [{ status: "asc" }, { startDate: "asc" }],
-    }),
-    prisma.pigReturn.groupBy({
-      by: ["beneficiaryId"],
-      _sum: { quantity: true },
-    }),
-    prisma.pig.findMany({
-      where: {
-        deletedAt: null,
-        currentBeneficiaryId: null,
-        healthStatus: PigHealthStatus.HEALTHY,
-        status: { in: [PigStatus.ACTIVE, PigStatus.REGISTERED, PigStatus.RETURNED] },
+  await ensureCooperativeBeneficiariesSynced();
+
+  const [cycles, returnSums, stockPigs, waitingBeneficiariesRaw, coopUsers, cooperatives, verifiedPayments] =
+    await Promise.all([
+      prisma.revolvingCycle.findMany({
+        orderBy: [{ status: "asc" }, { startDate: "asc" }],
+      }),
+      prisma.pigReturn.groupBy({
+        by: ["beneficiaryId"],
+        _sum: { quantity: true },
+      }),
+      prisma.pig.findMany({
+        where: {
+          deletedAt: null,
+          currentBeneficiaryId: null,
+          healthStatus: PigHealthStatus.HEALTHY,
+          status: { in: [PigStatus.ACTIVE, PigStatus.REGISTERED, PigStatus.RETURNED] },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          tagNumber: true,
+          source: true,
+          healthStatus: true,
+          status: true,
+          dateReceived: true,
+        },
+      }),
+      prisma.beneficiary.findMany({
+        where: {
+          deletedAt: null,
+          beneficiaryNumber: { startsWith: "COOP-" },
+          status: { in: [BeneficiaryStatus.AWAITING_PIGLET, BeneficiaryStatus.ACTIVE] },
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          fullName: true,
+          beneficiaryNumber: true,
+          status: true,
+          districtStr: true,
+        },
+      }),
+      prisma.user.findMany({
+        where: {
+          deletedAt: null,
+          isActive: true,
+          cooperativeId: { not: null },
+          role: { in: [Role.COOPERATIVE_MEMBER, Role.COOPERATIVE_LEADER] },
+        },
+        select: { id: true, role: true, cooperativeId: true },
+      }),
+      prisma.cooperative.findMany({
+        select: { id: true, name: true },
+      }),
+      prisma.cooperativeMemberPayment
+        .findMany({
+          where: { status: "VERIFIED" },
+          select: { memberId: true, cooperativeId: true },
+        })
+        .catch(() => []),
+    ]);
+
+  const userById = new Map(coopUsers.map((u) => [u.id, u]));
+  const coopNameById = new Map(cooperatives.map((c) => [c.id, c.name]));
+  const verifiedKeySet = new Set(
+    verifiedPayments.map((p) => `${p.memberId}:${p.cooperativeId}`)
+  );
+
+  const waitingBeneficiaries: SerializedWaitingBeneficiary[] = waitingBeneficiariesRaw.flatMap((b) => {
+    const memberId = b.beneficiaryNumber.replace(/^COOP-/, "");
+    const member = userById.get(memberId);
+    if (!member || !member.cooperativeId) return [];
+    if (!verifiedKeySet.has(`${member.id}:${member.cooperativeId}`)) return [];
+    const coopName = coopNameById.get(member.cooperativeId);
+    if (!coopName) return [];
+    const normRole = normalizeRoleValue(member.role);
+    const roleLabel =
+      normRole === Role.COOPERATIVE_LEADER ? "Cooperative Leader" : "Cooperative Member";
+    return [
+      {
+        ...b,
+        cooperativeName: coopName,
+        roleLabel,
       },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        tagNumber: true,
-        source: true,
-        healthStatus: true,
-        status: true,
-        dateReceived: true,
-      },
-    }),
-    prisma.beneficiary.findMany({
-      where: {
-        deletedAt: null,
-        status: { in: [BeneficiaryStatus.AWAITING_PIGLET, BeneficiaryStatus.ACTIVE] },
-      },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        fullName: true,
-        beneficiaryNumber: true,
-        status: true,
-        districtStr: true,
-      },
-    }),
-  ]);
+    ];
+  });
 
   const beneficiaryIds = Array.from(new Set(cycles.map((c) => c.beneficiaryId)));
   const benList = beneficiaryIds.length
@@ -250,6 +301,7 @@ export async function allocateClearedPiglet(formData: FormData) {
       select: {
         id: true,
         fullName: true,
+        beneficiaryNumber: true,
         districtId: true,
         sectorId: true,
         cellId: true,
@@ -257,6 +309,46 @@ export async function allocateClearedPiglet(formData: FormData) {
       },
     });
     if (!beneficiary) return { success: false, error: "Beneficiary not found." };
+    if (!beneficiary.beneficiaryNumber.startsWith("COOP-")) {
+      return {
+        success: false,
+        error: "Pig receivers (beneficiaries) must be enrolled Cooperative Members or Cooperative Leaders.",
+      };
+    }
+
+    const memberId = beneficiary.beneficiaryNumber.replace(/^COOP-/, "");
+    const member = await prisma.user.findUnique({ where: { id: memberId } });
+    const memberRole = normalizeRoleValue(member?.role);
+    if (
+      !member ||
+      member.deletedAt ||
+      !member.isActive ||
+      !member.cooperativeId ||
+      (memberRole !== Role.COOPERATIVE_MEMBER && memberRole !== Role.COOPERATIVE_LEADER)
+    ) {
+      return {
+        success: false,
+        error: "Pig receivers (beneficiaries) must be active Cooperative Members or Cooperative Leaders.",
+      };
+    }
+
+    const coop = await prisma.cooperative.findUnique({ where: { id: member.cooperativeId } });
+    if (!coop) {
+      return { success: false, error: "Cooperative for this beneficiary was not found." };
+    }
+
+    const payment = await prisma.cooperativeMemberPayment.findFirst({
+      where: { memberId, cooperativeId: coop.id },
+    });
+    if (!payment || payment.status !== "VERIFIED") {
+      return {
+        success: false,
+        error:
+          payment?.status === "PENDING"
+            ? "This member's 18,800 RWF payment is still PENDING Finance Officer verification."
+            : "This member has not been verified by Finance Officer for the 18,800 RWF qualification payment.",
+      };
+    }
 
     const now = new Date();
     await prisma.$transaction(async (tx) => {
@@ -264,13 +356,21 @@ export async function allocateClearedPiglet(formData: FormData) {
         where: { id: pigId },
         data: {
           currentBeneficiaryId: beneficiary.id,
+          cooperativeId: coop.id,
+          ownerMemberId: member.id,
+          ownerMemberName: member.name,
+          currentLocation: `${coop.name} (${coop.cellName})`,
           status: PigStatus.DISTRIBUTED,
         },
       });
 
       await tx.beneficiary.update({
         where: { id: beneficiary.id },
-        data: { status: BeneficiaryStatus.PIGLET_RECEIVED },
+        data: {
+          status: BeneficiaryStatus.PIGLET_RECEIVED,
+          savingsGroup: coop.name,
+          cellStr: coop.cellName,
+        },
       });
 
       const dist = await tx.pigDistribution.create({

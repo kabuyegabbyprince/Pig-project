@@ -50,11 +50,13 @@ export type SerializedMemberPaymentRecord = {
   memberEmail: string;
   cooperativeId: string;
   cooperativeName: string;
+  cellManagerName: string | null;
   pigValueFee: string;
   taxFee: string;
   totalAmount: string;
   momoReference: string;
   status: string;
+  verifiedByName: string | null;
   createdAt: string;
 };
 

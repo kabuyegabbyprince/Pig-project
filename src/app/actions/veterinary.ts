@@ -25,6 +25,18 @@ function getHealthStatusFromDiagnosis(diagnosis: string): PigHealthStatus | null
   return diagnosisHealthStatusMap[normalized] ?? null;
 }
 
+function toIsoString(val: unknown): string {
+  if (!val) return new Date().toISOString();
+  if (val instanceof Date) {
+    return Number.isNaN(val.getTime()) ? new Date().toISOString() : val.toISOString();
+  }
+  if (typeof val === "string" || typeof val === "number") {
+    const parsed = new Date(val);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return new Date().toISOString();
+}
+
 export async function createVeterinaryVisit(formData: FormData) {
   const user = await getActiveUser([Role.SUPER_ADMIN, Role.VETERINARIAN]);
   if (!user) throw new Error("Unauthorized");
@@ -326,106 +338,330 @@ export async function recordVeterinaryBatchExamination(formData: FormData) {
 }
 
 export async function getVeterinaryDateSummaries() {
-  const totalPigsAvailable = await prisma.pig.count({ where: { deletedAt: null } });
+  try {
+    const totalPigsAvailable = await prisma.pig.count({ where: { deletedAt: null } });
 
-  const records = await prisma.veterinaryRecord.findMany({
-    orderBy: { date: "asc" },
-    select: {
-      id: true,
-      pigId: true,
-      date: true,
-      activityType: true,
-      diagnosis: true,
-      treatment: true,
-      status: true,
-      notes: true,
-    },
-  });
+    const records = await prisma.veterinaryRecord.findMany({
+      orderBy: { date: "asc" },
+      select: {
+        id: true,
+        pigId: true,
+        date: true,
+        activityType: true,
+        diagnosis: true,
+        treatment: true,
+        status: true,
+        notes: true,
+      },
+    });
 
-  // Group by date (YYYY-MM-DD)
-  const dateMap = new Map<string, typeof records>();
+    // Group by date (YYYY-MM-DD)
+    const dateMap = new Map<string, typeof records>();
 
-  for (const rec of records) {
-    const dateStr = new Date(rec.date).toISOString().split("T")[0];
-    if (!dateMap.has(dateStr)) {
-      dateMap.set(dateStr, []);
-    }
-    dateMap.get(dateStr)!.push(rec);
-  }
-
-  // Sorted chronological asc to calculate cumulative unique examined pigs avoiding double-counting
-  const sortedDates = Array.from(dateMap.keys()).sort();
-  const seenPigs = new Set<string>();
-  const summary: Array<{
-    date: string;
-    pigsExamined: number;
-    notYetExamined: number;
-    sickPigs: number;
-    diseaseDescription: string;
-    treatmentDescription: string;
-  }> = [];
-
-  for (const dateStr of sortedDates) {
-    const dayRecords = dateMap.get(dateStr)!;
-    const dayPigs = new Set<string>();
-    let sickCount = 0;
-    const diseases = new Set<string>();
-    const treatments = new Set<string>();
-
-    for (const r of dayRecords) {
-      if (r.pigId) {
-        dayPigs.add(r.pigId);
-        seenPigs.add(r.pigId);
+    for (const rec of records) {
+      const dateStr = toIsoString(rec.date).split("T")[0];
+      if (!dateMap.has(dateStr)) {
+        dateMap.set(dateStr, []);
       }
+      dateMap.get(dateStr)!.push(rec);
+    }
 
-      const isSick =
-        r.status === "UNDER_TREATMENT" ||
-        r.activityType === "TREATMENT" ||
-        (r.diagnosis &&
+    // Sorted chronological asc to calculate cumulative unique examined pigs avoiding double-counting
+    const sortedDates = Array.from(dateMap.keys()).sort();
+    const seenPigs = new Set<string>();
+    const summary: Array<{
+      date: string;
+      pigsExamined: number;
+      notYetExamined: number;
+      sickPigs: number;
+      diseaseDescription: string;
+      treatmentDescription: string;
+    }> = [];
+
+    for (const dateStr of sortedDates) {
+      const dayRecords = dateMap.get(dateStr)!;
+      const dayPigs = new Set<string>();
+      let sickCount = 0;
+      const diseases = new Set<string>();
+      const treatments = new Set<string>();
+
+      for (const r of dayRecords) {
+        if (r.pigId) {
+          dayPigs.add(r.pigId);
+          seenPigs.add(r.pigId);
+        }
+
+        const isSick =
+          r.status === "UNDER_TREATMENT" ||
+          r.activityType === "TREATMENT" ||
+          (r.diagnosis &&
+            r.diagnosis.toLowerCase() !== "healthy" &&
+            r.diagnosis.toLowerCase() !== "none" &&
+            r.diagnosis !== "-");
+
+        if (isSick) {
+          sickCount++;
+        }
+
+        if (
+          r.diagnosis &&
           r.diagnosis.toLowerCase() !== "healthy" &&
           r.diagnosis.toLowerCase() !== "none" &&
-          r.diagnosis !== "-");
-
-      if (isSick) {
-        sickCount++;
+          r.diagnosis !== "-"
+        ) {
+          diseases.add(r.diagnosis.trim());
+        }
+        if (
+          r.treatment &&
+          r.treatment.toLowerCase() !== "cleared" &&
+          r.treatment.toLowerCase() !== "none" &&
+          r.treatment !== "-"
+        ) {
+          treatments.add(r.treatment.trim());
+        }
       }
 
-      if (
-        r.diagnosis &&
-        r.diagnosis.toLowerCase() !== "healthy" &&
-        r.diagnosis.toLowerCase() !== "none" &&
-        r.diagnosis !== "-"
-      ) {
-        diseases.add(r.diagnosis.trim());
-      }
-      if (
-        r.treatment &&
-        r.treatment.toLowerCase() !== "cleared" &&
-        r.treatment.toLowerCase() !== "none" &&
-        r.treatment !== "-"
-      ) {
-        treatments.add(r.treatment.trim());
+      const pigsExamined = dayPigs.size || dayRecords.length;
+      // Number not yet examined avoiding double counting
+      const notYetExamined = Math.max(0, totalPigsAvailable - seenPigs.size);
+
+      summary.push({
+        date: dateStr,
+        pigsExamined,
+        notYetExamined,
+        sickPigs: sickCount,
+        diseaseDescription: Array.from(diseases).join(", ") || "None / All Healthy",
+        treatmentDescription: Array.from(treatments).join(", ") || "Routine check / Cleared",
+      });
+    }
+
+    // Sort descending for display (most recent date first)
+    summary.reverse();
+
+    return { summary, totalPigsAvailable };
+  } catch (err) {
+    console.error("Error in getVeterinaryDateSummaries:", err);
+    return { summary: [], totalPigsAvailable: 0 };
+  }
+}
+
+export async function getAllPigsForVet() {
+  const user = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.VETERINARIAN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.FINANCE_OFFICER,
+  ]);
+  if (!user) return [];
+  try {
+    const pigs = await prisma.pig.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        tagNumber: true,
+        healthStatus: true,
+        status: true,
+        breed: true,
+        currentWeight: true,
+      },
+      orderBy: { tagNumber: "asc" },
+    });
+    return pigs;
+  } catch (err) {
+    console.error("Error in getAllPigsForVet:", err);
+    return [];
+  }
+}
+
+export async function getBadStatusPigs() {
+  const user = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.VETERINARIAN,
+    Role.PROJECT_MANAGER,
+    Role.CELL_MANAGER,
+    Role.FINANCE_OFFICER,
+  ]);
+  if (!user) return [];
+
+  try {
+    const pigs = await prisma.pig.findMany({
+      where: {
+        deletedAt: null,
+        healthStatus: { in: [PigHealthStatus.SICK, PigHealthStatus.UNDER_TREATMENT, PigHealthStatus.CRITICAL] },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    if (!pigs || pigs.length === 0) return [];
+
+    const pigIds = pigs.map((p) => p.id);
+    const records = await prisma.veterinaryRecord.findMany({
+      where: { pigId: { in: pigIds } },
+      orderBy: { date: "desc" },
+    });
+
+    const latestRecordByPigId = new Map<string, (typeof records)[number]>();
+    for (const r of records) {
+      if (!latestRecordByPigId.has(r.pigId)) {
+        latestRecordByPigId.set(r.pigId, r);
       }
     }
 
-    const pigsExamined = dayPigs.size || dayRecords.length;
-    // Number not yet examined avoiding double counting
-    const notYetExamined = Math.max(0, totalPigsAvailable - seenPigs.size);
-
-    summary.push({
-      date: dateStr,
-      pigsExamined,
-      notYetExamined,
-      sickPigs: sickCount,
-      diseaseDescription: Array.from(diseases).join(", ") || "None / All Healthy",
-      treatmentDescription: Array.from(treatments).join(", ") || "Routine check / Cleared",
+    return pigs.map((p) => {
+      const latestRec = latestRecordByPigId.get(p.id);
+      return {
+        id: p.id,
+        tagNumber: p.tagNumber,
+        healthStatus: p.healthStatus,
+        status: p.status,
+        latestDiagnosis: latestRec?.diagnosis ?? "—",
+        latestMedication: latestRec?.medication ?? latestRec?.treatment ?? "—",
+        examinationDate: toIsoString(latestRec?.date ?? p.updatedAt),
+      };
     });
+  } catch (err) {
+    console.error("Error in getBadStatusPigs:", err);
+    return [];
+  }
+}
+
+export async function recordIndividualPigExamination(formData: FormData) {
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.VETERINARIAN]);
+  if (!user) throw new Error("Unauthorized");
+
+  const pigId = String(formData.get("pigId") || "").trim();
+  const diagnosis = String(formData.get("diagnosis") || "").trim();
+  const healthStatusRaw = String(formData.get("healthStatus") || "HEALTHY").trim().toUpperCase();
+  const medication = String(formData.get("medication") || "").trim();
+  const dateRaw = String(formData.get("date") || "").trim();
+
+  if (!pigId) {
+    return { success: false, error: "Please select a pig." };
   }
 
-  // Sort descending for display (most recent date first)
-  summary.reverse();
+  const healthStatus = Object.values(PigHealthStatus).includes(healthStatusRaw as PigHealthStatus)
+    ? (healthStatusRaw as PigHealthStatus)
+    : PigHealthStatus.HEALTHY;
 
-  return { summary, totalPigsAvailable };
+  const examDate = dateRaw ? new Date(dateRaw) : new Date();
+
+  await prisma.$transaction(async (tx) => {
+    const pig = await tx.pig.findUnique({
+      where: { id: pigId },
+      select: { id: true, tagNumber: true, status: true },
+    });
+    if (!pig) throw new Error("Pig not found.");
+
+    await tx.veterinaryRecord.create({
+      data: {
+        pigId,
+        veterinarianId: user.id,
+        date: examDate,
+        activityType: "INDIVIDUAL_EXAMINATION",
+        diagnosis: diagnosis || "Clinical examination completed",
+        medication: medication || null,
+        treatment: medication ? `Prescribed medication: ${medication}` : "Routine check",
+        status: healthStatus === PigHealthStatus.HEALTHY ? "COMPLETED" : "UNDER_TREATMENT",
+      },
+    });
+
+    const newStatus =
+      healthStatus === PigHealthStatus.HEALTHY && pig.status === PigStatus.REGISTERED
+        ? PigStatus.ACTIVE
+        : pig.status;
+
+    await tx.pig.update({
+      where: { id: pigId },
+      data: {
+        healthStatus,
+        status: newStatus,
+      },
+    });
+
+    if (healthStatus === PigHealthStatus.HEALTHY || healthStatus === PigHealthStatus.RECOVERED) {
+      await tx.pigReturn.updateMany({
+        where: { pigId },
+        data: {
+          veterinaryVerified: true,
+          verifiedByVetId: user.id,
+        },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        userId: user.id,
+        role: user.role,
+        action: "EXAMINED",
+        entity: "PIG",
+        entityId: pigId,
+        newValue: {
+          tagNumber: pig.tagNumber,
+          diagnosis,
+          healthStatus,
+          medication,
+        },
+      },
+    });
+  });
+
+  revalidatePath("/dashboard/vet");
+  revalidatePath("/dashboard/vet/veterinary");
+  revalidatePath("/dashboard/vet/veterinary/new");
+  revalidatePath("/dashboard/finance");
+  revalidatePath("/dashboard/field");
+
+  return { success: true };
 }
+
+export async function updatePigHealthStatus(pigId: string, newHealthStatus: PigHealthStatus) {
+  const user = await getActiveUser([Role.SUPER_ADMIN, Role.VETERINARIAN]);
+  if (!user) throw new Error("Unauthorized");
+
+  await prisma.$transaction(async (tx) => {
+    const pig = await tx.pig.findUnique({ where: { id: pigId } });
+    if (!pig) throw new Error("Pig not found.");
+
+    await tx.pig.update({
+      where: { id: pigId },
+      data: {
+        healthStatus: newHealthStatus,
+        ...(newHealthStatus === PigHealthStatus.HEALTHY || newHealthStatus === PigHealthStatus.RECOVERED
+          ? { status: pig.status === PigStatus.REGISTERED ? PigStatus.ACTIVE : pig.status }
+          : {}),
+      },
+    });
+
+    await tx.veterinaryRecord.create({
+      data: {
+        pigId,
+        veterinarianId: user.id,
+        date: new Date(),
+        activityType: "STATUS_UPDATE",
+        diagnosis: `Health status updated to ${newHealthStatus}`,
+        status: newHealthStatus === PigHealthStatus.HEALTHY ? "COMPLETED" : "UNDER_TREATMENT",
+      },
+    });
+
+    if (newHealthStatus === PigHealthStatus.HEALTHY || newHealthStatus === PigHealthStatus.RECOVERED) {
+      await tx.pigReturn.updateMany({
+        where: { pigId, veterinaryVerified: false },
+        data: {
+          veterinaryVerified: true,
+          verifiedByVetId: user.id,
+        },
+      });
+    }
+  });
+
+  revalidatePath("/dashboard/vet");
+  revalidatePath("/dashboard/vet/veterinary");
+  revalidatePath("/dashboard/finance");
+  revalidatePath("/dashboard/field");
+
+  return { success: true };
+}
+
 
 

@@ -171,14 +171,32 @@ export async function createUser(formData: FormData) {
 export async function updatePersonalProfile(formData: FormData) {
   const { getServerSession } = await import("next-auth");
   const { authOptions } = await import("@/lib/auth");
+  const { saveUserAddressProfile, getUserAddressProfile } = await import(
+    "@/lib/user-profile-address"
+  );
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const returnToRaw = String(formData.get("returnTo") || "").trim();
+  const safeReturnTo =
+    returnToRaw === "/dashboard/field" ? "/dashboard/field" : "/dashboard/settings";
 
   const name = String(formData.get("name") || "").trim();
   const rawPhone = String(formData.get("phone") || "").trim();
   const phone = rawPhone ? normalizePhone(rawPhone) : "";
+
+  const districtId = String(formData.get("districtId") || "").trim();
+  const districtName = String(formData.get("district") || "").trim();
+  const sectorId = String(formData.get("sectorId") || "").trim();
+  const sectorName = String(formData.get("sector") || "").trim();
+  const cellId = String(formData.get("cellId") || "").trim();
+  const cellName = String(formData.get("cell") || "").trim();
+  const villageId = String(formData.get("villageId") || "").trim();
+  const villageName = String(formData.get("village") || "").trim();
+  const address = String(formData.get("address") || "").trim();
+
   if (!name) {
-    redirect("/dashboard/settings?profileError=Full+Name+is+required");
+    redirect(`${safeReturnTo}?profileError=${encodeURIComponent("Full Name is required")}`);
   }
 
   try {
@@ -186,6 +204,19 @@ export async function updatePersonalProfile(formData: FormData) {
       where: { id: session.user.id },
       select: { email: true, name: true, phone: true, role: true },
     });
+
+    if (prevUser?.role === Role.CELL_MANAGER) {
+      if (!phone) {
+        redirect(
+          `${safeReturnTo}?profileError=${encodeURIComponent("Phone number is required for Cell Managers.")}`
+        );
+      }
+      if (!districtName || !sectorName || !cellName) {
+        redirect(
+          `${safeReturnTo}?profileError=${encodeURIComponent("Please select your District, Sector, and Cell address.")}`
+        );
+      }
+    }
 
     if (phone) {
       const existingWithPhone = await prisma.user.findFirst({
@@ -195,9 +226,13 @@ export async function updatePersonalProfile(formData: FormData) {
         },
       });
       if (existingWithPhone) {
-        redirect("/dashboard/settings?profileError=Phone+number+is+already+registered+to+another+user");
+        redirect(
+          `${safeReturnTo}?profileError=${encodeURIComponent("Phone number is already registered to another user")}`
+        );
       }
     }
+
+    const prevAddress = await getUserAddressProfile(session.user.id);
 
     await prisma.user.update({
       where: { id: session.user.id },
@@ -206,6 +241,25 @@ export async function updatePersonalProfile(formData: FormData) {
         phone: phone || null,
       },
     });
+
+    const nextAddress = {
+      districtId,
+      districtName,
+      sectorId,
+      sectorName,
+      cellId,
+      cellName,
+      villageId,
+      villageName,
+      address,
+    };
+
+    await saveUserAddressProfile(
+      session.user.id,
+      name,
+      prevUser?.role || "USER",
+      nextAddress
+    );
 
     if (prevUser?.email) {
       await syncSupabaseAuthUser({
@@ -222,20 +276,31 @@ export async function updatePersonalProfile(formData: FormData) {
         action: "UPDATED",
         entity: "USER_PROFILE",
         entityId: session.user.id,
-        previousValue: { name: prevUser?.name, phone: prevUser?.phone },
-        newValue: { name, phone: phone || null },
+        previousValue: {
+          name: prevUser?.name,
+          phone: prevUser?.phone,
+          address: prevAddress,
+        },
+        newValue: {
+          name,
+          phone: phone || null,
+          address: nextAddress,
+        },
       },
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update profile";
     if (message.includes("NEXT_REDIRECT")) throw err;
-    redirect(`/dashboard/settings?profileError=${encodeURIComponent(message)}`);
+    redirect(`${safeReturnTo}?profileError=${encodeURIComponent(message)}`);
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/field");
+  revalidatePath("/dashboard/field/cooperative");
+  revalidatePath("/dashboard/field/stock-reports");
   revalidatePath("/dashboard/history");
-  redirect("/dashboard/settings?profileSuccess=1");
+  redirect(`${safeReturnTo}?profileSuccess=1`);
 }
 
 export async function changeUserPassword(formData: FormData) {

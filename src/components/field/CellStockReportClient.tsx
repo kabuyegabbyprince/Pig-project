@@ -10,10 +10,12 @@ export function CellStockReportClient({
   reports,
   clearedPigs,
   tableMissing,
+  defaultCellName = "",
 }: {
   reports: SerializedStockReport[];
   clearedPigs: SerializedClearedPigOption[];
   tableMissing: boolean;
+  defaultCellName?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -22,7 +24,7 @@ export function CellStockReportClient({
 
   const [cooperativeOwnerName, setCooperativeOwnerName] = useState("");
   const [cooperativeOwnerRole, setCooperativeOwnerRole] = useState("COOPERATIVE_MEMBER");
-  const [cellName, setCellName] = useState("");
+  const [cellName, setCellName] = useState(defaultCellName);
   const [animalTitle, setAnimalTitle] = useState("");
   const [pigCount, setPigCount] = useState("1");
   const [estimatedWeightKg, setEstimatedWeightKg] = useState("");

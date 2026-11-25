@@ -1,7 +1,7 @@
 "use client";
 
 import type { Session } from "next-auth";
-import { useSession } from "next-auth/react";
+import { useAuthSession } from "@/components/AuthProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { performSignOut } from "@/lib/client-auth";
@@ -157,8 +157,8 @@ export function DashboardShell({
   children: React.ReactNode;
   initialSession?: Session | null;
 }) {
-  const { data: sessionData } = useSession();
-  const session = sessionData ?? initialSession ?? null;
+  const { data: sessionData } = useAuthSession();
+  const session = initialSession ?? sessionData ?? null;
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 

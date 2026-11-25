@@ -92,6 +92,11 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
   user: {
     cooperativeId: "cooperative_id",
     mustChangePassword: "must_change_password",
+    districtName: "district_name",
+    sectorName: "sector_name",
+    cellName: "cell_name",
+    villageName: "village_name",
+    address: "address",
     createdAt: "created_at",
     updatedAt: "updated_at",
   },
@@ -152,6 +157,13 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     transactionDate: "date",
   },
   backendUser: {
+    cooperativeId: "cooperative_id",
+    mustChangePassword: "must_change_password",
+    districtName: "district_name",
+    sectorName: "sector_name",
+    cellName: "cell_name",
+    villageName: "village_name",
+    address: "address",
     createdAt: "created_at",
     updatedAt: "updated_at",
   },
@@ -380,6 +392,7 @@ const RELATIONS: Record<string, Record<string, RelationSpec>> = {
     distributions: { type: "many", targetModel: "pigDistribution", localField: "id", foreignField: "pigId" },
     returns: { type: "many", targetModel: "pigReturn", localField: "id", foreignField: "pigId" },
     vetVisits: { type: "many", targetModel: "veterinaryVisit", localField: "id", foreignField: "pigId" },
+    vetRecords: { type: "many", targetModel: "veterinaryRecord", localField: "id", foreignField: "pigId" },
     treatments: { type: "many", targetModel: "treatment", localField: "id", foreignField: "pigId" },
     veterinaryExams: { type: "many", targetModel: "veterinaryExamination", localField: "id", foreignField: "pigId" },
     storeProducts: { type: "many", targetModel: "storeProduct", localField: "id", foreignField: "pigId" },
@@ -548,6 +561,11 @@ function mapRowFromDb(model: string, row: Record<string, unknown>): Record<strin
     if (!("assignedVillageId" in out)) out.assignedVillageId = null;
     if (!("cooperativeId" in out)) out.cooperativeId = null;
     if (!("mustChangePassword" in out)) out.mustChangePassword = false;
+    if (!("districtName" in out)) out.districtName = null;
+    if (!("sectorName" in out)) out.sectorName = null;
+    if (!("cellName" in out)) out.cellName = null;
+    if (!("villageName" in out)) out.villageName = null;
+    if (!("address" in out)) out.address = null;
   }
 
   if (model === "pig") {
@@ -1473,22 +1491,37 @@ function isConnectionError(error: unknown): boolean {
 function createResilientPrisma(): PrismaClient {
   const hasDatabaseUrl = Boolean(process.env.DATABASE_URL?.trim());
   const supabaseCfg = getSupabaseConfig();
+  const isProd = process.env.NODE_ENV === "production";
 
   if (!hasDatabaseUrl) {
     if (supabaseCfg) {
       return createSupabasePrisma();
     }
+    if (isProd) {
+      throw new Error("Database configuration missing: DATABASE_URL or Supabase credentials are required in production.");
+    }
     console.warn("[AI Studio] Neither DATABASE_URL nor Supabase credentials configured — using mock Prisma client");
     return createMockPrisma();
   }
 
-  const fallback = supabaseCfg ? createSupabasePrisma() : createMockPrisma();
+  const fallback = supabaseCfg
+    ? createSupabasePrisma()
+    : isProd
+      ? null
+      : createMockPrisma();
   let realClient: PrismaClient;
   try {
     realClient = new PrismaClient();
   } catch (err) {
-    console.warn("[AI Studio] Database initialization failed — using fallback client", err);
-    return fallback;
+    if (fallback) {
+      console.warn("[AI Studio] Database initialization failed — using fallback client", err);
+      return fallback;
+    }
+    throw err;
+  }
+
+  if (!fallback) {
+    return realClient;
   }
 
   return new Proxy(realClient, {

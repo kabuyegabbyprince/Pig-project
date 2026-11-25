@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import {
+  BeneficiaryStatus,
   NotificationType,
   PigHealthStatus,
   PigSex,
@@ -17,6 +18,7 @@ import { normalizePhone } from "@/lib/phone-utils";
 import { syncSupabaseAuthUser } from "@/lib/supabase-auth";
 import { normalizeRoleValue } from "@/lib/roles";
 import { checkPigVetClearance } from "@/lib/vet-clearance";
+import { getUserAddressProfile } from "@/lib/user-profile-address";
 
 const MAX_COOPERATIVE_MEMBERS = 15;
 
@@ -62,6 +64,8 @@ export type SerializedCooperative = {
 export type SerializedCooperativeAnimal = {
   id: string;
   tagNumber: string;
+  pigType: string | null;
+  batchCode: string | null;
   breed: string | null;
   sex: string | null;
   currentWeight: number | null;
@@ -99,6 +103,23 @@ export type SerializedMemberReport = {
   createdAt: string;
 };
 
+export type SerializedMemberPaymentSummary = {
+  id: string;
+  memberId: string;
+  memberName: string;
+  memberEmail: string;
+  cooperativeId: string;
+  cooperativeName: string;
+  pigValueFee: string;
+  taxFee: string;
+  totalAmount: string;
+  momoReference: string;
+  status: string;
+  verifiedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CooperativesWorkspaceData = {
   schemaMissing: boolean;
   actor: {
@@ -107,9 +128,12 @@ export type CooperativesWorkspaceData = {
     role: Role;
     cooperativeId: string | null;
     mustChangePassword: boolean;
+    cellName: string | null;
   };
   cooperatives: SerializedCooperative[];
   animals: SerializedCooperativeAnimal[];
+  availableStockPigs: SerializedCooperativeAnimal[];
+  memberPayments: SerializedMemberPaymentSummary[];
   memberReports: SerializedMemberReport[];
   unassignedUsers: SerializedCooperativeMember[];
 };
@@ -120,7 +144,11 @@ function revalidateAllCooperativePaths() {
   revalidatePath("/dashboard/field/my-animals");
   revalidatePath("/dashboard/field/member-reports");
   revalidatePath("/dashboard/field/stock-reports");
+  revalidatePath("/dashboard/field/distributions");
+  revalidatePath("/dashboard/field/distributions/new");
   revalidatePath("/dashboard/field/pigs");
+  revalidatePath("/dashboard/finance");
+  revalidatePath("/dashboard/finance/pigs");
   revalidatePath("/dashboard/history");
   revalidatePath("/dashboard/admin/users");
 }
@@ -136,6 +164,133 @@ function getFriendlyActionError(err: unknown, fallback: string): string {
   return msg || fallback;
 }
 
+export async function syncBeneficiaryRecordForCoopUser(params: {
+  userId: string;
+  name: string;
+  phone?: string | null;
+  nationalId?: string | null;
+  role: Role;
+  isActive: boolean;
+  cooperativeName: string;
+  cellName?: string | null;
+  districtName?: string | null;
+  sectorName?: string | null;
+  villageName?: string | null;
+  createdById?: string | null;
+}) {
+  const beneficiaryNumber = `COOP-${params.userId}`;
+  const roleLabel =
+    params.role === Role.COOPERATIVE_LEADER ? "Cooperative Leader" : "Cooperative Member";
+  const noteText = `${roleLabel} in ${params.cooperativeName}`;
+
+  const existing = await prisma.beneficiary.findFirst({
+    where: { beneficiaryNumber },
+  });
+
+  if (!existing) {
+    return prisma.beneficiary.create({
+      data: {
+        beneficiaryNumber,
+        fullName: params.name,
+        phone: params.phone ?? null,
+        nationalId: params.nationalId ?? null,
+        districtStr: params.districtName ?? null,
+        sectorStr: params.sectorName ?? null,
+        cellStr: params.cellName ?? null,
+        villageStr: params.villageName ?? null,
+        savingsGroup: params.cooperativeName,
+        status: params.isActive ? BeneficiaryStatus.ACTIVE : BeneficiaryStatus.INACTIVE,
+        registrationDate: new Date(),
+        createdById: params.createdById ?? null,
+        notes: noteText,
+      },
+    });
+  }
+
+  const preserveProgressStatuses = new Set<BeneficiaryStatus>([
+    BeneficiaryStatus.PIGLET_RECEIVED,
+    BeneficiaryStatus.GROWING,
+    BeneficiaryStatus.PREGNANT,
+    BeneficiaryStatus.LITTER_BORN,
+    BeneficiaryStatus.PIGLETS_GROWING,
+    BeneficiaryStatus.REPAYMENT_DUE,
+    BeneficiaryStatus.PARTIALLY_REPAID,
+    BeneficiaryStatus.REPAID_3_PIGLETS,
+    BeneficiaryStatus.COMPLETED,
+  ]);
+
+  const nextStatus = !params.isActive
+    ? BeneficiaryStatus.INACTIVE
+    : preserveProgressStatuses.has(existing.status)
+      ? existing.status
+      : BeneficiaryStatus.ACTIVE;
+
+  return prisma.beneficiary.update({
+    where: { id: existing.id },
+    data: {
+      fullName: params.name,
+      phone: params.phone ?? existing.phone,
+      nationalId: params.nationalId ?? existing.nationalId,
+      districtStr: params.districtName ?? existing.districtStr,
+      sectorStr: params.sectorName ?? existing.sectorStr,
+      cellStr: params.cellName ?? existing.cellStr,
+      villageStr: params.villageName ?? existing.villageStr,
+      savingsGroup: params.cooperativeName,
+      status: nextStatus,
+      notes: noteText,
+      deletedAt: null,
+    },
+  });
+}
+
+export async function ensureCooperativeBeneficiariesSynced() {
+  try {
+    const [coops, members] = await Promise.all([
+      prisma.cooperative.findMany(),
+      prisma.user.findMany({
+        where: {
+          deletedAt: null,
+          cooperativeId: { not: null },
+          role: { in: [Role.COOPERATIVE_MEMBER, Role.COOPERATIVE_LEADER] },
+        },
+      }),
+    ]);
+
+    if (members.length === 0) return;
+
+    const coopById = new Map(coops.map((c) => [c.id, c]));
+    const benNumbers = members.map((m) => `COOP-${m.id}`);
+    const existingBens = await prisma.beneficiary.findMany({
+      where: { beneficiaryNumber: { in: benNumbers } },
+      select: { beneficiaryNumber: true },
+    });
+    const existingSet = new Set(existingBens.map((b) => b.beneficiaryNumber));
+
+    for (const m of members) {
+      const benNum = `COOP-${m.id}`;
+      if (existingSet.has(benNum)) continue;
+      const coop = m.cooperativeId ? coopById.get(m.cooperativeId) : undefined;
+      if (!coop) continue;
+      const normRole = normalizeRoleValue(m.role) || Role.COOPERATIVE_MEMBER;
+      await syncBeneficiaryRecordForCoopUser({
+        userId: String(m.id),
+        name: m.name,
+        phone: m.phone ?? null,
+        role: normRole,
+        isActive: Boolean(m.isActive),
+        cooperativeName: coop.name,
+        cellName: m.cellName ?? coop.cellName,
+        districtName: m.districtName ?? null,
+        sectorName: m.sectorName ?? null,
+        villageName: m.villageName ?? null,
+        createdById: coop.createdById,
+      });
+    }
+  } catch {
+    // Non-blocking sync safeguard
+  }
+}
+
 export async function getCooperativesWorkspaceData(): Promise<CooperativesWorkspaceData | null> {
   const actor = await getActiveUser([
     Role.SUPER_ADMIN,
@@ -145,16 +300,20 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
   ]);
   if (!actor) return null;
 
-  const fullActor = await prisma.user.findUnique({
-    where: { id: actor.id },
-  });
+  const [fullActor, addressProfile] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: actor.id },
+    }),
+    getUserAddressProfile(actor.id),
+  ]);
 
   const actorCoopId = fullActor?.cooperativeId ?? null;
   const mustChangePassword = Boolean(fullActor?.mustChangePassword);
+  const actorCellName = addressProfile.cellName || null;
   const actorRole = normalizeRoleValue(actor.role) || actor.role;
 
   try {
-    const [coopsRaw, usersRaw, pigsRaw, reportsRaw] = await Promise.all([
+    const [coopsRaw, usersRaw, pigsRaw, reportsRaw, paymentsRaw] = await Promise.all([
       prisma.cooperative.findMany({
         orderBy: { createdAt: "desc" },
       }),
@@ -166,11 +325,17 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
         orderBy: { createdAt: "asc" },
       }),
       prisma.pig.findMany({
+        where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
       }),
       prisma.cooperativeMemberReport.findMany({
         orderBy: { createdAt: "desc" },
       }),
+      prisma.cooperativeMemberPayment
+        .findMany({
+          orderBy: { createdAt: "desc" },
+        })
+        .catch(() => []),
     ]);
 
     const coopNameById = new Map<string, string>();
@@ -178,13 +343,18 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
       coopNameById.set(c.id, c.name);
     }
 
-    // Filter scope based on role
+    // Strict role scoping:
+    // - SUPER_ADMIN sees all cooperatives
+    // - CELL_MANAGER sees ONLY cooperatives (and members inside them) that he created
+    // - COOPERATIVE_LEADER / COOPERATIVE_MEMBER see only their own cooperative
     const visibleCoops =
-      actorRole === Role.SUPER_ADMIN || actorRole === Role.CELL_MANAGER
+      actorRole === Role.SUPER_ADMIN
         ? coopsRaw
-        : actorCoopId
-          ? coopsRaw.filter((c) => c.id === actorCoopId)
-          : coopsRaw.filter((c) => c.leaderUserId === actor.id);
+        : actorRole === Role.CELL_MANAGER
+          ? coopsRaw.filter((c) => String(c.createdById) === String(actor.id))
+          : actorCoopId
+            ? coopsRaw.filter((c) => c.id === actorCoopId)
+            : coopsRaw.filter((c) => String(c.leaderUserId) === String(actor.id));
 
     const visibleCoopIds = new Set(visibleCoops.map((c) => c.id));
 
@@ -216,6 +386,10 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
     });
 
     const serializedUsers = usersRaw.map(serializeMember);
+    const userById = new Map<string, SerializedCooperativeMember>();
+    for (const u of serializedUsers) {
+      userById.set(u.id, u);
+    }
 
     const cooperatives: SerializedCooperative[] = visibleCoops.map((c) => {
       const members = serializedUsers.filter((u) => u.cooperativeId === c.id);
@@ -245,34 +419,21 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
       };
     });
 
+    // Only SUPER_ADMIN sees global unassigned users; Cell Managers manage members they add to their cooperatives
     const unassignedUsers =
-      actorRole === Role.SUPER_ADMIN || actorRole === Role.CELL_MANAGER
+      actorRole === Role.SUPER_ADMIN
         ? serializedUsers.filter((u) => !u.cooperativeId)
         : [];
 
-    // Filter animals
-    const scopedPigs = pigsRaw.filter((p) => {
-      if (actorRole === Role.SUPER_ADMIN || actorRole === Role.CELL_MANAGER) {
-        return Boolean(p.cooperativeId || p.ownerMemberId);
-      }
-      if (actorRole === Role.COOPERATIVE_LEADER) {
-        return (
-          (actorCoopId && p.cooperativeId === actorCoopId) ||
-          (p.cooperativeId && visibleCoopIds.has(p.cooperativeId)) ||
-          p.ownerMemberId === actor.id
-        );
-      }
-      // COOPERATIVE_MEMBER: only own animals
-      return p.ownerMemberId === actor.id;
-    });
-
-    const animals: SerializedCooperativeAnimal[] = scopedPigs.map((p) => ({
+    const serializePig = (p: (typeof pigsRaw)[number]): SerializedCooperativeAnimal => ({
       id: p.id,
       tagNumber: p.tagNumber,
+      pigType: p.pigType ?? null,
+      batchCode: p.batchCode ?? null,
       breed: p.breed ?? null,
       sex: p.sex ? String(p.sex) : null,
       currentWeight: p.currentWeight ?? null,
-      estimatedAge: p.estimatedAge ?? null,
+      estimatedAge: p.estimatedAge ?? p.daysAge ?? null,
       healthStatus: p.healthStatus,
       status: p.status,
       notes: p.notes ?? null,
@@ -293,12 +454,97 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
         p.createdAt instanceof Date
           ? p.createdAt.toISOString()
           : new Date(p.createdAt).toISOString(),
-    }));
+    });
 
-    // Filter member reports
+    // Filter cooperative/member animals strictly by role & owned cooperatives
+    const scopedPigs = pigsRaw.filter((p) => {
+      if (actorRole === Role.SUPER_ADMIN) {
+        return Boolean(p.cooperativeId || p.ownerMemberId);
+      }
+      if (actorRole === Role.CELL_MANAGER) {
+        return Boolean(p.cooperativeId && visibleCoopIds.has(p.cooperativeId));
+      }
+      if (actorRole === Role.COOPERATIVE_LEADER) {
+        return (
+          (actorCoopId && p.cooperativeId === actorCoopId) ||
+          (p.cooperativeId && visibleCoopIds.has(p.cooperativeId)) ||
+          p.ownerMemberId === actor.id
+        );
+      }
+      // COOPERATIVE_MEMBER: only own animals
+      return p.ownerMemberId === actor.id;
+    });
+
+    const animals: SerializedCooperativeAnimal[] = scopedPigs.map(serializePig);
+
+    // Vet-cleared unallocated stock pigs available for Cell Manager / Admin distribution
+    const availableStockPigs: SerializedCooperativeAnimal[] = [];
+    if (actorRole === Role.SUPER_ADMIN || actorRole === Role.CELL_MANAGER) {
+      const candidateStock = pigsRaw.filter(
+        (p) =>
+          !p.currentBeneficiaryId &&
+          !p.ownerMemberId &&
+          !p.cooperativeId &&
+          p.healthStatus === PigHealthStatus.HEALTHY &&
+          (p.status === PigStatus.REGISTERED ||
+            p.status === PigStatus.ACTIVE ||
+            p.status === PigStatus.RETURNED)
+      );
+      const clearanceResults = await Promise.all(
+        candidateStock.map(async (p) => ({
+          pig: p,
+          clearance: await checkPigVetClearance(p.id, "DISTRIBUTION"),
+        }))
+      );
+      for (const item of clearanceResults) {
+        if (item.clearance.cleared) {
+          availableStockPigs.push(serializePig(item.pig));
+        }
+      }
+    }
+
+    // Scoped member qualification payments
+    const memberPayments: SerializedMemberPaymentSummary[] = paymentsRaw
+      .filter((pm) => {
+        if (actorRole === Role.SUPER_ADMIN) return true;
+        if (actorRole === Role.CELL_MANAGER || actorRole === Role.COOPERATIVE_LEADER) {
+          return visibleCoopIds.has(String(pm.cooperativeId));
+        }
+        return String(pm.memberId) === String(actor.id);
+      })
+      .map((pm) => {
+        const mem = userById.get(String(pm.memberId));
+        return {
+          id: pm.id,
+          memberId: String(pm.memberId),
+          memberName: mem?.name ?? "Cooperative Member",
+          memberEmail: mem?.email ?? "",
+          cooperativeId: String(pm.cooperativeId),
+          cooperativeName: coopNameById.get(String(pm.cooperativeId)) ?? "Cooperative",
+          pigValueFee: pm.pigValueFee.toString(),
+          taxFee: pm.taxFee.toString(),
+          totalAmount: pm.totalAmount.toString(),
+          momoReference: pm.momoReference,
+          status: pm.status,
+          verifiedById: pm.verifiedById ?? null,
+          createdAt:
+            pm.createdAt instanceof Date
+              ? pm.createdAt.toISOString()
+              : new Date(pm.createdAt).toISOString(),
+          updatedAt:
+            pm.updatedAt instanceof Date
+              ? pm.updatedAt.toISOString()
+              : new Date(pm.updatedAt).toISOString(),
+        };
+      });
+
+    // Filter member reports strictly to visible cooperatives
     const scopedReports = reportsRaw.filter((r) => {
-      if (actorRole === Role.SUPER_ADMIN || actorRole === Role.CELL_MANAGER) {
+      if (actorRole === Role.SUPER_ADMIN) {
         return true;
+      }
+      if (actorRole === Role.CELL_MANAGER) {
+        return visibleCoopIds.has(r.cooperativeId);
       }
       if (actorRole === Role.COOPERATIVE_LEADER) {
         return (
@@ -346,9 +592,12 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
         role: actorRole,
         cooperativeId: actorCoopId,
         mustChangePassword,
+        cellName: actorCellName,
       },
       cooperatives,
       animals,
+      availableStockPigs,
+      memberPayments,
       memberReports,
       unassignedUsers,
     };
@@ -362,9 +611,12 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
           role: actorRole,
           cooperativeId: actorCoopId,
           mustChangePassword,
+          cellName: actorCellName,
         },
         cooperatives: [],
         animals: [],
+        availableStockPigs: [],
+        memberPayments: [],
         memberReports: [],
         unassignedUsers: [],
       };
@@ -483,11 +735,18 @@ export async function addCooperativeMember(formData: FormData): Promise<{
   const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
 
   try {
+    const actorRole = normalizeRoleValue(actor.role) || actor.role;
     const coop = await prisma.cooperative.findUnique({
       where: { id: cooperativeId },
     });
     if (!coop) {
       return { success: false, error: "Selected cooperative was not found." };
+    }
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(actor.id)) {
+      return {
+        success: false,
+        error: "Access denied: You can only add members to cooperatives you created.",
+      };
     }
 
     const currentMembers = await prisma.user.findMany({
@@ -540,6 +799,8 @@ export async function addCooperativeMember(formData: FormData): Promise<{
       });
     }
 
+    const actorAddress = await getUserAddressProfile(actor.id);
+
     const createdUser = await prisma.user.create({
       data: {
         name,
@@ -550,6 +811,10 @@ export async function addCooperativeMember(formData: FormData): Promise<{
         cooperativeId,
         mustChangePassword: true,
         isActive: true,
+        districtName: actorAddress.districtName || null,
+        sectorName: actorAddress.sectorName || null,
+        cellName: actorAddress.cellName || coop.cellName,
+        villageName: actorAddress.villageName || null,
       },
     });
 
@@ -563,6 +828,20 @@ export async function addCooperativeMember(formData: FormData): Promise<{
       isActive: true,
     });
 
+    await syncBeneficiaryRecordForCoopUser({
+      userId: String(createdUser.id),
+      name,
+      phone: normalizedPhone,
+      role: assignedRole,
+      isActive: true,
+      cooperativeName: coop.name,
+      cellName: actorAddress.cellName || coop.cellName,
+      districtName: actorAddress.districtName || null,
+      sectorName: actorAddress.sectorName || null,
+      villageName: actorAddress.villageName || null,
+      createdById: actor.id,
+    });
+
     if (assignedRole === Role.COOPERATIVE_LEADER) {
       await prisma.cooperative.update({
         where: { id: cooperativeId },
@@ -570,6 +849,19 @@ export async function addCooperativeMember(formData: FormData): Promise<{
           leaderUserId: String(createdUser.id),
           leaderName: createdUser.name,
         },
+      });
+    }
+
+    if (previousLeader) {
+      await syncBeneficiaryRecordForCoopUser({
+        userId: String(previousLeader.id),
+        name: previousLeader.name,
+        phone: previousLeader.phone ?? null,
+        role: Role.COOPERATIVE_MEMBER,
+        isActive: Boolean(previousLeader.isActive),
+        cooperativeName: coop.name,
+        cellName: coop.cellName,
+        createdById: actor.id,
       });
     }
 
@@ -654,11 +946,18 @@ export async function assignCooperativeManager(
   }
 
   try {
+    const actorRole = normalizeRoleValue(actor.role) || actor.role;
     const coop = await prisma.cooperative.findUnique({
       where: { id: cooperativeId },
     });
     if (!coop) {
       return { success: false, error: "Cooperative not found." };
+    }
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(actor.id)) {
+      return {
+        success: false,
+        error: "Access denied: You can only manage cooperatives you created.",
+      };
     }
 
     const target = await prisma.user.findUnique({
@@ -699,6 +998,16 @@ export async function assignCooperativeManager(
         email: prev.email,
         role: Role.COOPERATIVE_MEMBER,
       });
+      await syncBeneficiaryRecordForCoopUser({
+        userId: String(prev.id),
+        name: prev.name,
+        phone: prev.phone ?? null,
+        role: Role.COOPERATIVE_MEMBER,
+        isActive: Boolean(prev.isActive),
+        cooperativeName: coop.name,
+        cellName: coop.cellName,
+        createdById: actor.id,
+      });
       try {
         await prisma.notification.create({
           data: {
@@ -725,6 +1034,16 @@ export async function assignCooperativeManager(
     await syncSupabaseAuthUser({
       email: target.email,
       role: Role.COOPERATIVE_LEADER,
+    });
+    await syncBeneficiaryRecordForCoopUser({
+      userId: String(target.id),
+      name: target.name,
+      phone: target.phone ?? null,
+      role: Role.COOPERATIVE_LEADER,
+      isActive: Boolean(target.isActive),
+      cooperativeName: coop.name,
+      cellName: coop.cellName,
+      createdById: actor.id,
     });
 
     await prisma.cooperative.update({
@@ -789,8 +1108,15 @@ export async function assignExistingUserToCooperative(
   }
 
   try {
+    const actorRole = normalizeRoleValue(actor.role) || actor.role;
     const coop = await prisma.cooperative.findUnique({ where: { id: cooperativeId } });
     if (!coop) return { success: false, error: "Cooperative not found." };
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(actor.id)) {
+      return {
+        success: false,
+        error: "Access denied: You can only assign users to cooperatives you created.",
+      };
+    }
 
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target || target.deletedAt) return { success: false, error: "User not found." };
@@ -815,6 +1141,16 @@ export async function assignExistingUserToCooperative(
     await syncSupabaseAuthUser({
       email: target.email,
       role: Role.COOPERATIVE_MEMBER,
+    });
+    await syncBeneficiaryRecordForCoopUser({
+      userId: String(target.id),
+      name: target.name,
+      phone: target.phone ?? null,
+      role: Role.COOPERATIVE_MEMBER,
+      isActive: Boolean(target.isActive),
+      cooperativeName: coop.name,
+      cellName: coop.cellName,
+      createdById: actor.id,
     });
 
     await prisma.auditLog.create({
@@ -853,6 +1189,7 @@ export async function toggleCooperativeMemberActive(userId: string): Promise<{
   }
 
   try {
+    const actorRole = normalizeRoleValue(actor.role) || actor.role;
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target || target.deletedAt) {
       return { success: false, error: "Member not found." };
@@ -860,6 +1197,17 @@ export async function toggleCooperativeMemberActive(userId: string): Promise<{
     const norm = normalizeRoleValue(target.role);
     if (norm !== Role.COOPERATIVE_LEADER && norm !== Role.COOPERATIVE_MEMBER) {
       return { success: false, error: "Cell Managers can only manage cooperative accounts." };
+    }
+    if (actorRole === Role.CELL_MANAGER) {
+      const targetCoop = target.cooperativeId
+        ? await prisma.cooperative.findUnique({ where: { id: target.cooperativeId } })
+        : null;
+      if (!targetCoop || String(targetCoop.createdById) !== String(actor.id)) {
+        return {
+          success: false,
+          error: "Access denied: You can only manage members of cooperatives you created.",
+        };
+      }
     }
 
     const nextActive = !target.isActive;
@@ -871,6 +1219,21 @@ export async function toggleCooperativeMemberActive(userId: string): Promise<{
       email: target.email,
       isActive: nextActive,
     });
+    if (target.cooperativeId) {
+      const targetCoop = await prisma.cooperative.findUnique({ where: { id: target.cooperativeId } });
+      if (targetCoop) {
+        await syncBeneficiaryRecordForCoopUser({
+          userId: String(target.id),
+          name: target.name,
+          phone: target.phone ?? null,
+          role: norm,
+          isActive: nextActive,
+          cooperativeName: targetCoop.name,
+          cellName: targetCoop.cellName,
+          createdById: targetCoop.createdById,
+        });
+      }
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -903,6 +1266,7 @@ export async function removeCooperativeMember(userId: string): Promise<{
   }
 
   try {
+    const actorRole = normalizeRoleValue(actor.role) || actor.role;
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target || target.deletedAt) {
       return { success: false, error: "Member not found." };
@@ -910,6 +1274,17 @@ export async function removeCooperativeMember(userId: string): Promise<{
     const norm = normalizeRoleValue(target.role);
     if (norm !== Role.COOPERATIVE_LEADER && norm !== Role.COOPERATIVE_MEMBER) {
       return { success: false, error: "Cell Managers can only manage cooperative accounts." };
+    }
+    if (actorRole === Role.CELL_MANAGER) {
+      const targetCoop = target.cooperativeId
+        ? await prisma.cooperative.findUnique({ where: { id: target.cooperativeId } })
+        : null;
+      if (!targetCoop || String(targetCoop.createdById) !== String(actor.id)) {
+        return {
+          success: false,
+          error: "Access denied: You can only remove members from cooperatives you created.",
+        };
+      }
     }
 
     const prevCoopId = target.cooperativeId;
@@ -934,6 +1309,10 @@ export async function removeCooperativeMember(userId: string): Promise<{
         });
       }
     }
+    await prisma.beneficiary.updateMany({
+      where: { beneficiaryNumber: `COOP-${String(target.id)}` },
+      data: { status: BeneficiaryStatus.INACTIVE },
+    });
 
     await prisma.auditLog.create({
       data: {
@@ -1022,6 +1401,15 @@ export async function registerCooperativeAnimal(formData: FormData): Promise<{
       cooperativeId = requestedCoopId || cooperativeId;
       if (!cooperativeId) {
         return { success: false, error: "Please select a cooperative." };
+      }
+      if (actorRole === Role.CELL_MANAGER) {
+        const coop = await prisma.cooperative.findUnique({ where: { id: cooperativeId } });
+        if (!coop || String(coop.createdById) !== String(actor.id)) {
+          return {
+            success: false,
+            error: "Access denied: You can only register animals inside cooperatives you created.",
+          };
+        }
       }
       if (requestedOwnerId) {
         const member = await prisma.user.findUnique({ where: { id: requestedOwnerId } });
@@ -1159,6 +1547,17 @@ export async function updateCooperativeAnimalRecord(formData: FormData): Promise
       pig.ownerMemberId !== actor.id
     ) {
       return { success: false, error: "This animal does not belong to your cooperative." };
+    }
+    if (actorRole === Role.CELL_MANAGER) {
+      const coop = pig.cooperativeId
+        ? await prisma.cooperative.findUnique({ where: { id: pig.cooperativeId } })
+        : null;
+      if (!coop || String(coop.createdById) !== String(actor.id)) {
+        return {
+          success: false,
+          error: "Access denied: You can only update animals belonging to cooperatives you created.",
+        };
+      }
     }
 
     const currentWeight = weightRaw ? Number(weightRaw) : pig.currentWeight;
@@ -1373,6 +1772,10 @@ export async function reviewMemberReport(
       return { success: false, error: "Member report not found." };
     }
 
+    const coop = await prisma.cooperative.findUnique({
+      where: { id: report.cooperativeId },
+    });
+
     const actorRole = normalizeRoleValue(actor.role) || actor.role;
     if (actorRole === Role.COOPERATIVE_LEADER) {
       const fullActor = await prisma.user.findUnique({ where: { id: actor.id } });
@@ -1381,6 +1784,14 @@ export async function reviewMemberReport(
         report.leaderId !== actor.id
       ) {
         return { success: false, error: "You can only review reports from your own cooperative." };
+      }
+    }
+    if (actorRole === Role.CELL_MANAGER) {
+      if (!coop || String(coop.createdById) !== String(actor.id)) {
+        return {
+          success: false,
+          error: "Access denied: You can only review reports from cooperatives you created.",
+        };
       }
     }
 
@@ -1438,21 +1849,13 @@ export async function reviewMemberReport(
       }
     }
 
-    // If escalated, notify Cell Managers so they can prepare official stock reports to Gebyian Manager
+    // If escalated, notify the owning Cell Manager who created the cooperative
     if (nextStatus === "ESCALATED_TO_CELL") {
       try {
-        const cellManagers = await prisma.user.findMany({
-          where: {
-            role: Role.CELL_MANAGER,
-            isActive: true,
-            deletedAt: null,
-          },
-        });
-        for (const cm of cellManagers) {
-          if (String(cm.id) === actor.id) continue;
+        if (coop?.createdById && String(coop.createdById) !== String(actor.id)) {
           await prisma.notification.create({
             data: {
-              userId: String(cm.id),
+              userId: String(coop.createdById),
               type: NotificationType.ALERT,
               title: `Cooperative Escalation: ${report.cooperativeName}`,
               message: `${actor.name} escalated a report from ${report.memberName} (${report.animalCount} animal(s)${report.pigTag ? `, Tag ${report.pigTag}` : ""}): ${report.summary}`,
@@ -1476,50 +1879,85 @@ export async function reviewMemberReport(
   }
 }
 
-export async function distributePigToCooperativeMember(formData: FormData): Promise<{
+export async function submitMemberPaymentForApproval(formData: FormData): Promise<{
   success: boolean;
   error?: string;
 }> {
   const actor = await getActiveUser([Role.SUPER_ADMIN, Role.CELL_MANAGER]);
   if (!actor) {
-    return { success: false, error: "Unauthorized: Only Cell Managers can distribute pigs to cooperative members." };
+    return {
+      success: false,
+      error: "Unauthorized: Only Cell Managers can submit member payment proofs for Finance approval.",
+    };
   }
 
-  const pigId = String(formData.get("pigId") || "").trim();
+  const actorRole = normalizeRoleValue(actor.role) || actor.role;
   const cooperativeId = String(formData.get("cooperativeId") || "").trim();
   const memberId = String(formData.get("memberId") || "").trim();
   const momoReference = String(formData.get("momoReference") || "").trim();
-  const notes = String(formData.get("notes") || "").trim() || null;
 
-  if (!pigId || !cooperativeId || !memberId) {
-    return { success: false, error: "Pig, Cooperative, and Cooperative Member are required." };
+  if (!cooperativeId || !memberId || !momoReference) {
+    return {
+      success: false,
+      error: "Cooperative, Cooperative Member, and MoMo Payment Reference are required.",
+    };
   }
 
   try {
-    const pig = await prisma.pig.findUnique({ where: { id: pigId } });
-    if (!pig || pig.deletedAt) {
-      return { success: false, error: "Selected pig was not found." };
+    const coop = await prisma.cooperative.findUnique({ where: { id: cooperativeId } });
+    if (!coop) {
+      return { success: false, error: "Selected cooperative was not found." };
+    }
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(actor.id)) {
+      return {
+        success: false,
+        error: "Access denied: You can only submit members from cooperatives you created.",
+      };
     }
 
     const member = await prisma.user.findUnique({ where: { id: memberId } });
-    if (!member || member.deletedAt || member.cooperativeId !== cooperativeId) {
-      return { success: false, error: "Selected member is invalid or does not belong to the cooperative." };
+    const memberNormRole = normalizeRoleValue(member?.role);
+    if (
+      !member ||
+      !member.isActive ||
+      member.deletedAt ||
+      member.cooperativeId !== cooperativeId ||
+      (memberNormRole !== Role.COOPERATIVE_MEMBER && memberNormRole !== Role.COOPERATIVE_LEADER)
+    ) {
+      return {
+        success: false,
+        error: "Selected beneficiary must be an active Cooperative Member or Cooperative Leader in this cooperative.",
+      };
     }
 
-    // Check qualification payment (16,000 RWF + 2,800 RWF tax)
-    let payment = await prisma.cooperativeMemberPayment.findFirst({
+    const existing = await prisma.cooperativeMemberPayment.findFirst({
       where: { memberId },
     });
 
-    if (!payment || payment.status !== "VERIFIED") {
-      if (!momoReference) {
-        return {
-          success: false,
-          error: "Member qualification payment required: Member must pay 16,000 RWF (pig value) + 2,800 RWF tax (18,800 RWF total) to the Finance Officer's MoMo merchant code and provide the MoMo transaction reference.",
-        };
-      }
-      // Register and verify payment instantly
-      payment = await prisma.cooperativeMemberPayment.create({
+    if (existing && existing.status === "VERIFIED" && existing.cooperativeId === cooperativeId) {
+      return {
+        success: false,
+        error: "This member's payment is already verified & approved by Finance Officer. Proceed to Step 2 to distribute a pig.",
+      };
+    }
+
+    let paymentId = "";
+    if (existing) {
+      await prisma.cooperativeMemberPayment.update({
+        where: { id: existing.id },
+        data: {
+          cooperativeId,
+          pigValueFee: new Prisma.Decimal("16000.00"),
+          taxFee: new Prisma.Decimal("2800.00"),
+          totalAmount: new Prisma.Decimal("18800.00"),
+          momoReference,
+          status: "PENDING",
+          verifiedById: null,
+        },
+      });
+      paymentId = existing.id;
+    } else {
+      const created = await prisma.cooperativeMemberPayment.create({
         data: {
           memberId,
           cooperativeId,
@@ -1527,10 +1965,159 @@ export async function distributePigToCooperativeMember(formData: FormData): Prom
           taxFee: new Prisma.Decimal("2800.00"),
           totalAmount: new Prisma.Decimal("18800.00"),
           momoReference,
-          status: "VERIFIED",
-          verifiedById: actor.id,
+          status: "PENDING",
+          verifiedById: null,
         },
       });
+      paymentId = created.id;
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: "SUBMITTED_FOR_APPROVAL",
+        entity: "COOPERATIVE_MEMBER_PAYMENT",
+        entityId: paymentId,
+        newValue: {
+          memberId,
+          memberName: member.name,
+          cooperativeId,
+          cooperativeName: coop.name,
+          submittedById: actor.id,
+          submittedByName: actor.name,
+          pigValueFee: 16000,
+          taxFee: 2800,
+          totalAmount: 18800,
+          momoReference,
+          status: "PENDING",
+        },
+      },
+    });
+
+    // Notify Finance Officers for manual verification
+    try {
+      const financeOfficers = await prisma.user.findMany({
+        where: {
+          role: Role.FINANCE_OFFICER,
+          isActive: true,
+          deletedAt: null,
+        },
+      });
+      for (const fo of financeOfficers) {
+        await prisma.notification.create({
+          data: {
+            userId: String(fo.id),
+            type: NotificationType.APPROVAL,
+            title: `Member Payment Pending Approval: ${member.name}`,
+            message: `Cell Manager ${actor.name} added ${member.name} (${coop.name}) to the awaiting-approval list. Fee: 16,000 + 2,800 = 18,800 RWF. MoMo Ref: ${momoReference}`,
+            relatedEntity: "COOPERATIVE_MEMBER_PAYMENT",
+            relatedEntityId: paymentId,
+          },
+        });
+      }
+    } catch {
+      // Non-blocking notification
+    }
+
+    revalidateAllCooperativePaths();
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: getFriendlyActionError(err, "Failed to submit member payment for approval."),
+    };
+  }
+}
+
+export async function distributePigToCooperativeMember(formData: FormData): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.CELL_MANAGER]);
+  if (!actor) {
+    return {
+      success: false,
+      error: "Unauthorized: Only Cell Managers can distribute pigs to cooperative members.",
+    };
+  }
+
+  const actorRole = normalizeRoleValue(actor.role) || actor.role;
+  const pigId = String(formData.get("pigId") || "").trim();
+  const cooperativeId = String(formData.get("cooperativeId") || "").trim();
+  const memberId = String(formData.get("memberId") || "").trim();
+  const notes = String(formData.get("notes") || "").trim() || null;
+
+  if (!pigId || !cooperativeId || !memberId) {
+    return { success: false, error: "Pig, Cooperative, and Cooperative Member are required." };
+  }
+
+  try {
+    const coop = await prisma.cooperative.findUnique({ where: { id: cooperativeId } });
+    if (!coop) {
+      return { success: false, error: "Selected cooperative was not found." };
+    }
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(actor.id)) {
+      return {
+        success: false,
+        error: "Access denied: Only the Cell Manager who added this cooperative and member can distribute a pig to them.",
+      };
+    }
+
+    const pig = await prisma.pig.findUnique({ where: { id: pigId } });
+    if (!pig || pig.deletedAt) {
+      return { success: false, error: "Selected pig was not found." };
+    }
+
+    const member = await prisma.user.findUnique({ where: { id: memberId } });
+    const memberNormRole = normalizeRoleValue(member?.role);
+    if (
+      !member ||
+      !member.isActive ||
+      member.deletedAt ||
+      member.cooperativeId !== cooperativeId ||
+      (memberNormRole !== Role.COOPERATIVE_MEMBER && memberNormRole !== Role.COOPERATIVE_LEADER)
+    ) {
+      return {
+        success: false,
+        error: "Pig receivers (beneficiaries) must be active Cooperative Members or Cooperative Leaders in this cooperative.",
+      };
+    }
+
+    // Enforce manual Finance Officer approval (no instant verification allowed!)
+    const payment = await prisma.cooperativeMemberPayment.findFirst({
+      where: { memberId },
+    });
+
+    if (!payment || payment.cooperativeId !== cooperativeId) {
+      return {
+        success: false,
+        error:
+          "Member has not been submitted to Finance for payment verification yet. In Step 1, add the member and their 18,800 RWF (16,000 + 2,800 RWF) MoMo reference to the Finance awaiting-approval list first.",
+      };
+    }
+
+    if (payment.status === "PENDING") {
+      return {
+        success: false,
+        error:
+          "Payment is still PENDING Finance Officer verification. The Finance Officer must manually verify and approve this member's MoMo payment before pig handover.",
+      };
+    }
+
+    if (payment.status === "REJECTED") {
+      return {
+        success: false,
+        error:
+          "This member's payment submission was REJECTED by the Finance Officer. Submit a valid MoMo payment reference in Step 1 for manual verification first.",
+      };
+    }
+
+    if (payment.status !== "VERIFIED") {
+      return {
+        success: false,
+        error: `Payment status (${payment.status}) is not approved for pig distribution.`,
+      };
     }
 
     // Check vet clearance
@@ -1538,18 +2125,57 @@ export async function distributePigToCooperativeMember(formData: FormData): Prom
     if (!clearance.cleared) {
       return {
         success: false,
-        error: clearance.reason || "This pig has not passed veterinary health clearance and cannot be distributed.",
+        error:
+          clearance.reason ||
+          "This pig has not passed veterinary health clearance and cannot be distributed.",
       };
     }
 
+    const now = new Date();
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    const dueDate = new Date(now.getTime() + oneYearMs);
+    const coopMemberBeneficiaryNumber = `COOP-${memberId}`;
+
     await prisma.$transaction(async (tx) => {
-      // Update pig ownership
+      // Ensure a linked Beneficiary record exists so PigDistribution, RevolvingCycle, and PigReturn FKs stay valid
+      let beneficiary = await tx.beneficiary.findFirst({
+        where: { beneficiaryNumber: coopMemberBeneficiaryNumber },
+      });
+
+      if (!beneficiary) {
+        beneficiary = await tx.beneficiary.create({
+          data: {
+            beneficiaryNumber: coopMemberBeneficiaryNumber,
+            fullName: member.name,
+            phone: member.phone ?? null,
+            cellStr: coop.cellName,
+            status: BeneficiaryStatus.PIGLET_RECEIVED,
+            registrationDate: now,
+            createdById: actor.id,
+            notes: `Auto-linked Cooperative Member (${coop.name})`,
+          },
+        });
+      } else {
+        await tx.beneficiary.update({
+          where: { id: beneficiary.id },
+          data: {
+            fullName: member.name,
+            phone: member.phone ?? beneficiary.phone,
+            cellStr: coop.cellName,
+            status: BeneficiaryStatus.PIGLET_RECEIVED,
+          },
+        });
+      }
+
+      // Update pig ownership & holder
       await tx.pig.update({
         where: { id: pig.id },
         data: {
           cooperativeId,
           ownerMemberId: memberId,
           ownerMemberName: member.name,
+          currentBeneficiaryId: beneficiary.id,
+          currentLocation: `${coop.name} (${coop.cellName})`,
           status: PigStatus.DISTRIBUTED,
         },
       });
@@ -1558,22 +2184,26 @@ export async function distributePigToCooperativeMember(formData: FormData): Prom
       const distribution = await tx.pigDistribution.create({
         data: {
           pigId: pig.id,
-          beneficiaryId: memberId, // Map cooperative member as beneficiary for audit/distribution records
+          beneficiaryId: beneficiary.id,
           distributedById: actor.id,
-          distributionDate: new Date(),
-          notes: notes || `Distributed by Cell Manager ${actor.name} to Cooperative Member ${member.name}`,
+          distributionDate: now,
+          notes:
+            notes ||
+            `Distributed by Cell Manager ${actor.name} to Cooperative Member ${member.name} (Finance-verified MoMo: ${payment.momoReference})`,
         },
       });
 
       // Create revolving cycle expecting minimum 2 piglets return
-      const cycleNumber = (await tx.revolvingCycle.count({ where: { beneficiaryId: memberId } })) + 1;
+      const cycleNumber =
+        (await tx.revolvingCycle.count({ where: { beneficiaryId: beneficiary.id } })) + 1;
       await tx.revolvingCycle.create({
         data: {
-          beneficiaryId: memberId,
+          beneficiaryId: beneficiary.id,
           cycleNumber,
-          startDate: new Date(),
+          startDate: now,
+          dueDate,
           expectedReturn: 2,
-          notes: `Cooperative revolving return requirement: minimum 2 piglets upon birth. Distribution ID: ${distribution.id}`,
+          notes: `Cooperative revolving return requirement: minimum 2 piglets upon birth. Cooperative: ${coop.name}. Distribution ID: ${distribution.id}`,
         },
       });
 
@@ -1587,17 +2217,35 @@ export async function distributePigToCooperativeMember(formData: FormData): Prom
           newValue: {
             pigTag: pig.tagNumber,
             cooperativeId,
+            cooperativeName: coop.name,
             memberId,
             memberName: member.name,
+            beneficiaryId: beneficiary.id,
             cellManagerName: actor.name,
             paymentVerified: true,
+            momoReference: payment.momoReference,
           },
         },
       });
     });
 
+    // Notify member
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: memberId,
+          type: NotificationType.SUCCESS,
+          title: `Pig Handover Completed (${pig.tagNumber})`,
+          message: `Cell Manager ${actor.name} has distributed vet-cleared pig ${pig.tagNumber} to you in ${coop.name}. Minimum revolving return: 2 piglets.`,
+          relatedEntity: "PIG",
+          relatedEntityId: pig.id,
+        },
+      });
+    } catch {
+      // Non-blocking
+    }
+
     revalidateAllCooperativePaths();
-    revalidatePath("/dashboard/finance");
     return { success: true };
   } catch (err) {
     return {

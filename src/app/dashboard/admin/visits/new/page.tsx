@@ -1,5 +1,5 @@
 import { createFieldVisit } from "@/app/actions/visit";
-import { prisma } from "@/lib/prisma";
+import { getBeneficiaryReturnOptions } from "@/app/actions/returns";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { Role } from "@prisma/client";
@@ -19,15 +19,7 @@ export default async function NewVisitPage() {
     redirect("/dashboard");
   }
 
-  const beneficiaries = await prisma.beneficiary.findMany({
-    orderBy: { fullName: 'asc' },
-    select: {
-      id: true,
-      fullName: true,
-      beneficiaryNumber: true,
-      districtStr: true,
-    },
-  });
+  const beneficiaries = await getBeneficiaryReturnOptions();
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">

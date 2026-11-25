@@ -6,12 +6,15 @@ import { getClearedPigsForSale } from "@/lib/vet-clearance";
 import { CellStockReportClient } from "@/components/field/CellStockReportClient";
 import type { SerializedStockReport } from "@/app/actions/ecommerce";
 
+import { getUserAddressProfile } from "@/lib/user-profile-address";
+
 export const dynamic = "force-dynamic";
 
 export default async function FieldStockReportsPage() {
   const actor = await getActiveUser([Role.CELL_MANAGER, Role.SUPER_ADMIN]);
   if (!actor) redirect("/dashboard");
 
+  const addressProfile = await getUserAddressProfile(actor.id);
   let tableMissing = false;
   let reports: SerializedStockReport[] = [];
   let clearedPigs: Awaited<ReturnType<typeof getClearedPigsForSale>> = [];
@@ -56,6 +59,7 @@ export default async function FieldStockReportsPage() {
       reports={reports}
       clearedPigs={clearedPigs}
       tableMissing={tableMissing}
+      defaultCellName={addressProfile.cellName}
     />
   );
 }

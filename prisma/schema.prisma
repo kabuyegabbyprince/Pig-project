@@ -111,6 +111,13 @@ model User {
   cooperativeId      String?     @map("cooperative_id")
   mustChangePassword Boolean     @default(false) @map("must_change_password")
 
+  // Profile & Cell Manager duty address stored in database
+  districtName       String?     @map("district_name")
+  sectorName         String?     @map("sector_name")
+  cellName           String?     @map("cell_name")
+  villageName        String?     @map("village_name")
+  address            String?
+
   // old geographic fields preserved for backward compat
   accessLevel        AccessLevel @default(ALL)
   assignedDistrictId String?

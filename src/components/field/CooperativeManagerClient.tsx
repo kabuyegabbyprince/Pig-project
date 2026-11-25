@@ -51,7 +51,7 @@ export function CooperativeManagerClient({
   // Create cooperative form
   const [coopName, setCoopName] = useState("");
   const [coopCode, setCoopCode] = useState("");
-  const [cellName, setCellName] = useState("");
+  const [cellName, setCellName] = useState(data.actor.cellName ?? "");
 
   // Add member form
   const [selectedCoopId, setSelectedCoopId] = useState(

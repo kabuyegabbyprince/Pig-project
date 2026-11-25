@@ -1,24 +1,40 @@
 "use client";
 
+import { createContext, useContext, useMemo } from "react";
 import type { Session } from "next-auth";
-import { SessionProvider } from "next-auth/react";
+
+type AuthSessionContextValue = {
+  data: Session | null;
+  status: "authenticated" | "unauthenticated";
+};
+
+const AuthSessionContext = createContext<AuthSessionContextValue>({
+  data: null,
+  status: "unauthenticated",
+});
+
+export function useAuthSession() {
+  return useContext(AuthSessionContext);
+}
 
 export function AuthProvider({
   children,
-  session,
+  session = null,
 }: {
   children: React.ReactNode;
   session?: Session | null;
 }) {
+  const value = useMemo<AuthSessionContextValue>(
+    () => ({
+      data: session ?? null,
+      status: session ? "authenticated" : "unauthenticated",
+    }),
+    [session]
+  );
+
   return (
-    <SessionProvider
-      basePath="/api/auth"
-      session={session}
-      refetchOnWindowFocus={false}
-      refetchWhenOffline={false}
-      refetchInterval={0}
-    >
+    <AuthSessionContext.Provider value={value}>
       {children}
-    </SessionProvider>
+    </AuthSessionContext.Provider>
   );
 }

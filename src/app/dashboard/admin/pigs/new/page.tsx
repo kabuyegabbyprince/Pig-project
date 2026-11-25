@@ -1,17 +1,17 @@
-import { getReceivedPigBatches, getTotalPigsAvailable } from "@/app/actions/pig";
+import { getRegisteredPigs, getTotalPigsAvailable } from "@/app/actions/pig";
 import { PigRegisterManager } from "@/components/pigs/PigRegisterManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminNewPigPage() {
-  const [initialBatches, initialTotalAvailable] = await Promise.all([
-    getReceivedPigBatches(),
+  const [initialPigs, initialTotalAvailable] = await Promise.all([
+    getRegisteredPigs(),
     getTotalPigsAvailable(),
   ]);
 
   return (
     <PigRegisterManager
-      initialBatches={initialBatches}
+      initialPigs={initialPigs}
       initialTotalAvailable={initialTotalAvailable}
       backHref="/dashboard/admin/pigs"
     />

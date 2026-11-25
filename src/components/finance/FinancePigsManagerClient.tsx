@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { PigHealthStatus, PigSex, PigStatus } from "@prisma/client";
 import {
   AlertTriangle,
-  Boxes,
   CheckCircle2,
   Edit3,
   Layers,
@@ -18,11 +17,13 @@ import {
   Trash2,
   Users,
   Wallet,
+  Stethoscope,
+  HeartPulse,
   X,
 } from "lucide-react";
 import {
   financeDeletePig,
-  financeStockInPigBatch,
+  financeStockInPig,
   financeUpdatePig,
 } from "@/app/actions/livestock-finance";
 import {
@@ -31,8 +32,9 @@ import {
   type SerializedFinanceWorkspaceData,
 } from "@/lib/finance-types";
 import { formatRwf } from "@/lib/format-rwf";
+import { MemberPaymentsApprovalCard } from "@/components/finance/MemberPaymentsApprovalCard";
 
-type TabKey = "INVENTORY" | "RECIPIENTS" | "CYCLES";
+type TabKey = "INVENTORY" | "PAYMENTS" | "RECIPIENTS" | "CYCLES" | "VET_CLEARANCE";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -78,97 +80,65 @@ export function FinancePigsManagerClient({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Batch stock-in form state
+  // Individual Pig Stock-In Form State
   const [showCreateForm, setShowCreateForm] = useState(true);
-  const [batchCode, setBatchCode] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [unitPrice, setUnitPrice] = useState(String(DEFAULT_PIG_PRICE_RWF));
   const [tagNumber, setTagNumber] = useState("");
-  const [pigType, setPigType] = useState("Gilt / Breeder");
-  const [daysAge, setDaysAge] = useState("");
-  const [breed, setBreed] = useState("");
-  const [sex, setSex] = useState("");
-  const [currentWeight, setCurrentWeight] = useState("");
   const [healthStatus, setHealthStatus] = useState<string>(PigHealthStatus.HEALTHY);
-  const [source, setSource] = useState("");
-  const [notes, setNotes] = useState("");
+  const [sex, setSex] = useState<string>(PigSex.FEMALE);
+  const [purchasePrice, setPurchasePrice] = useState(String(DEFAULT_PIG_PRICE_RWF));
 
-  // Inventory filters
+  // Inventory Filters
   const [pigSearch, setPigSearch] = useState("");
-  const [batchFilter, setBatchFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [healthFilter, setHealthFilter] = useState("ALL");
 
-  // Edit modal & inline delete state
+  // Edit Modal & Delete State
   const [editingPig, setEditingPig] = useState<SerializedFinancePigStock | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Edit form fields
+  // Edit Form Fields
   const [editTag, setEditTag] = useState("");
-  const [editBatch, setEditBatch] = useState("");
-  const [editPigType, setEditPigType] = useState("");
-  const [editDaysAge, setEditDaysAge] = useState("");
-  const [editBreed, setEditBreed] = useState("");
-  const [editSex, setEditSex] = useState("");
-  const [editWeight, setEditWeight] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editSex, setEditSex] = useState("");
   const [editHealth, setEditHealth] = useState<string>(PigHealthStatus.HEALTHY);
   const [editStatus, setEditStatus] = useState<string>(PigStatus.REGISTERED);
-  const [editSource, setEditSource] = useState("");
-  const [editNotes, setEditNotes] = useState("");
 
-  // Recipients filters
+  // Recipients Filters
   const [recipientSearch, setRecipientSearch] = useState("");
   const [recipientCoopFilter, setRecipientCoopFilter] = useState("ALL");
 
-  // Cycles filters
+  // Cycles Filters
   const [cycleSearch, setCycleSearch] = useState("");
   const [cycleStatusFilter, setCycleStatusFilter] = useState("ALL");
 
-  const parsedQty = Math.max(1, parseInt(quantity || "1", 10) || 1);
-  const parsedUnitPrice = Math.max(0, Number(unitPrice || 0) || 0);
-  const liveBatchInvestment = parsedQty * parsedUnitPrice;
+  const uniqueCoops = useMemo(() => {
+    return Array.from(
+      new Set(data.auditRows.map((r) => r.cooperativeName).filter(Boolean))
+    ) as string[];
+  }, [data.auditRows]);
 
-  const handleBatchSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
     const fd = new FormData();
-    fd.append("batchCode", batchCode);
-    fd.append("quantity", quantity);
-    fd.append("unitPrice", unitPrice);
     fd.append("tagNumber", tagNumber);
-    fd.append("pigType", pigType);
-    fd.append("daysAge", daysAge);
-    fd.append("breed", breed);
-    fd.append("sex", sex);
-    fd.append("currentWeight", currentWeight);
     fd.append("healthStatus", healthStatus);
-    fd.append("source", source);
-    fd.append("notes", notes);
+    fd.append("sex", sex);
+    fd.append("purchasePrice", purchasePrice);
 
     startTransition(async () => {
-      const res = await financeStockInPigBatch(fd);
+      const res = await financeStockInPig(fd);
       if (!res.success) {
-        setError(res.error || "Could not stock in pig batch.");
+        setError(res.error || "Could not register individual pig.");
         return;
       }
-      setSuccess(
-        `Registered Batch ${res.batchCode} (${res.count} pig(s)) — Investment recorded: ${formatRwf(
-          res.totalInvestment ?? 0
-        )}.`
-      );
-      setBatchCode("");
-      setQuantity("1");
-      setUnitPrice(String(DEFAULT_PIG_PRICE_RWF));
+      setSuccess(`Registered individual pig successfully.`);
       setTagNumber("");
-      setDaysAge("");
-      setBreed("");
-      setSex("");
-      setCurrentWeight("");
-      setSource("");
-      setNotes("");
+      setHealthStatus(PigHealthStatus.HEALTHY);
+      setSex(PigSex.FEMALE);
+      setPurchasePrice(String(DEFAULT_PIG_PRICE_RWF));
       router.refresh();
     });
   };
@@ -178,17 +148,10 @@ export function FinancePigsManagerClient({
     setSuccess("");
     setEditingPig(pig);
     setEditTag(pig.tagNumber);
-    setEditBatch(pig.batchCode ?? "");
-    setEditPigType(pig.pigType ?? "");
-    setEditDaysAge(pig.daysAge !== null ? String(pig.daysAge) : "");
-    setEditBreed(pig.breed ?? "");
-    setEditSex(pig.sex ?? "");
-    setEditWeight(pig.currentWeight !== null ? String(pig.currentWeight) : "");
     setEditPrice(pig.purchasePrice ?? String(DEFAULT_PIG_PRICE_RWF));
+    setEditSex(pig.sex ?? "");
     setEditHealth(pig.healthStatus);
     setEditStatus(pig.status);
-    setEditSource(pig.source ?? "");
-    setEditNotes(pig.notes ?? "");
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -200,17 +163,10 @@ export function FinancePigsManagerClient({
     const fd = new FormData();
     fd.append("id", editingPig.id);
     fd.append("tagNumber", editTag);
-    fd.append("batchCode", editBatch);
-    fd.append("pigType", editPigType);
-    fd.append("daysAge", editDaysAge);
-    fd.append("breed", editBreed);
-    fd.append("sex", editSex);
-    fd.append("currentWeight", editWeight);
     fd.append("purchasePrice", editPrice);
+    fd.append("sex", editSex);
     fd.append("healthStatus", editHealth);
     fd.append("status", editStatus);
-    fd.append("source", editSource);
-    fd.append("notes", editNotes);
 
     startTransition(async () => {
       const res = await financeUpdatePig(fd);
@@ -243,32 +199,16 @@ export function FinancePigsManagerClient({
   const filteredPigs = useMemo(() => {
     const q = pigSearch.trim().toLowerCase();
     return data.stockedPigs.filter((p) => {
-      if (batchFilter !== "ALL") {
-        if (batchFilter === "UNBATCHED") {
-          if (p.batchCode) return false;
-        } else if (p.batchCode !== batchFilter) {
-          return false;
-        }
-      }
       if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
       if (healthFilter !== "ALL" && p.healthStatus !== healthFilter) return false;
       if (!q) return true;
       return (
         p.tagNumber.toLowerCase().includes(q) ||
-        (p.batchCode && p.batchCode.toLowerCase().includes(q)) ||
-        (p.pigType && p.pigType.toLowerCase().includes(q)) ||
-        (p.breed && p.breed.toLowerCase().includes(q)) ||
         (p.beneficiaryName && p.beneficiaryName.toLowerCase().includes(q)) ||
-        (p.source && p.source.toLowerCase().includes(q))
+        (p.cooperativeName && p.cooperativeName.toLowerCase().includes(q))
       );
     });
-  }, [data.stockedPigs, pigSearch, batchFilter, statusFilter, healthFilter]);
-
-  const uniqueCoops = useMemo(() => {
-    return Array.from(
-      new Set(data.auditRows.map((r) => r.cooperativeName).filter(Boolean))
-    ) as string[];
-  }, [data.auditRows]);
+  }, [data.stockedPigs, pigSearch, statusFilter, healthFilter]);
 
   const filteredRecipients = useMemo(() => {
     const q = recipientSearch.trim().toLowerCase();
@@ -281,7 +221,6 @@ export function FinancePigsManagerClient({
         row.memberName.toLowerCase().includes(q) ||
         (row.memberPhone && row.memberPhone.toLowerCase().includes(q)) ||
         row.pigTag.toLowerCase().includes(q) ||
-        (row.batchCode && row.batchCode.toLowerCase().includes(q)) ||
         (row.cellManagerName && row.cellManagerName.toLowerCase().includes(q)) ||
         (row.cooperativeName && row.cooperativeName.toLowerCase().includes(q))
       );
@@ -296,7 +235,6 @@ export function FinancePigsManagerClient({
       return (
         c.beneficiaryName.toLowerCase().includes(q) ||
         (c.pigTag && c.pigTag.toLowerCase().includes(q)) ||
-        (c.batchCode && c.batchCode.toLowerCase().includes(q)) ||
         (c.cooperativeName && c.cooperativeName.toLowerCase().includes(q))
       );
     });
@@ -340,22 +278,14 @@ export function FinancePigsManagerClient({
         </div>
       )}
 
-      {/* KPI Strip (Pure Live DB Data) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* KPI Strip */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-slate-500">Total Pigs in Stock</p>
             <PiggyBank className="h-4 w-4 text-[#FF8A00]" />
           </div>
           <p className="mt-2 text-2xl font-bold text-[#101827]">{data.totalPigsCount}</p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Collection Batches</p>
-            <Boxes className="h-4 w-4 text-[#FF8A00]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-[#101827]">{data.totalBatchesCount}</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -397,7 +327,20 @@ export function FinancePigsManagerClient({
           }`}
         >
           <Layers className="h-4 w-4 text-[#FF8A00]" />
-          Batches &amp; Pig CRUD ({data.stockedPigs.length})
+          Pig Inventory &amp; Register ({data.stockedPigs.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("PAYMENTS")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            activeTab === "PAYMENTS"
+              ? "bg-[#101827] text-white"
+              : "bg-white border border-slate-200 text-slate-700 hover:border-[#FF8A00]"
+          }`}
+        >
+          <ShieldCheck className="h-4 w-4 text-[#FF8A00]" />
+          Member Payment Approvals ({data.memberPayments.filter((p) => p.status === "PENDING").length} pending)
         </button>
 
         <button
@@ -425,12 +368,30 @@ export function FinancePigsManagerClient({
           <RefreshCw className="h-4 w-4 text-[#FF8A00]" />
           Full Pig Cycles ({data.pigCycles.length})
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("VET_CLEARANCE")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            activeTab === "VET_CLEARANCE"
+              ? "bg-[#101827] text-white"
+              : "bg-white border border-slate-200 text-slate-700 hover:border-[#FF8A00]"
+          }`}
+        >
+          <Stethoscope className="h-4 w-4 text-[#FF8A00]" />
+          Vet Inspection &amp; Clearance ({data.stockedPigs.filter((p) => p.healthStatus === "HEALTHY").length} Cleared)
+        </button>
       </div>
 
-      {/* TAB 1: BATCHES & PIG CRUD */}
+      {/* TAB: MEMBER PAYMENT APPROVALS */}
+      {activeTab === "PAYMENTS" && (
+        <MemberPaymentsApprovalCard memberPayments={data.memberPayments} />
+      )}
+
+      {/* TAB 1: PIG INVENTORY & REGISTER */}
       {activeTab === "INVENTORY" && (
         <div className="space-y-6">
-          {/* Batch Collection Stock-In Form */}
+          {/* Register Individual Pig Form */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
               <div className="flex items-center gap-2.5">
@@ -439,10 +400,10 @@ export function FinancePigsManagerClient({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-[#101827]">
-                    Stock In Pig Collection Batch (Finance Intake)
+                    Register Individual Pig (Finance Intake)
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Identify a batch collection, set price per pig (defaults to 80,000 RWF), and automatically post total investment as an approved Pig Purchase expense.
+                    Add individual pigs with tag number, health status, sex, and price (auto-fills to 80,000 RWF).
                   </p>
                 </div>
               </div>
@@ -451,67 +412,16 @@ export function FinancePigsManagerClient({
                 onClick={() => setShowCreateForm((v) => !v)}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#101827] hover:border-[#FF8A00] cursor-pointer"
               >
-                {showCreateForm ? "Collapse Form" : "New Batch Stock-In"}
+                {showCreateForm ? "Collapse Form" : "New Pig Intake"}
               </button>
             </div>
 
             {showCreateForm && (
-              <form onSubmit={handleBatchSubmit} className="p-6 space-y-5">
+              <form onSubmit={handleCreateSubmit} className="p-6 space-y-5">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Batch / Collection Code
-                    </label>
-                    <input
-                      value={batchCode}
-                      onChange={(e) => setBatchCode(e.target.value)}
-                      placeholder="Auto: BATCH-2026-..."
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Quantity (Pigs) *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      required
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Price per Pig (RWF) *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      required
-                      value={unitPrice}
-                      onChange={(e) => setUnitPrice(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="rounded-xl border border-orange-200 bg-orange-50/60 px-4 py-2.5 flex flex-col justify-center">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                      Total Batch Investment
-                    </span>
-                    <span className="text-lg font-extrabold text-[#101827]">
-                      {formatRwf(liveBatchInvestment)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      {parsedQty > 1 ? "Tag Prefix (Optional)" : "Pig Tag ID (Optional)"}
+                      Pig Tag ID (Optional)
                     </label>
                     <input
                       value={tagNumber}
@@ -523,34 +433,7 @@ export function FinancePigsManagerClient({
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Pig Type *
-                    </label>
-                    <input
-                      required
-                      value={pigType}
-                      onChange={(e) => setPigType(e.target.value)}
-                      placeholder="e.g. Gilt / Breeder / Weaner"
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Age (Days)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={daysAge}
-                      onChange={(e) => setDaysAge(e.target.value)}
-                      placeholder="Enter age in days"
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Initial Health Status *
+                      Health Status *
                     </label>
                     <select
                       value={healthStatus}
@@ -560,31 +443,19 @@ export function FinancePigsManagerClient({
                       <option value={PigHealthStatus.HEALTHY}>Healthy</option>
                       <option value={PigHealthStatus.SICK}>Sick / Needs Vet</option>
                       <option value={PigHealthStatus.UNDER_TREATMENT}>Under Treatment</option>
+                      <option value={PigHealthStatus.RECOVERED}>Recovered</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Breed
-                    </label>
-                    <input
-                      value={breed}
-                      onChange={(e) => setBreed(e.target.value)}
-                      placeholder="e.g. Landrace / Large White"
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Sex
+                      Sex *
                     </label>
                     <select
                       value={sex}
                       onChange={(e) => setSex(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-[#101827]"
                     >
-                      <option value="">Unspecified</option>
                       <option value={PigSex.FEMALE}>Female</option>
                       <option value={PigSex.MALE}>Male</option>
                     </select>
@@ -592,40 +463,16 @@ export function FinancePigsManagerClient({
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Weight (kg)
+                      Price (RWF) *
                     </label>
                     <input
                       type="number"
                       min="0"
-                      step="0.1"
-                      value={currentWeight}
-                      onChange={(e) => setCurrentWeight(e.target.value)}
-                      placeholder="kg"
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Collection Source / Supplier
-                    </label>
-                    <input
-                      value={source}
-                      onChange={(e) => setSource(e.target.value)}
-                      placeholder="Supplier farm or cooperative"
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2 lg:col-span-4">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Notes
-                    </label>
-                    <input
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Additional purchase or veterinary intake notes..."
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                      step="100"
+                      required
+                      value={purchasePrice}
+                      onChange={(e) => setPurchasePrice(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-[#101827] focus:border-[#FF8A00] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -641,86 +488,22 @@ export function FinancePigsManagerClient({
                     ) : (
                       <PiggyBank className="h-4 w-4" />
                     )}
-                    <span>
-                      Stock In {parsedQty > 1 ? `${parsedQty} Pigs` : "Pig"} &amp; Record Investment
-                    </span>
+                    <span>Register Pig &amp; Record Investment</span>
                   </button>
                 </div>
               </form>
             )}
           </div>
 
-          {/* Collection Batches Overview */}
-          {data.batches.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-[#101827]">
-                    Collection Batches ({data.batches.length})
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Click a batch to filter the pig inventory table below.
-                  </p>
-                </div>
-                {batchFilter !== "ALL" && (
-                  <button
-                    type="button"
-                    onClick={() => setBatchFilter("ALL")}
-                    className="text-xs font-semibold text-[#FF8A00] hover:underline cursor-pointer"
-                  >
-                    Show All Batches
-                  </button>
-                )}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {data.batches.map((b) => {
-                  const selected = batchFilter === b.batchCode;
-                  return (
-                    <button
-                      key={b.batchCode}
-                      type="button"
-                      onClick={() => setBatchFilter(selected ? "ALL" : b.batchCode)}
-                      className={`text-left rounded-xl border p-4 transition cursor-pointer ${
-                        selected
-                          ? "border-[#FF8A00] bg-orange-50/60"
-                          : "border-slate-200 bg-slate-50/70 hover:border-[#FF8A00]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs font-bold text-[#101827]">
-                          {b.batchCode}
-                        </span>
-                        <span className="rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-[#101827]">
-                          {b.pigCount} pig(s)
-                        </span>
-                      </div>
-                      <p className="mt-2 text-base font-extrabold text-[#FF8A00]">
-                        {formatRwf(b.totalInvestment)}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-slate-500">
-                        Avg {formatRwf(b.unitPriceAvg)} / pig ·{" "}
-                        {b.availableCount} available · {b.distributedCount} distributed
-                      </p>
-                      {b.source && (
-                        <p className="mt-1 truncate text-[11px] text-slate-600">{b.source}</p>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Full Pig Inventory CRUD Table */}
+          {/* Full Pig Inventory Table */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
             <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-base font-bold text-[#101827]">
-                  Pig Inventory Registry ({filteredPigs.length})
+                  Pig Registry ({filteredPigs.length})
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Full CRUD management across all stocked pigs, investment prices, vet status, and distribution state.
+                  Manage individual pigs, health statuses, sex, and prices.
                 </p>
               </div>
 
@@ -730,24 +513,10 @@ export function FinancePigsManagerClient({
                   <input
                     value={pigSearch}
                     onChange={(e) => setPigSearch(e.target.value)}
-                    placeholder="Search tag, batch, recipient..."
+                    placeholder="Search tag or recipient..."
                     className="rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs text-[#101827] w-48 focus:border-[#FF8A00] focus:outline-none"
                   />
                 </div>
-
-                <select
-                  value={batchFilter}
-                  onChange={(e) => setBatchFilter(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-[#101827]"
-                >
-                  <option value="ALL">All Batches</option>
-                  <option value="UNBATCHED">No Batch Code</option>
-                  {data.batches.map((b) => (
-                    <option key={b.batchCode} value={b.batchCode}>
-                      {b.batchCode}
-                    </option>
-                  ))}
-                </select>
 
                 <select
                   value={statusFilter}
@@ -781,11 +550,11 @@ export function FinancePigsManagerClient({
               <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
                 <thead className="bg-slate-50/70 uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-4 py-3">Tag &amp; Batch</th>
-                    <th className="px-4 py-3">Details (Type / Age / Wt)</th>
-                    <th className="px-4 py-3">Investment (RWF)</th>
-                    <th className="px-4 py-3">Health &amp; Vet Notes</th>
-                    <th className="px-4 py-3">Status &amp; Holder</th>
+                    <th className="px-4 py-3">Pig Tag</th>
+                    <th className="px-4 py-3">Health Status</th>
+                    <th className="px-4 py-3">Sex</th>
+                    <th className="px-4 py-3">Price (RWF)</th>
+                    <th className="px-4 py-3">Lifecycle &amp; Holder</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -799,24 +568,8 @@ export function FinancePigsManagerClient({
                   ) : (
                     filteredPigs.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-3">
-                          <p className="font-mono font-bold text-[#101827]">{p.tagNumber}</p>
-                          <p className="text-[11px] font-mono text-slate-500">
-                            {p.batchCode ? `Batch: ${p.batchCode}` : "No batch"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold">
-                            {p.pigType || p.breed || "—"}
-                            {p.sex ? ` · ${p.sex}` : ""}
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            {p.daysAge !== null ? `${p.daysAge} days` : "Age —"} ·{" "}
-                            {p.currentWeight !== null ? `${p.currentWeight} kg` : "Wt —"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 font-bold text-[#101827]">
-                          {p.purchasePrice !== null ? formatRwf(p.purchasePrice) : "—"}
+                        <td className="px-4 py-3 font-mono font-bold text-[#101827]">
+                          {p.tagNumber}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -826,11 +579,12 @@ export function FinancePigsManagerClient({
                           >
                             {p.healthStatus}
                           </span>
-                          {p.latestVetExamSummary && (
-                            <p className="mt-1 max-w-xs truncate text-[11px] text-slate-500">
-                              {p.latestVetExamSummary}
-                            </p>
-                          )}
+                        </td>
+                        <td className="px-4 py-3 font-semibold">
+                          {p.sex ? String(p.sex) : "—"}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-[#101827]">
+                          {p.purchasePrice !== null ? formatRwf(p.purchasePrice) : "—"}
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-[#101827]">
@@ -892,13 +646,13 @@ export function FinancePigsManagerClient({
         </div>
       )}
 
-      {/* TAB 2: PEOPLE GIVEN PIGS */}
+      {/* TAB 3: RECIPIENTS (AUDIT) */}
       {activeTab === "RECIPIENTS" && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-bold text-[#101827]">
-                People Given Pigs &amp; Qualification Payments ({filteredRecipients.length})
+                People Given Pigs — Audit Trail ({filteredRecipients.length})
               </h2>
               <p className="text-xs text-slate-500">
                 Complete audit of every beneficiary and cooperative member assigned a pig, Cell Manager sign-off, and MoMo qualification record.
@@ -911,23 +665,25 @@ export function FinancePigsManagerClient({
                 <input
                   value={recipientSearch}
                   onChange={(e) => setRecipientSearch(e.target.value)}
-                  placeholder="Search recipient, phone, tag..."
-                  className="rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs text-[#101827] w-56 focus:border-[#FF8A00] focus:outline-none"
+                  placeholder="Search recipient, tag..."
+                  className="rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs text-[#101827] w-48 focus:border-[#FF8A00] focus:outline-none"
                 />
               </div>
 
-              <select
-                value={recipientCoopFilter}
-                onChange={(e) => setRecipientCoopFilter(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-[#101827]"
-              >
-                <option value="ALL">All Cooperatives / Programs</option>
-                {uniqueCoops.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              {uniqueCoops.length > 0 && (
+                <select
+                  value={recipientCoopFilter}
+                  onChange={(e) => setRecipientCoopFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-[#101827]"
+                >
+                  <option value="ALL">All Cooperatives</option>
+                  {uniqueCoops.map((cName) => (
+                    <option key={cName} value={cName}>
+                      {cName}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -935,19 +691,19 @@ export function FinancePigsManagerClient({
             <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
               <thead className="bg-slate-50/70 uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Recipient</th>
-                  <th className="px-4 py-3">Cooperative / Program</th>
+                  <th className="px-4 py-3">Recipient &amp; Phone</th>
+                  <th className="px-4 py-3">Cooperative</th>
+                  <th className="px-4 py-3">Pig Tag</th>
                   <th className="px-4 py-3">Cell Manager (Signed)</th>
-                  <th className="px-4 py-3">Pig Tag, Batch &amp; Value</th>
-                  <th className="px-4 py-3">Qualification Payment</th>
-                  <th className="px-4 py-3">Distribution Date</th>
+                  <th className="px-4 py-3">MoMo Payment (18.8k RWF)</th>
+                  <th className="px-4 py-3">Handover Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white text-[#101827]">
                 {filteredRecipients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
-                      No pig recipient records found.
+                      No distribution audit records found matching your filters.
                     </td>
                   </tr>
                 ) : (
@@ -959,37 +715,36 @@ export function FinancePigsManagerClient({
                           {row.memberPhone || "No phone"} · {row.memberRoleOrType}
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">
-                        {row.cooperativeName || "—"}
+                      <td className="px-4 py-3 font-medium">
+                        {row.cooperativeName || "Independent"}
                       </td>
-                      <td className="px-4 py-3 font-medium text-[#101827]">
+                      <td className="px-4 py-3 font-mono font-bold text-[#FF8A00]">
+                        {row.pigTag}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-700">
                         {row.cellManagerName || "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-mono font-bold text-[#101827]">{row.pigTag}</p>
-                        <p className="text-[11px] text-slate-500">
-                          {row.batchCode ? `${row.batchCode} · ` : ""}
-                          {row.pigValueRwf ? formatRwf(row.pigValueRwf) : "Value —"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.paymentVerified && row.momoReference ? (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                            <ShieldCheck className="h-3 w-3" />
-                            {row.paymentAmount ? formatRwf(row.paymentAmount) : "Verified"} · MoMo:{" "}
-                            {row.momoReference}
-                          </span>
+                        {row.paymentVerified ? (
+                          <div className="inline-flex flex-col">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Verified ({formatRwf(row.paymentAmount ?? "18800")})
+                            </span>
+                            {row.momoReference && (
+                              <span className="mt-0.5 text-[10px] font-mono text-slate-500">
+                                MoMo: {row.momoReference}
+                              </span>
+                            )}
+                          </div>
                         ) : (
-                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                            Not Recorded
+                          <span className="inline-flex rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                            Pending / Unverified
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-slate-500">
-                        <p>{formatDate(row.distributionDate)}</p>
-                        {row.notes && (
-                          <p className="max-w-xs truncate text-[11px] text-slate-400">{row.notes}</p>
-                        )}
+                        {formatDate(row.distributionDate)}
                       </td>
                     </tr>
                   ))
@@ -1000,16 +755,16 @@ export function FinancePigsManagerClient({
         </div>
       )}
 
-      {/* TAB 3: FULL PIG CYCLES */}
+      {/* TAB 4: PIG CYCLES */}
       {activeTab === "CYCLES" && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-bold text-[#101827]">
-                Full Pig Revolving Cycles ({filteredCycles.length})
+                Revolving Pig Cycles ({filteredCycles.length})
               </h2>
               <p className="text-xs text-slate-500">
-                Track every pig from Finance intake through distribution, expected piglet returns (pass-on cycle), due dates, and completion status.
+                Track 1-year revolving livestock cycles, offspring returns, and compliance deadlines.
               </p>
             </div>
 
@@ -1019,22 +774,20 @@ export function FinancePigsManagerClient({
                 <input
                   value={cycleSearch}
                   onChange={(e) => setCycleSearch(e.target.value)}
-                  placeholder="Search recipient, tag, batch..."
-                  className="rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs text-[#101827] w-52 focus:border-[#FF8A00] focus:outline-none"
+                  placeholder="Search recipient, tag..."
+                  className="rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs text-[#101827] w-48 focus:border-[#FF8A00] focus:outline-none"
                 />
               </div>
 
               <select
                 value={cycleStatusFilter}
                 onChange={(e) => setCycleStatusFilter(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-[#101827]"
+                className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-[#101827]"
               >
                 <option value="ALL">All Cycle Statuses</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="PARTIALLY_COMPLETED">PARTIALLY_COMPLETED</option>
-                <option value="COMPLETED">COMPLETED</option>
-                <option value="OVERDUE">OVERDUE</option>
-                <option value="CANCELLED">CANCELLED</option>
+                <option value="ACTIVE">Active</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="OVERDUE">Overdue</option>
               </select>
             </div>
           </div>
@@ -1043,83 +796,153 @@ export function FinancePigsManagerClient({
             <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
               <thead className="bg-slate-50/70 uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Recipient &amp; Cooperative</th>
-                  <th className="px-4 py-3">Pig Tag, Batch &amp; Value</th>
-                  <th className="px-4 py-3">Cycle</th>
-                  <th className="px-4 py-3">Piglet Return Progress</th>
-                  <th className="px-4 py-3">Start &amp; Due Date</th>
-                  <th className="px-4 py-3">Cycle Status</th>
+                  <th className="px-4 py-3">Recipient &amp; Coop</th>
+                  <th className="px-4 py-3">Pig Tag</th>
+                  <th className="px-4 py-3">Cycle &amp; Dates</th>
+                  <th className="px-4 py-3">Returns Progress</th>
+                  <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white text-[#101827]">
                 {filteredCycles.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
-                      No revolving pig cycles recorded yet.
+                    <td colSpan={5} className="px-5 py-10 text-center text-slate-500">
+                      No revolving cycles found matching your filters.
                     </td>
                   </tr>
                 ) : (
-                  filteredCycles.map((c) => {
-                    const pct =
-                      c.expectedReturn > 0
-                        ? Math.min(100, Math.round((c.returnedCount / c.expectedReturn) * 100))
-                        : 0;
-                    return (
-                      <tr key={c.id} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-[#101827]">{c.beneficiaryName}</p>
-                          <p className="text-[11px] text-slate-500">
-                            {c.cooperativeName || c.beneficiaryPhone || "—"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-mono font-bold text-[#101827]">
-                            {c.pigTag || "—"}
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            {c.batchCode ? `${c.batchCode} · ` : ""}
-                            {c.pigValueRwf ? formatRwf(c.pigValueRwf) : "Value —"}
-                            {c.pigHealthStatus ? ` · ${c.pigHealthStatus}` : ""}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-[#101827]">
-                          Cycle #{c.cycleNumber}
-                        </td>
-                        <td className="px-4 py-3 min-w-[160px]">
-                          <div className="flex items-center justify-between text-[11px] font-semibold mb-1">
-                            <span>
-                              {c.returnedCount} / {c.expectedReturn} piglets
-                            </span>
-                            <span className="text-slate-500">{pct}%</span>
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-[#FF8A00]"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          <p>Start: {formatDate(c.startDate)}</p>
-                          <p className={c.isPastDue ? "font-semibold text-rose-600" : "text-slate-500"}>
-                            Due: {formatDate(c.dueDate)}
-                            {c.isPastDue ? " (Past Due)" : ""}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-bold ${getCycleBadge(
-                              c.status,
-                              c.isPastDue
-                            )}`}
-                          >
-                            {c.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
+                  filteredCycles.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-[#101827]">{c.beneficiaryName}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {c.cooperativeName || "Independent"} {c.beneficiaryPhone ? `· ${c.beneficiaryPhone}` : ""}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 font-mono font-bold text-[#FF8A00]">
+                        {c.pigTag || "Unlinked"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold">Cycle #{c.cycleNumber}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Start: {formatDate(c.startDate)} · Due: {formatDate(c.dueDate)}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-[#101827]">
+                          {c.returnedCount} / {c.expectedReturn} Returned
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold ${getCycleBadge(
+                            c.status,
+                            c.isPastDue
+                          )}`}
+                        >
+                          {c.isPastDue && c.status !== "COMPLETED" ? "OVERDUE" : c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
                 )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: VETERINARY CLEARANCE & HEALTH STATUS */}
+      {activeTab === "VET_CLEARANCE" && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[#101827]">
+                Veterinary Clearance &amp; Health Registry ({data.stockedPigs.length})
+              </h2>
+              <p className="text-xs text-slate-500">
+                Official clinical clearance status from the Veterinarian. Only vet-cleared healthy pigs are eligible for Cell Manager handover.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {data.stockedPigs.filter((p) => p.healthStatus === "HEALTHY").length} Cleared
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-bold text-rose-800">
+                <HeartPulse className="h-3.5 w-3.5" />
+                {data.stockedPigs.filter((p) => p.healthStatus !== "HEALTHY").length} Bad Status / In Treatment
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+              <thead className="bg-slate-50 uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Pig Tag Number</th>
+                  <th className="px-4 py-3">Clinical Health Status</th>
+                  <th className="px-4 py-3">Latest Vet Findings &amp; Meds</th>
+                  <th className="px-4 py-3">Exam Date</th>
+                  <th className="px-4 py-3">Handover Clearance</th>
+                  <th className="px-4 py-3">Current Holder / Coop</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white text-[#101827]">
+                {data.stockedPigs.map((p) => {
+                  const isHealthy = p.healthStatus === "HEALTHY";
+                  const isAvailable = p.status === "REGISTERED" || p.status === "ACTIVE";
+                  const canHandover = isHealthy && isAvailable && !p.beneficiaryId;
+
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3 font-mono font-bold text-[#101827]">
+                        {p.tagNumber}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold ${getHealthBadge(
+                            p.healthStatus
+                          )}`}
+                        >
+                          {p.healthStatus}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 max-w-xs text-slate-700">
+                        {p.latestVetExamSummary || "Routine intake check"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {formatDate(p.latestVetExamDate ?? p.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {canHandover ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Cleared for Handover
+                          </span>
+                        ) : !isHealthy ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-bold text-rose-800">
+                            <HeartPulse className="h-3 w-3" />
+                            Blocked (Bad Status)
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                            Already Distributed
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {p.beneficiaryName ? (
+                          <span>
+                            {p.beneficiaryName} {p.cooperativeName ? `(${p.cooperativeName})` : ""}
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-emerald-700">In Reserve Stock</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1129,14 +952,14 @@ export function FinancePigsManagerClient({
       {/* Edit Pig Modal */}
       {editingPig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101827]/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
               <div>
                 <h3 className="text-base font-bold text-[#101827]">
                   Edit Pig Record · {editingPig.tagNumber}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Update tag, batch collection, price (RWF), age, health status, or lifecycle state.
+                  Update tag, price (RWF), sex, health status, or lifecycle state.
                 </p>
               </div>
               <button
@@ -1148,7 +971,7 @@ export function FinancePigsManagerClient({
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 overflow-y-auto">
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
@@ -1164,18 +987,7 @@ export function FinancePigsManagerClient({
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Batch / Collection Code
-                  </label>
-                  <input
-                    value={editBatch}
-                    onChange={(e) => setEditBatch(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-mono text-[#101827]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Unit Price / Value (RWF)
+                    Price / Value (RWF)
                   </label>
                   <input
                     type="number"
@@ -1184,55 +996,6 @@ export function FinancePigsManagerClient({
                     value={editPrice}
                     onChange={(e) => setEditPrice(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-bold text-[#101827]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Pig Type
-                  </label>
-                  <input
-                    value={editPigType}
-                    onChange={(e) => setEditPigType(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-[#101827]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Age (Days)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editDaysAge}
-                    onChange={(e) => setEditDaysAge(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-[#101827]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Weight (kg)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={editWeight}
-                    onChange={(e) => setEditWeight(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-[#101827]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Breed
-                  </label>
-                  <input
-                    value={editBreed}
-                    onChange={(e) => setEditBreed(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-[#101827]"
                   />
                 </div>
 
@@ -1268,7 +1031,7 @@ export function FinancePigsManagerClient({
                   </select>
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
                     Lifecycle Status
                   </label>
@@ -1283,28 +1046,6 @@ export function FinancePigsManagerClient({
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Source / Supplier
-                  </label>
-                  <input
-                    value={editSource}
-                    onChange={(e) => setEditSource(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-[#101827]"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Notes
-                  </label>
-                  <input
-                    value={editNotes}
-                    onChange={(e) => setEditNotes(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-[#101827]"
-                  />
                 </div>
               </div>
 
