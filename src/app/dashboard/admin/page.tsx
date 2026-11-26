@@ -352,7 +352,6 @@ export default async function AdminDashboardOverview() {
             <Link
               key={item.label}
               href={item.href}
-              prefetch={false}
               className="flex items-center justify-between rounded-xl border border-slate-200/70 bg-slate-50/70 px-3.5 py-2.5 hover:border-[#FF8A00]/50 hover:bg-orange-50/40 transition"
             >
               <span className="text-xs font-medium text-slate-700">{item.label}</span>
@@ -381,7 +380,6 @@ export default async function AdminDashboardOverview() {
             <Link
               key={title}
               href={href}
-              prefetch={false}
               className="group flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs hover:border-[#FF8A00] hover:shadow-sm transition-all"
             >
               <div>

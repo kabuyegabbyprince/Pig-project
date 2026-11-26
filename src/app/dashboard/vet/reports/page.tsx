@@ -3,10 +3,22 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { format } from "date-fns";
-import { FileText, ArrowLeft, Stethoscope, HeartPulse, CheckCircle2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { FileText, ArrowLeft, Calendar, CheckCircle2, HeartPulse, Plus } from "lucide-react";
+import { getVeterinaryDateSummaries } from "@/app/actions/veterinary";
 
 export const dynamic = "force-dynamic";
+
+function formatReportDate(dateStr: string) {
+  try {
+    const clean = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr;
+    const parsed = parseISO(clean);
+    if (Number.isNaN(parsed.getTime())) return dateStr;
+    return format(parsed, "MMM d, yyyy");
+  } catch {
+    return dateStr;
+  }
+}
 
 export default async function VetReportsPage() {
   const session = await getServerSession(authOptions);
@@ -14,24 +26,32 @@ export default async function VetReportsPage() {
     redirect("/dashboard");
   }
 
-  const [
-    totalExams,
-    healthyCount,
-    sickCount,
-    allRecords,
-  ] = await Promise.all([
-    prisma.veterinaryRecord.count(),
-    prisma.pig.count({ where: { healthStatus: "HEALTHY", deletedAt: null } }),
-    prisma.pig.count({ where: { healthStatus: { in: ["SICK", "UNDER_TREATMENT", "CRITICAL"] }, deletedAt: null } }),
-    prisma.veterinaryRecord.findMany({
-      orderBy: { date: "desc" },
-      take: 50,
-      include: {
-        pig: { select: { tagNumber: true, breed: true } },
-        veterinarian: { select: { name: true } },
-      },
-    }),
-  ]);
+  let totalExams = 0;
+  let healthyCount = 0;
+  let badStatusCount = 0;
+  let dateSummaries: Awaited<ReturnType<typeof getVeterinaryDateSummaries>>["summary"] = [];
+  let totalPigsAvailable = 0;
+
+  try {
+    const [examsCount, healthy, badStatus, dateSummaryResult] = await Promise.all([
+      prisma.veterinaryRecord.count(),
+      prisma.pig.count({
+        where: { healthStatus: { in: ["HEALTHY", "RECOVERED"] }, deletedAt: null },
+      }),
+      prisma.pig.count({
+        where: { healthStatus: { in: ["SICK", "UNDER_TREATMENT", "CRITICAL"] }, deletedAt: null },
+      }),
+      getVeterinaryDateSummaries(),
+    ]);
+
+    totalExams = examsCount;
+    healthyCount = healthy;
+    badStatusCount = badStatus;
+    dateSummaries = dateSummaryResult.summary;
+    totalPigsAvailable = dateSummaryResult.totalPigsAvailable;
+  } catch (err) {
+    console.error("Failed to load VetReportsPage:", err);
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -39,98 +59,157 @@ export default async function VetReportsPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/vet"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfe7df] bg-white text-[#5d6e64] hover:bg-[#f3f5f1] transition"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold font-serif text-[#1b2d24]">Veterinary Health Reports</h1>
-            <p className="text-xs text-[#5d6e64]">
-              Aggregated clinical overview generated automatically from verified animal examinations.
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#101827]">
+              Veterinary Reports (All Tested by Date)
+            </h1>
+            <p className="text-xs text-slate-500">
+              Summary of all examined pigs grouped by examination date, health outcomes, and medications prescribed.
             </p>
           </div>
         </div>
+
+        <Link
+          href="/dashboard/vet/veterinary/new"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#FF8A00] px-4 py-2.5 text-xs font-bold text-[#101827] hover:bg-[#e57c00] shadow-xs transition"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Log Examination</span>
+        </Link>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-3">
-        <div className="rounded-[20px] border border-[#dfe7df] bg-white p-5 shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#5d6d64]">Total Examinations</span>
-          <p className="mt-3 text-3xl font-bold text-[#1b2d24]">{totalExams}</p>
-          <p className="mt-1 text-xs text-[#7a8a82]">Cumulative medical checks</p>
+      {/* KPI Summary Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Total Pigs in System
+          </span>
+          <p className="mt-2 text-2xl font-bold text-[#101827]">{totalPigsAvailable}</p>
+          <p className="mt-0.5 text-xs text-slate-500">Registered livestock</p>
         </div>
-        <div className="rounded-[20px] border border-[#dfe7df] bg-white p-5 shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#5d6d64]">Active Healthy Herd</span>
-          <p className="mt-3 text-3xl font-bold text-[#173d2e]">{healthyCount}</p>
-          <p className="mt-1 text-xs text-[#7a8a82]">Cleared animals</p>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Total Examinations Done
+          </span>
+          <p className="mt-2 text-2xl font-bold text-[#FF8A00]">{totalExams}</p>
+          <p className="mt-0.5 text-xs text-slate-500">Recorded clinical checks</p>
         </div>
-        <div className="rounded-[20px] border border-[#dfe7df] bg-white p-5 shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#5d6d64]">Clinical Intervention Cases</span>
-          <p className="mt-3 text-3xl font-bold text-[#a44d67]">{sickCount}</p>
-          <p className="mt-1 text-xs text-[#7a8a82]">Currently in treatment</p>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Healthy / Cleared Herd
+          </span>
+          <p className="mt-2 text-2xl font-bold text-emerald-700">{healthyCount}</p>
+          <p className="mt-0.5 text-xs text-slate-500">Ready for Finance &amp; Handover</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Bad Status Cases
+          </span>
+          <p className="mt-2 text-2xl font-bold text-rose-700">{badStatusCount}</p>
+          <p className="mt-0.5 text-xs text-slate-500">Sick / on medication</p>
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-[#dfe7df] bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-[#dfe7df] bg-[#f8faf8] px-6 py-4 flex items-center justify-between">
+      {/* Summary of All Tested Pigs & Date Done */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <FileText className="h-5 w-5 text-[#173d2e]" />
-            <span className="text-sm font-bold text-[#1b2d24]">Clinical Examination History</span>
+            <FileText className="h-5 w-5 text-[#FF8A00]" />
+            <div>
+              <h2 className="text-sm font-bold text-[#101827]">
+                Tested Pigs Summary by Date Done ({dateSummaries.length} Date(s))
+              </h2>
+              <p className="text-xs text-slate-500">
+                Daily breakdown of every pig examined, tests conducted, and prescribed medication.
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-[#dfe7df]">
-            <thead className="bg-[#f2f5f0]">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+            <thead className="bg-slate-50 uppercase tracking-wider text-slate-500">
               <tr>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-[#1c2b23]">
-                  Date
-                </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-[#1c2b23]">
-                  Pig Tag
-                </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-[#1c2b23]">
-                  Activity
-                </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-[#1c2b23]">
-                  Diagnosis
-                </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-[#1c2b23]">
-                  Therapy / Medication
-                </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-[#1c2b23]">
-                  Examined By
-                </th>
+                <th className="px-6 py-3.5">Date Done</th>
+                <th className="px-6 py-3.5 text-right">Total Tested</th>
+                <th className="px-6 py-3.5 text-right">Healthy</th>
+                <th className="px-6 py-3.5 text-right">Bad Status</th>
+                <th className="px-6 py-3.5">Tested Pigs &amp; Status</th>
+                <th className="px-6 py-3.5">Tests Done / Findings</th>
+                <th className="px-6 py-3.5">Medication Prescribed</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#dfe7df] bg-white">
-              {allRecords.map((r) => (
-                <tr key={r.id} className="hover:bg-[#f8faf8] transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#1b2d24]">
-                    {format(new Date(r.date), "MMM d, yyyy")}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-mono text-xs font-bold text-[#173d2e] bg-[#e3efe7] px-2 py-1 rounded">
-                      {r.pig.tagNumber}
+            <tbody className="divide-y divide-slate-100 bg-white text-[#101827]">
+              {dateSummaries.map((row) => (
+                <tr key={row.date} className="hover:bg-slate-50/70 transition-colors align-top">
+                  <td className="px-6 py-4 whitespace-nowrap font-semibold text-[#101827]">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-[#FF8A00]" />
+                      <span>{formatReportDate(row.date)}</span>
+                    </div>
+                    <span className="ml-6 block font-mono text-[11px] text-slate-400">
+                      {row.date}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#1b2d24]">
-                    {r.activityType}
+                  <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-[#FF8A00]">
+                    {row.pigsExamined}
                   </td>
-                  <td className="px-6 py-4 text-sm text-[#1b2d24]">
-                    {r.diagnosis || "Routine"}
+                  <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-emerald-700">
+                    {row.healthyPigs}
                   </td>
-                  <td className="px-6 py-4 text-sm text-[#5d6e64]">
-                    {r.medication || r.treatment || "None prescribed"}
+                  <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-rose-700">
+                    {row.sickPigs}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[#5d6e64]">
-                    Dr. {r.veterinarian.name}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1.5 max-w-xs">
+                      {row.testedPigs.map((tp) => {
+                        const isBad =
+                          tp.healthStatus === "SICK" ||
+                          tp.healthStatus === "UNDER_TREATMENT" ||
+                          tp.healthStatus === "CRITICAL";
+                        return (
+                          <span
+                            key={tp.pigId}
+                            title={`${tp.diagnosis}${tp.medication && tp.medication !== "None" ? ` | Meds: ${tp.medication}` : ""}`}
+                            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold ${
+                              isBad
+                                ? "bg-rose-50 border-rose-200 text-rose-800"
+                                : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                            }`}
+                          >
+                            {isBad ? (
+                              <HeartPulse className="h-3 w-3 shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="h-3 w-3 shrink-0" />
+                            )}
+                            {tp.tagNumber}
+                          </span>
+                        );
+                      })}
+                      {row.testedPigs.length === 0 && (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-slate-700 max-w-xs">
+                    {row.diseaseDescription}
+                  </td>
+                  <td className="px-6 py-4 text-slate-700 max-w-xs">
+                    {row.treatmentDescription}
                   </td>
                 </tr>
               ))}
-              {allRecords.length === 0 && (
+              {dateSummaries.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-[#5d6e64]">
-                    No examination records available for reporting.
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                    No veterinary examinations have been recorded yet.
                   </td>
                 </tr>
               )}

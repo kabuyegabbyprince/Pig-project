@@ -1,10 +1,9 @@
-import { getServerSession } from "next-auth/next";
+import { getCachedSession } from "@/lib/session";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
 import { normalizeRoleValue } from "@/lib/roles";
 
 export default async function DashboardRedirect() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

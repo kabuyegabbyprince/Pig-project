@@ -17,6 +17,34 @@ if (!process.env.AUTH_TRUST_HOST) {
 
 const normalizeRole = (role?: string | null): Role | "" => normalizeRoleValue(role);
 
+const AUTH_USER_TTL_MS = 45_000;
+
+type CachedAuthUser = {
+  role: Role | "";
+  name: string;
+  isActive: boolean;
+  deletedAt: Date | null;
+  expiresAt: number;
+};
+
+const globalForAuthCache = globalThis as unknown as {
+  authUserCache?: Map<string, CachedAuthUser>;
+};
+
+const authUserCache =
+  globalForAuthCache.authUserCache ?? new Map<string, CachedAuthUser>();
+if (!globalForAuthCache.authUserCache) {
+  globalForAuthCache.authUserCache = authUserCache;
+}
+
+export function invalidateAuthUserCache(userId?: string) {
+  if (userId) {
+    authUserCache.delete(String(userId));
+  } else {
+    authUserCache.clear();
+  }
+}
+
 type BackendLoginResponse = {
   success?: boolean;
   data?: {
@@ -318,28 +346,70 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user) {
-        token.id = String(user.id);
-        token.role = normalizeRole(user.role);
+        const userId = String(user.id);
+        const normalized = normalizeRole(user.role);
+        token.id = userId;
+        token.role = normalized;
         token.accessToken = user.token;
         token.accessLevel = user.accessLevel;
         token.assignedDistrictId = user.assignedDistrictId;
         token.assignedSectorId = user.assignedSectorId;
         token.assignedCellId = user.assignedCellId;
         token.assignedVillageId = user.assignedVillageId;
+        authUserCache.set(userId, {
+          role: normalized,
+          name: String(user.name ?? ""),
+          isActive: true,
+          deletedAt: null,
+          expiresAt: Date.now() + AUTH_USER_TTL_MS,
+        });
         return token;
       }
 
       if (token?.id) {
-        try {
-          const dbUser = await prisma.user.findUnique({
-            where: { id: String(token.id) },
-            select: { role: true, isActive: true, deletedAt: true, name: true },
-          });
-          if (!dbUser || !dbUser.isActive || dbUser.deletedAt) {
+        const userId = String(token.id);
+        const cached = authUserCache.get(userId);
+        if (cached && cached.expiresAt > Date.now()) {
+          if (!cached.isActive || cached.deletedAt) {
             token.role = "";
           } else {
-            token.role = normalizeRole(dbUser.role);
-            token.name = dbUser.name;
+            token.role = cached.role;
+            token.name = cached.name;
+          }
+          return token;
+        }
+
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true, isActive: true, deletedAt: true, name: true },
+          });
+          if (!dbUser) {
+            authUserCache.set(userId, {
+              role: "",
+              name: "",
+              isActive: false,
+              deletedAt: new Date(),
+              expiresAt: Date.now() + AUTH_USER_TTL_MS,
+            });
+            token.role = "";
+          } else {
+            const normRole = normalizeRole(dbUser.role);
+            const active = Boolean(dbUser.isActive);
+            const deleted = dbUser.deletedAt ?? null;
+            authUserCache.set(userId, {
+              role: normRole,
+              name: dbUser.name,
+              isActive: active,
+              deletedAt: deleted,
+              expiresAt: Date.now() + AUTH_USER_TTL_MS,
+            });
+            if (!active || deleted) {
+              token.role = "";
+            } else {
+              token.role = normRole;
+              token.name = dbUser.name;
+            }
           }
         } catch {
           // Preserve existing token claims if database is temporarily unreachable

@@ -6,6 +6,8 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { Prisma, Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
+import { getCachedSession } from "@/lib/session";
+import { invalidateAuthUserCache } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone-utils";
 import {
   deleteSupabaseAuthUserByEmail,
@@ -169,12 +171,10 @@ export async function createUser(formData: FormData) {
 }
 
 export async function updatePersonalProfile(formData: FormData) {
-  const { getServerSession } = await import("next-auth");
-  const { authOptions } = await import("@/lib/auth");
   const { saveUserAddressProfile, getUserAddressProfile } = await import(
     "@/lib/user-profile-address"
   );
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const returnToRaw = String(formData.get("returnTo") || "").trim();
@@ -185,14 +185,14 @@ export async function updatePersonalProfile(formData: FormData) {
   const rawPhone = String(formData.get("phone") || "").trim();
   const phone = rawPhone ? normalizePhone(rawPhone) : "";
 
-  const districtId = String(formData.get("districtId") || "").trim();
   const districtName = String(formData.get("district") || "").trim();
-  const sectorId = String(formData.get("sectorId") || "").trim();
   const sectorName = String(formData.get("sector") || "").trim();
-  const cellId = String(formData.get("cellId") || "").trim();
   const cellName = String(formData.get("cell") || "").trim();
-  const villageId = String(formData.get("villageId") || "").trim();
   const villageName = String(formData.get("village") || "").trim();
+  const districtId = String(formData.get("districtId") || "").trim() || districtName;
+  const sectorId = String(formData.get("sectorId") || "").trim() || sectorName;
+  const cellId = String(formData.get("cellId") || "").trim() || cellName;
+  const villageId = String(formData.get("villageId") || "").trim() || villageName;
   const address = String(formData.get("address") || "").trim();
 
   if (!name) {
@@ -213,7 +213,7 @@ export async function updatePersonalProfile(formData: FormData) {
       }
       if (!districtName || !sectorName || !cellName) {
         redirect(
-          `${safeReturnTo}?profileError=${encodeURIComponent("Please select your District, Sector, and Cell address.")}`
+          `${safeReturnTo}?profileError=${encodeURIComponent("Please enter your District, Sector, and Cell address.")}`
         );
       }
     }
@@ -294,6 +294,7 @@ export async function updatePersonalProfile(formData: FormData) {
     redirect(`${safeReturnTo}?profileError=${encodeURIComponent(message)}`);
   }
 
+  invalidateAuthUserCache(session.user.id);
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/field");
@@ -304,9 +305,7 @@ export async function updatePersonalProfile(formData: FormData) {
 }
 
 export async function changeUserPassword(formData: FormData) {
-  const { getServerSession } = await import("next-auth");
-  const { authOptions } = await import("@/lib/auth");
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const currentPassword = String(formData.get("currentPassword") || "");
@@ -420,6 +419,7 @@ export async function deleteUser(userId: string) {
       },
     });
 
+    invalidateAuthUserCache(userId);
     revalidatePath("/dashboard/admin/users");
     revalidatePath("/dashboard/admin");
     return { success: true };
@@ -492,6 +492,7 @@ export async function updateUserRole(userId: string, newRole: string) {
       // Non-blocking notification failure
     }
 
+    invalidateAuthUserCache(userId);
     revalidatePath("/dashboard/admin/users");
     revalidatePath("/dashboard/admin");
     return { success: true };
@@ -544,6 +545,7 @@ export async function toggleUserActive(userId: string) {
       },
     });
 
+    invalidateAuthUserCache(userId);
     revalidatePath("/dashboard/admin/users");
     revalidatePath("/dashboard/admin");
     return { success: true, isActive: nextActive };

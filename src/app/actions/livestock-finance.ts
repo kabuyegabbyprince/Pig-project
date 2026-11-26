@@ -61,6 +61,7 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
     cyclesRaw,
     returnsRaw,
     vetExamsRaw,
+    vetRecordsRaw,
     beneficiariesRaw,
     expenseTxsRaw,
   ] = await Promise.all([
@@ -101,6 +102,9 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
     prisma.veterinaryExamination
       .findMany({ orderBy: { examinationDate: "desc" } })
       .catch(catchSchemaMissing([], "VeterinaryExamination")),
+    prisma.veterinaryRecord
+      .findMany({ orderBy: { date: "desc" } })
+      .catch(catchSchemaMissing([], "VeterinaryRecord")),
     prisma.beneficiary
       .findMany({ where: { deletedAt: null } })
       .catch(catchSchemaMissing([], "Beneficiary")),
@@ -131,10 +135,17 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
     }
   }
 
-  const latestVetByPigId = new Map<string, (typeof vetExamsRaw)[number]>();
+  const latestVetExamByPigId = new Map<string, (typeof vetExamsRaw)[number]>();
   for (const v of vetExamsRaw) {
-    if (!latestVetByPigId.has(v.pigId)) {
-      latestVetByPigId.set(v.pigId, v);
+    if (!latestVetExamByPigId.has(v.pigId)) {
+      latestVetExamByPigId.set(v.pigId, v);
+    }
+  }
+
+  const latestVetRecordByPigId = new Map<string, (typeof vetRecordsRaw)[number]>();
+  for (const r of vetRecordsRaw) {
+    if (!latestVetRecordByPigId.has(r.pigId)) {
+      latestVetRecordByPigId.set(r.pigId, r);
     }
   }
 
@@ -168,13 +179,38 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
       totalLivestockInvestmentNum += priceNum;
     }
 
-    const latestVet = latestVetByPigId.get(p.id);
+    const latestVetExam = latestVetExamByPigId.get(p.id);
+    const latestVetRecord = latestVetRecordByPigId.get(p.id);
     const ben = p.currentBeneficiaryId ? benMap.get(p.currentBeneficiaryId) : undefined;
-    const vetParts = [
-      latestVet?.diagnosis ? `Dx: ${latestVet.diagnosis}` : null,
-      latestVet?.treatment ? `Tx: ${latestVet.treatment}` : null,
-      latestVet?.verificationStatus ? `Status: ${latestVet.verificationStatus}` : null,
-    ].filter(Boolean);
+
+    const recordParts = latestVetRecord
+      ? [
+          latestVetRecord.diagnosis ? `Test: ${latestVetRecord.diagnosis}` : null,
+          latestVetRecord.medication
+            ? `Meds: ${latestVetRecord.medication}`
+            : latestVetRecord.treatment
+              ? `Tx: ${latestVetRecord.treatment}`
+              : null,
+        ].filter(Boolean)
+      : [];
+
+    const examParts = latestVetExam
+      ? [
+          latestVetExam.diagnosis ? `Test: ${latestVetExam.diagnosis}` : null,
+          latestVetExam.treatment ? `Tx: ${latestVetExam.treatment}` : null,
+          latestVetExam.verificationStatus ? `Status: ${latestVetExam.verificationStatus}` : null,
+        ].filter(Boolean)
+      : [];
+
+    const combinedVetParts = recordParts.length > 0 ? recordParts : examParts;
+    const latestVetExamDate = latestVetRecord?.date
+      ? toIsoString(latestVetRecord.date)
+      : latestVetExam?.examinationDate
+        ? toIsoString(latestVetExam.examinationDate)
+        : null;
+    const hasVetInspection = Boolean(
+      latestVetRecord || latestVetExam || p.status === PigStatus.ACTIVE
+    );
 
     return {
       id: p.id,
@@ -199,8 +235,9 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
       ownerMemberName: p.ownerMemberName ?? null,
       beneficiaryId: p.currentBeneficiaryId ?? null,
       beneficiaryName: ben?.fullName ?? p.ownerMemberName ?? null,
-      latestVetExamSummary: vetParts.length > 0 ? vetParts.join(" · ") : null,
-      latestVetExamDate: latestVet?.examinationDate ? toIsoString(latestVet.examinationDate) : null,
+      latestVetExamSummary: combinedVetParts.length > 0 ? combinedVetParts.join(" · ") : null,
+      latestVetExamDate,
+      hasVetInspection,
       dateReceived: p.dateReceived ? toIsoString(p.dateReceived) : null,
       createdAt: toIsoString(p.createdAt),
     };

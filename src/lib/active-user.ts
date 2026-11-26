@@ -2,12 +2,11 @@ import "server-only";
 
 import { cache } from "react";
 import { Role } from "@prisma/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 const getCurrentSessionUser = cache(async () => {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if (!session?.user?.id) return null;
 
   return prisma.user.findUnique({

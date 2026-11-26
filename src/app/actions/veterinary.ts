@@ -339,21 +339,34 @@ export async function recordVeterinaryBatchExamination(formData: FormData) {
 
 export async function getVeterinaryDateSummaries() {
   try {
-    const totalPigsAvailable = await prisma.pig.count({ where: { deletedAt: null } });
+    const [pigs, records] = await Promise.all([
+      prisma.pig.findMany({
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          tagNumber: true,
+          healthStatus: true,
+          sex: true,
+        },
+      }),
+      prisma.veterinaryRecord.findMany({
+        orderBy: { date: "asc" },
+        select: {
+          id: true,
+          pigId: true,
+          date: true,
+          activityType: true,
+          diagnosis: true,
+          medication: true,
+          treatment: true,
+          status: true,
+          notes: true,
+        },
+      }),
+    ]);
 
-    const records = await prisma.veterinaryRecord.findMany({
-      orderBy: { date: "asc" },
-      select: {
-        id: true,
-        pigId: true,
-        date: true,
-        activityType: true,
-        diagnosis: true,
-        treatment: true,
-        status: true,
-        notes: true,
-      },
-    });
+    const totalPigsAvailable = pigs.length;
+    const pigById = new Map(pigs.map((p) => [p.id, p]));
 
     // Group by date (YYYY-MM-DD)
     const dateMap = new Map<string, typeof records>();
@@ -372,16 +385,35 @@ export async function getVeterinaryDateSummaries() {
     const summary: Array<{
       date: string;
       pigsExamined: number;
+      healthyPigs: number;
       notYetExamined: number;
       sickPigs: number;
       diseaseDescription: string;
       treatmentDescription: string;
+      testedPigs: Array<{
+        pigId: string;
+        tagNumber: string;
+        healthStatus: string;
+        diagnosis: string;
+        medication: string;
+      }>;
     }> = [];
 
     for (const dateStr of sortedDates) {
       const dayRecords = dateMap.get(dateStr)!;
       const dayPigs = new Set<string>();
+      const testedPigMap = new Map<
+        string,
+        {
+          pigId: string;
+          tagNumber: string;
+          healthStatus: string;
+          diagnosis: string;
+          medication: string;
+        }
+      >();
       let sickCount = 0;
+      let healthyDayCount = 0;
       const diseases = new Set<string>();
       const treatments = new Set<string>();
 
@@ -391,16 +423,19 @@ export async function getVeterinaryDateSummaries() {
           seenPigs.add(r.pigId);
         }
 
+        const pigInfo = r.pigId ? pigById.get(r.pigId) : undefined;
         const isSick =
           r.status === "UNDER_TREATMENT" ||
           r.activityType === "TREATMENT" ||
-          (r.diagnosis &&
-            r.diagnosis.toLowerCase() !== "healthy" &&
-            r.diagnosis.toLowerCase() !== "none" &&
-            r.diagnosis !== "-");
+          (pigInfo &&
+            (pigInfo.healthStatus === PigHealthStatus.SICK ||
+              pigInfo.healthStatus === PigHealthStatus.UNDER_TREATMENT ||
+              pigInfo.healthStatus === PigHealthStatus.CRITICAL));
 
         if (isSick) {
           sickCount++;
+        } else {
+          healthyDayCount++;
         }
 
         if (
@@ -411,27 +446,40 @@ export async function getVeterinaryDateSummaries() {
         ) {
           diseases.add(r.diagnosis.trim());
         }
+        const medOrTx = r.medication || r.treatment;
         if (
-          r.treatment &&
-          r.treatment.toLowerCase() !== "cleared" &&
-          r.treatment.toLowerCase() !== "none" &&
-          r.treatment !== "-"
+          medOrTx &&
+          medOrTx.toLowerCase() !== "cleared" &&
+          medOrTx.toLowerCase() !== "routine check" &&
+          medOrTx.toLowerCase() !== "none" &&
+          medOrTx !== "-"
         ) {
-          treatments.add(r.treatment.trim());
+          treatments.add(medOrTx.trim());
+        }
+
+        if (r.pigId && pigInfo) {
+          testedPigMap.set(r.pigId, {
+            pigId: r.pigId,
+            tagNumber: pigInfo.tagNumber,
+            healthStatus: pigInfo.healthStatus,
+            diagnosis: r.diagnosis || "Routine check",
+            medication: r.medication || r.treatment || "None",
+          });
         }
       }
 
       const pigsExamined = dayPigs.size || dayRecords.length;
-      // Number not yet examined avoiding double counting
       const notYetExamined = Math.max(0, totalPigsAvailable - seenPigs.size);
 
       summary.push({
         date: dateStr,
         pigsExamined,
+        healthyPigs: healthyDayCount,
         notYetExamined,
         sickPigs: sickCount,
         diseaseDescription: Array.from(diseases).join(", ") || "None / All Healthy",
         treatmentDescription: Array.from(treatments).join(", ") || "Routine check / Cleared",
+        testedPigs: Array.from(testedPigMap.values()),
       });
     }
 
@@ -462,8 +510,7 @@ export async function getAllPigsForVet() {
         tagNumber: true,
         healthStatus: true,
         status: true,
-        breed: true,
-        currentWeight: true,
+        sex: true,
       },
       orderBy: { tagNumber: "asc" },
     });
@@ -562,12 +609,18 @@ export async function recordIndividualPigExamination(formData: FormData) {
         diagnosis: diagnosis || "Clinical examination completed",
         medication: medication || null,
         treatment: medication ? `Prescribed medication: ${medication}` : "Routine check",
-        status: healthStatus === PigHealthStatus.HEALTHY ? "COMPLETED" : "UNDER_TREATMENT",
+        status:
+          healthStatus === PigHealthStatus.HEALTHY || healthStatus === PigHealthStatus.RECOVERED
+            ? "COMPLETED"
+            : "UNDER_TREATMENT",
       },
     });
 
+    const isClearedHealth =
+      healthStatus === PigHealthStatus.HEALTHY || healthStatus === PigHealthStatus.RECOVERED;
+
     const newStatus =
-      healthStatus === PigHealthStatus.HEALTHY && pig.status === PigStatus.REGISTERED
+      isClearedHealth && (pig.status === PigStatus.REGISTERED || pig.status === PigStatus.RETURNED)
         ? PigStatus.ACTIVE
         : pig.status;
 
@@ -579,7 +632,7 @@ export async function recordIndividualPigExamination(formData: FormData) {
       },
     });
 
-    if (healthStatus === PigHealthStatus.HEALTHY || healthStatus === PigHealthStatus.RECOVERED) {
+    if (isClearedHealth) {
       await tx.pigReturn.updateMany({
         where: { pigId },
         data: {
@@ -609,8 +662,13 @@ export async function recordIndividualPigExamination(formData: FormData) {
   revalidatePath("/dashboard/vet");
   revalidatePath("/dashboard/vet/veterinary");
   revalidatePath("/dashboard/vet/veterinary/new");
+  revalidatePath("/dashboard/vet/returned");
+  revalidatePath("/dashboard/vet/reports");
   revalidatePath("/dashboard/finance");
+  revalidatePath("/dashboard/finance/pigs");
   revalidatePath("/dashboard/field");
+  revalidatePath("/dashboard/field/distributions/new");
+  revalidatePath("/api/pigs/available");
 
   return { success: true };
 }
@@ -623,12 +681,21 @@ export async function updatePigHealthStatus(pigId: string, newHealthStatus: PigH
     const pig = await tx.pig.findUnique({ where: { id: pigId } });
     if (!pig) throw new Error("Pig not found.");
 
+    const isClearedHealth =
+      newHealthStatus === PigHealthStatus.HEALTHY ||
+      newHealthStatus === PigHealthStatus.RECOVERED;
+
     await tx.pig.update({
       where: { id: pigId },
       data: {
         healthStatus: newHealthStatus,
-        ...(newHealthStatus === PigHealthStatus.HEALTHY || newHealthStatus === PigHealthStatus.RECOVERED
-          ? { status: pig.status === PigStatus.REGISTERED ? PigStatus.ACTIVE : pig.status }
+        ...(isClearedHealth
+          ? {
+              status:
+                pig.status === PigStatus.REGISTERED || pig.status === PigStatus.RETURNED
+                  ? PigStatus.ACTIVE
+                  : pig.status,
+            }
           : {}),
       },
     });
@@ -640,11 +707,11 @@ export async function updatePigHealthStatus(pigId: string, newHealthStatus: PigH
         date: new Date(),
         activityType: "STATUS_UPDATE",
         diagnosis: `Health status updated to ${newHealthStatus}`,
-        status: newHealthStatus === PigHealthStatus.HEALTHY ? "COMPLETED" : "UNDER_TREATMENT",
+        status: isClearedHealth ? "COMPLETED" : "UNDER_TREATMENT",
       },
     });
 
-    if (newHealthStatus === PigHealthStatus.HEALTHY || newHealthStatus === PigHealthStatus.RECOVERED) {
+    if (isClearedHealth) {
       await tx.pigReturn.updateMany({
         where: { pigId, veterinaryVerified: false },
         data: {
@@ -657,8 +724,13 @@ export async function updatePigHealthStatus(pigId: string, newHealthStatus: PigH
 
   revalidatePath("/dashboard/vet");
   revalidatePath("/dashboard/vet/veterinary");
+  revalidatePath("/dashboard/vet/returned");
+  revalidatePath("/dashboard/vet/reports");
   revalidatePath("/dashboard/finance");
+  revalidatePath("/dashboard/finance/pigs");
   revalidatePath("/dashboard/field");
+  revalidatePath("/dashboard/field/distributions/new");
+  revalidatePath("/api/pigs/available");
 
   return { success: true };
 }

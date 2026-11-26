@@ -26,6 +26,7 @@ export type SerializedFinancePigStock = {
   beneficiaryName: string | null;
   latestVetExamSummary: string | null;
   latestVetExamDate: string | null;
+  hasVetInspection: boolean;
   dateReceived: string | null;
   createdAt: string;
 };

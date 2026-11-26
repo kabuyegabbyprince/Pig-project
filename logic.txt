@@ -153,30 +153,30 @@ Landing router after login: /dashboard (reads normalized Role and redirects).
 
 6) VETERINARIAN ("Veterinarian")
    Landing Route: /dashboard/vet
-   Access Scope : Clinical examination, quarantine clearance, treatment, and
-                  vaccination across all project pigs and returned piglets.
+   Access Scope : Clinical examination, Bad Status treatment management, and
+                  veterinary clearance across all project pigs and returned piglets.
    Core Tasks   :
      - Log Individual Pig Examination (/dashboard/vet/veterinary/new):
-       * Dropdown selects any pig registered in the system by Pig Tag Number.
-       * Record tests conducted / clinical findings.
+       * Dropdown selects any pig registered in the system by Pig Tag Number
+         (supports ?pigId=... preselection).
+       * Record test done / clinical findings.
        * Set health status (HEALTHY, SICK, UNDER_TREATMENT, CRITICAL, RECOVERED).
        * Prescribe medication (mandatory when marked Sick / Bad Status).
-       * Follow-up date fields removed; direct date of examination recorded.
-     - Bad Status (Sick / On Medication) Registry (/dashboard/vet/veterinary):
-       * Automatic list of all pigs identified with SICK, UNDER_TREATMENT, or
-         CRITICAL status with their latest diagnosis, prescribed medication, and date.
-       * Once the animal recovers, the Veterinarian clicks "Mark Recovered / Healthy"
-         which updates the pig status to HEALTHY and immediately removes it from the list.
-     - Date-based Veterinary Reports (/dashboard/vet/veterinary & /reports):
-       * Summary by date: Pigs tested, remaining unexamined pigs, sick count,
-         disease description, and treatments administered.
-     - Returned Piglets Clearance (/dashboard/vet/returned):
-       * Inspects returned piglets from revolving cycles; healthy inspection
-         sets veterinaryVerified = true, unlocking them for redistribution.
+       * Follow-up dates & Follow-ups menu removed; direct examination date recorded.
+     - Bad Status (Sick / On Medication) List (/dashboard/vet/returned &
+       /dashboard/vet/veterinary Bad Status tab):
+       * Automatic list of all pigs with SICK, UNDER_TREATMENT, or CRITICAL
+         status, showing latest test done, medication, and exam date.
+       * Veterinarian clicks "Mark OK (Healthy)" / "Mark Recovered / Healthy"
+         to update status to HEALTHY (ACTIVE) and immediately remove the pig
+         from the Bad Status list (also verifies any pending returned piglet).
+     - Tested-by-Date Veterinary Reports (/dashboard/vet/reports & /veterinary):
+       * Summary of all tested pigs grouped by date done: total tested, healthy
+         count, bad status count, tested pig tags, tests done, and medications.
    Sidebar Links:
      - Dashboard               -> /dashboard/vet
      - Veterinary Records      -> /dashboard/vet/veterinary (+ /new)
-     - Returned Piglets        -> /dashboard/vet/returned
+     - Bad Status              -> /dashboard/vet/returned (Follow-ups removed)
      - Veterinary Reports      -> /dashboard/vet/reports
      - Historical Records      -> /dashboard/history
      - Personal Settings       -> /dashboard/settings
@@ -202,10 +202,13 @@ Landing router after login: /dashboard (reads normalized Role and redirects).
          * VERIFIED -> posts approved INCOME FinanceTransaction (18,800 RWF:
            "Member Qualification Fee & Tax") and unlocks member for pig handover.
          * REJECTED -> blocks pig distribution and alerts the Cell Manager.
-     - Monitor Vet Inspection & Clearance Tab on /dashboard/finance/pigs:
-       * Direct visibility into all examined pigs, clinical health status,
-         latest diagnosis/medication, and handover readiness.
-       * Identifies reserve stock vs pigs in Bad Status vs already distributed.
+     - Monitor Veterinary Health & Clearance List (/dashboard/finance summary +
+       /dashboard/finance/pigs "Vet Inspection & Clearance" tab):
+       * Reads live VeterinaryRecord + VeterinaryExamination findings, prescribed
+         medications, exam dates, and Pig health status.
+       * Displays the exact vet-cleared list ("Cleared for Handover") that Cell
+         Managers use to distribute pigs, vs "Blocked (Bad Status)" vs
+         "Awaiting Vet Check" vs "Already Distributed".
      - Track live Recipient & Revolving Cycle Audit Matrix (which member received
        which pig, revolving cycle status, and returns progress).
      - Verify Cell Manager Animal Food Sales and pending FinanceTransactions.
@@ -276,24 +279,26 @@ FLOW C: VETERINARY EXAMINATION, BAD STATUS LIST & CLEARANCE GATEKEEPER
        - Follow-up dates are removed; direct date of examination is recorded.
   2. Bad Status (Sick / On Medication) Management:
        - Any pig marked SICK, UNDER_TREATMENT, or CRITICAL automatically enters
-         the Bad Status Registry on /dashboard/vet/veterinary.
-       - Veterinarian treats the pig; when recovered, veterinarian clicks
-         "Mark Recovered / Healthy", updating healthStatus to HEALTHY and immediately
-         removing the pig from the Bad Status list.
-  3. Date-based Veterinary Reports:
-       - Summary reports by examination date detailing pigs tested, remaining
-         unexamined animals, sick count, diseases observed, and treatments administered.
+         the Bad Status Registry on /dashboard/vet/returned and /dashboard/vet/veterinary.
+       - Veterinarian treats the pig; when OK, veterinarian clicks
+         "Mark OK (Healthy)" / "Mark Recovered / Healthy", updating healthStatus to
+         HEALTHY (status = ACTIVE) and immediately removing the pig from the list.
+  3. Tested-by-Date Veterinary Reports (/dashboard/vet/reports & /veterinary):
+       - Summary of all tested pigs grouped by date done: total tested, healthy count,
+         bad status count, tested pig tags, tests done, and medications prescribed.
   4. Handover Gatekeeper checkPigVetClearance(pigId, "DISTRIBUTION"):
        - Pig must NOT be deleted, DECEASED, SOLD, INACTIVE, or already DISTRIBUTED.
        - Pig has currentBeneficiaryId = null.
-       - Pig healthStatus must be HEALTHY (cannot be in Bad Status / Sick / Meds).
+       - Pig healthStatus must be HEALTHY or RECOVERED (cannot be in Bad Status).
        - Zero unverified PigReturn records (veterinaryVerified = false).
        - Latest VeterinaryRecord must not be SICK/CRITICAL/UNDER_TREATMENT/PENDING.
+       - Pig must have explicit veterinary clearance (ACTIVE or VeterinaryRecord /
+         VeterinaryExamination present).
   5. Finance Officer & Cell Manager Integration:
-       - Finance Officer views live "Vet Inspection & Clearance" tab on
-         /dashboard/finance/pigs to see all examined pigs and handover eligibility.
-       - Cell Manager distribution pig selector filters strictly to vet-cleared,
-         healthy stock pigs with no bad status.
+       - Finance Officer views live Veterinary Health & Clearance list on
+         /dashboard/finance and /dashboard/finance/pigs ("Vet Inspection & Clearance").
+       - Cell Manager distribution pig selector (/dashboard/field/distributions/new)
+         filters strictly to that exact vet-cleared list ("Cleared for Handover").
 
 FLOW D: 2-FEE QUALIFICATION PAYMENT -> FINANCE APPROVAL -> SCOPED PIG HANDOVER
   Step 1 — Member Pays Two Fees Off-System / MoMo:

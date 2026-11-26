@@ -86,7 +86,7 @@ export function CellManagerProfileCard({
               Complete Cell Manager Profile &amp; Duty Address
             </h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              Enter your phone number and select your exact District, Sector, Cell, and Village so your field operations and cooperative records map to your address.
+              Enter your phone number and enter your exact District, Sector, Cell, and Village so your field operations and cooperative records map to your address.
             </p>
           </div>
         </div>

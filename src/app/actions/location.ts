@@ -1,5 +1,8 @@
 "use server";
 
+import fs from "fs";
+import path from "path";
+import zlib from "zlib";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Role } from "@prisma/client";
@@ -7,18 +10,37 @@ import { getActiveUser } from "@/lib/active-user";
 
 type LocationOption = { id: string; name: string; code: string | null };
 
+type GeoUnit = {
+  code: string;
+  name: string;
+  parentCode?: string;
+};
+
+const geoCache = new Map<string, GeoUnit[]>();
+
+function loadRwandaGeoLevel(level: "districts" | "sectors" | "cells" | "villages"): GeoUnit[] {
+  const cached = geoCache.get(level);
+  if (cached) return cached;
+
+  const filePath = path.join(
+    process.cwd(),
+    "node_modules",
+    "rwanda-geo",
+    "dist",
+    "data",
+    `${level}.json.gz`
+  );
+  const compressed = fs.readFileSync(filePath);
+  const rawJson = zlib.gunzipSync(compressed).toString("utf8");
+  const parsed = JSON.parse(rawJson) as GeoUnit[];
+  geoCache.set(level, parsed);
+  return parsed;
+}
+
 function toOptions<T extends { id: string; name: string; code: string | null }>(
   rows: T[]
 ): LocationOption[] {
   return rows.map(({ id, name, code }) => ({ id, name, code }));
-}
-
-import { ALL_ROLE_VALUES } from "@/lib/roles";
-
-async function requireSession() {
-  const user = await getActiveUser([...ALL_ROLE_VALUES]);
-  if (!user) throw new Error("Unauthorized");
-  return user;
 }
 
 async function requireAdmin() {
@@ -41,8 +63,7 @@ export async function getDistricts(): Promise<LocationOption[]> {
   }
 
   try {
-    const rg = await import("rwanda-geo");
-    const districts = rg.getAllDistricts();
+    const districts = loadRwandaGeoLevel("districts");
     return districts
       .map((d) => ({ id: d.code, name: d.name, code: d.code }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -75,15 +96,14 @@ export async function getSectors(districtIdOrName: string): Promise<LocationOpti
   }
 
   try {
-    const rg = await import("rwanda-geo");
-    const allDistricts = rg.getAllDistricts();
+    const allDistricts = loadRwandaGeoLevel("districts");
     const dMatch = allDistricts.find(
       (d) =>
         d.code.toLowerCase() === normalized.toLowerCase() ||
         d.name.toLowerCase() === normalized.toLowerCase()
     );
     const code = dMatch ? dMatch.code : normalized;
-    const sectors = rg.getSectorsByDistrict(code);
+    const sectors = loadRwandaGeoLevel("sectors").filter((s) => s.parentCode === code);
     return sectors
       .map((s) => ({ id: s.code, name: s.name, code: s.code }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -116,15 +136,14 @@ export async function getCells(sectorIdOrName: string): Promise<LocationOption[]
   }
 
   try {
-    const rg = await import("rwanda-geo");
-    const allSectors = rg.getAllSectors();
+    const allSectors = loadRwandaGeoLevel("sectors");
     const sMatch = allSectors.find(
       (s) =>
         s.code.toLowerCase() === normalized.toLowerCase() ||
         s.name.toLowerCase() === normalized.toLowerCase()
     );
     const code = sMatch ? sMatch.code : normalized;
-    const cells = rg.getCellsBySector(code);
+    const cells = loadRwandaGeoLevel("cells").filter((c) => c.parentCode === code);
     return cells
       .map((c) => ({ id: c.code, name: c.name, code: c.code }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -157,15 +176,14 @@ export async function getVillages(cellIdOrName: string): Promise<LocationOption[
   }
 
   try {
-    const rg = await import("rwanda-geo");
-    const allCells = rg.getAllCells();
+    const allCells = loadRwandaGeoLevel("cells");
     const cMatch = allCells.find(
       (c) =>
         c.code.toLowerCase() === normalized.toLowerCase() ||
         c.name.toLowerCase() === normalized.toLowerCase()
     );
     const code = cMatch ? cMatch.code : normalized;
-    const villages = rg.getVillagesByCell(code);
+    const villages = loadRwandaGeoLevel("villages").filter((v) => v.parentCode === code);
     return villages
       .map((v) => ({ id: v.code, name: v.name, code: v.code }))
       .sort((a, b) => a.name.localeCompare(b.name));

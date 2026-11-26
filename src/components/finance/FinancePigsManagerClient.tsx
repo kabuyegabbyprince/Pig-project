@@ -379,7 +379,17 @@ export function FinancePigsManagerClient({
           }`}
         >
           <Stethoscope className="h-4 w-4 text-[#FF8A00]" />
-          Vet Inspection &amp; Clearance ({data.stockedPigs.filter((p) => p.healthStatus === "HEALTHY").length} Cleared)
+          Vet Inspection &amp; Clearance (
+          {
+            data.stockedPigs.filter(
+              (p) =>
+                p.hasVetInspection &&
+                (p.healthStatus === "HEALTHY" || p.healthStatus === "RECOVERED") &&
+                (p.status === "REGISTERED" || p.status === "ACTIVE" || p.status === "RETURNED") &&
+                !p.beneficiaryId
+            ).length
+          }{" "}
+          Cleared)
         </button>
       </div>
 
@@ -858,20 +868,37 @@ export function FinancePigsManagerClient({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-bold text-[#101827]">
-                Veterinary Clearance &amp; Health Registry ({data.stockedPigs.length})
+                Veterinary Inspection &amp; Clearance List ({data.stockedPigs.length})
               </h2>
               <p className="text-xs text-slate-500">
-                Official clinical clearance status from the Veterinarian. Only vet-cleared healthy pigs are eligible for Cell Manager handover.
+                Live examination results from the Veterinarian. Pigs marked Cleared for Handover are the exact list available to Cell Managers for member distribution.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                {data.stockedPigs.filter((p) => p.healthStatus === "HEALTHY").length} Cleared
+                {
+                  data.stockedPigs.filter(
+                    (p) =>
+                      p.hasVetInspection &&
+                      (p.healthStatus === "HEALTHY" || p.healthStatus === "RECOVERED") &&
+                      (p.status === "REGISTERED" || p.status === "ACTIVE" || p.status === "RETURNED") &&
+                      !p.beneficiaryId
+                  ).length
+                }{" "}
+                Cleared for Cell Manager
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-bold text-rose-800">
                 <HeartPulse className="h-3.5 w-3.5" />
-                {data.stockedPigs.filter((p) => p.healthStatus !== "HEALTHY").length} Bad Status / In Treatment
+                {
+                  data.stockedPigs.filter(
+                    (p) =>
+                      p.healthStatus === "SICK" ||
+                      p.healthStatus === "UNDER_TREATMENT" ||
+                      p.healthStatus === "CRITICAL"
+                  ).length
+                }{" "}
+                Bad Status
               </span>
             </div>
           </div>
@@ -881,18 +908,24 @@ export function FinancePigsManagerClient({
               <thead className="bg-slate-50 uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Pig Tag Number</th>
-                  <th className="px-4 py-3">Clinical Health Status</th>
-                  <th className="px-4 py-3">Latest Vet Findings &amp; Meds</th>
+                  <th className="px-4 py-3">Vet Status</th>
+                  <th className="px-4 py-3">Test Done &amp; Medication</th>
                   <th className="px-4 py-3">Exam Date</th>
-                  <th className="px-4 py-3">Handover Clearance</th>
+                  <th className="px-4 py-3">Cell Manager Availability</th>
                   <th className="px-4 py-3">Current Holder / Coop</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white text-[#101827]">
                 {data.stockedPigs.map((p) => {
-                  const isHealthy = p.healthStatus === "HEALTHY";
-                  const isAvailable = p.status === "REGISTERED" || p.status === "ACTIVE";
-                  const canHandover = isHealthy && isAvailable && !p.beneficiaryId;
+                  const isHealthy = p.healthStatus === "HEALTHY" || p.healthStatus === "RECOVERED";
+                  const isBadStatus =
+                    p.healthStatus === "SICK" ||
+                    p.healthStatus === "UNDER_TREATMENT" ||
+                    p.healthStatus === "CRITICAL";
+                  const isAvailable =
+                    p.status === "REGISTERED" || p.status === "ACTIVE" || p.status === "RETURNED";
+                  const canHandover =
+                    isHealthy && p.hasVetInspection && isAvailable && !p.beneficiaryId;
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/70">
@@ -905,14 +938,14 @@ export function FinancePigsManagerClient({
                             p.healthStatus
                           )}`}
                         >
-                          {p.healthStatus}
+                          {isBadStatus ? `${p.healthStatus} (Bad Status)` : p.healthStatus}
                         </span>
                       </td>
                       <td className="px-4 py-3 max-w-xs text-slate-700">
-                        {p.latestVetExamSummary || "Routine intake check"}
+                        {p.latestVetExamSummary || (p.hasVetInspection ? "Examined & cleared" : "Awaiting veterinary examination")}
                       </td>
                       <td className="px-4 py-3 text-slate-500">
-                        {formatDate(p.latestVetExamDate ?? p.createdAt)}
+                        {p.latestVetExamDate ? formatDate(p.latestVetExamDate) : "Not yet tested"}
                       </td>
                       <td className="px-4 py-3">
                         {canHandover ? (
@@ -920,10 +953,14 @@ export function FinancePigsManagerClient({
                             <CheckCircle2 className="h-3 w-3" />
                             Cleared for Handover
                           </span>
-                        ) : !isHealthy ? (
+                        ) : isBadStatus ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-bold text-rose-800">
                             <HeartPulse className="h-3 w-3" />
                             Blocked (Bad Status)
+                          </span>
+                        ) : !p.hasVetInspection && isAvailable && !p.beneficiaryId ? (
+                          <span className="inline-flex rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                            Awaiting Vet Check
                           </span>
                         ) : (
                           <span className="inline-flex rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700">

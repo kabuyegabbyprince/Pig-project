@@ -14,10 +14,18 @@ import { PigHealthStatus } from "@prisma/client";
 export interface DateSummaryRecord {
   date: string;
   pigsExamined: number;
+  healthyPigs?: number;
   notYetExamined: number;
   sickPigs: number;
   diseaseDescription: string;
   treatmentDescription: string;
+  testedPigs?: Array<{
+    pigId: string;
+    tagNumber: string;
+    healthStatus: string;
+    diagnosis: string;
+    medication: string;
+  }>;
 }
 
 export interface BadStatusPigItem {
@@ -287,8 +295,25 @@ export function VeterinaryRecordsTableClient({
                         <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-rose-600">
                           {row.sickPigs}
                         </td>
-                        <td className="px-6 py-4 max-w-xs truncate text-slate-700">
-                          {row.diseaseDescription}
+                        <td className="px-6 py-4 max-w-xs text-slate-700">
+                          <p className="truncate">{row.diseaseDescription}</p>
+                          {row.testedPigs && row.testedPigs.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {row.testedPigs.slice(0, 6).map((tp) => (
+                                <span
+                                  key={tp.pigId}
+                                  className="inline-flex rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#101827]"
+                                >
+                                  {tp.tagNumber}
+                                </span>
+                              ))}
+                              {row.testedPigs.length > 6 && (
+                                <span className="text-[10px] text-slate-400">
+                                  +{row.testedPigs.length - 6} more
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 max-w-xs truncate text-slate-700">
                           {row.treatmentDescription}

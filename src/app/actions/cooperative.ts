@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import { prisma, isSupabaseSchemaMissingError } from "@/lib/prisma";
 import { getActiveUser } from "@/lib/active-user";
+import { invalidateAuthUserCache } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone-utils";
 import { syncSupabaseAuthUser } from "@/lib/supabase-auth";
 import { normalizeRoleValue } from "@/lib/roles";
@@ -136,6 +137,37 @@ export type CooperativesWorkspaceData = {
   memberPayments: SerializedMemberPaymentSummary[];
   memberReports: SerializedMemberReport[];
   unassignedUsers: SerializedCooperativeMember[];
+};
+
+export type FieldDashboardSummary = {
+  actor: {
+    id: string;
+    name: string;
+    role: Role;
+    cooperativeId: string | null;
+    mustChangePassword: boolean;
+  };
+  cooperatives: Array<{
+    id: string;
+    name: string;
+    cellName: string;
+    maxMembers: number;
+    leaderName: string | null;
+    memberCount: number;
+  }>;
+  totalMembersCount: number;
+  animalsCount: number;
+  memberReportsCount: number;
+  pendingReportsCount: number;
+  escalatedReportsCount: number;
+  recentReports: Array<{
+    id: string;
+    summary: string;
+    memberName: string;
+    reportType: MemberReportType;
+    animalCount: number;
+    status: MemberReportStatus;
+  }>;
 };
 
 function revalidateAllCooperativePaths() {
@@ -288,6 +320,184 @@ export async function ensureCooperativeBeneficiariesSynced() {
     }
   } catch {
     // Non-blocking sync safeguard
+  }
+}
+
+export async function getFieldDashboardSummary(): Promise<FieldDashboardSummary | null> {
+  const actor = await getActiveUser([
+    Role.SUPER_ADMIN,
+    Role.CELL_MANAGER,
+    Role.COOPERATIVE_LEADER,
+    Role.COOPERATIVE_MEMBER,
+  ]);
+  if (!actor) return null;
+
+  const actorRole = normalizeRoleValue(actor.role) || actor.role;
+
+  const fullActor = await prisma.user.findUnique({
+    where: { id: actor.id },
+    select: { id: true, cooperativeId: true, mustChangePassword: true },
+  });
+
+  const actorCoopId = fullActor?.cooperativeId ?? null;
+  const mustChangePassword = Boolean(fullActor?.mustChangePassword);
+
+  try {
+    const [coopsRaw, coopUsersRaw, pigsRaw, reportsRaw] = await Promise.all([
+      prisma.cooperative.findMany({
+        select: {
+          id: true,
+          name: true,
+          cellName: true,
+          maxMembers: true,
+          leaderUserId: true,
+          leaderName: true,
+          createdById: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.findMany({
+        where: {
+          deletedAt: null,
+          cooperativeId: { not: null },
+          role: { in: [Role.COOPERATIVE_LEADER, Role.COOPERATIVE_MEMBER] },
+        },
+        select: { id: true, cooperativeId: true },
+      }),
+      prisma.pig.findMany({
+        where: { deletedAt: null },
+        select: { id: true, cooperativeId: true, ownerMemberId: true },
+      }),
+      prisma.cooperativeMemberReport.findMany({
+        select: {
+          id: true,
+          cooperativeId: true,
+          memberId: true,
+          leaderId: true,
+          memberName: true,
+          reportType: true,
+          animalCount: true,
+          summary: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    const visibleCoops =
+      actorRole === Role.SUPER_ADMIN
+        ? coopsRaw
+        : actorRole === Role.CELL_MANAGER
+          ? coopsRaw.filter((c) => String(c.createdById) === String(actor.id))
+          : actorCoopId
+            ? coopsRaw.filter((c) => c.id === actorCoopId)
+            : coopsRaw.filter((c) => String(c.leaderUserId) === String(actor.id));
+
+    const visibleCoopIds = new Set(visibleCoops.map((c) => c.id));
+
+    const memberCountByCoop = new Map<string, number>();
+    for (const u of coopUsersRaw) {
+      if (u.cooperativeId) {
+        memberCountByCoop.set(
+          u.cooperativeId,
+          (memberCountByCoop.get(u.cooperativeId) ?? 0) + 1
+        );
+      }
+    }
+
+    const cooperatives = visibleCoops.map((c) => ({
+      id: c.id,
+      name: c.name,
+      cellName: c.cellName,
+      maxMembers: c.maxMembers || MAX_COOPERATIVE_MEMBERS,
+      leaderName: c.leaderName ?? null,
+      memberCount: memberCountByCoop.get(c.id) ?? 0,
+    }));
+
+    const totalMembersCount = cooperatives.reduce((sum, c) => sum + c.memberCount, 0);
+
+    const animalsCount = pigsRaw.filter((p) => {
+      if (actorRole === Role.SUPER_ADMIN) {
+        return Boolean(p.cooperativeId || p.ownerMemberId);
+      }
+      if (actorRole === Role.CELL_MANAGER) {
+        return Boolean(p.cooperativeId && visibleCoopIds.has(p.cooperativeId));
+      }
+      if (actorRole === Role.COOPERATIVE_LEADER) {
+        return (
+          (actorCoopId && p.cooperativeId === actorCoopId) ||
+          (p.cooperativeId && visibleCoopIds.has(p.cooperativeId)) ||
+          p.ownerMemberId === actor.id
+        );
+      }
+      return p.ownerMemberId === actor.id;
+    }).length;
+
+    const scopedReports = reportsRaw.filter((r) => {
+      if (actorRole === Role.SUPER_ADMIN) return true;
+      if (actorRole === Role.CELL_MANAGER) return visibleCoopIds.has(r.cooperativeId);
+      if (actorRole === Role.COOPERATIVE_LEADER) {
+        return (
+          (actorCoopId && r.cooperativeId === actorCoopId) ||
+          r.leaderId === actor.id ||
+          r.memberId === actor.id
+        );
+      }
+      return r.memberId === actor.id;
+    });
+
+    const pendingReportsCount = scopedReports.filter((r) => r.status === "SUBMITTED").length;
+    const escalatedReportsCount = scopedReports.filter(
+      (r) => r.status === "ESCALATED_TO_CELL"
+    ).length;
+
+    const recentReports = scopedReports.slice(0, 4).map((r) => ({
+      id: r.id,
+      summary: r.summary,
+      memberName: r.memberName,
+      reportType: (r.reportType || "ROUTINE_UPDATE") as MemberReportType,
+      animalCount: r.animalCount ?? 1,
+      status: (r.status || "SUBMITTED") as MemberReportStatus,
+    }));
+
+    return {
+      actor: {
+        id: actor.id,
+        name: actor.name,
+        role: actorRole,
+        cooperativeId: actorCoopId,
+        mustChangePassword,
+      },
+      cooperatives,
+      totalMembersCount,
+      animalsCount,
+      memberReportsCount: scopedReports.length,
+      pendingReportsCount,
+      escalatedReportsCount,
+      recentReports,
+    };
+  } catch (err) {
+    if (isSupabaseSchemaMissingError(err)) {
+      return {
+        actor: {
+          id: actor.id,
+          name: actor.name,
+          role: actorRole,
+          cooperativeId: actorCoopId,
+          mustChangePassword,
+        },
+        cooperatives: [],
+        totalMembersCount: 0,
+        animalsCount: 0,
+        memberReportsCount: 0,
+        pendingReportsCount: 0,
+        escalatedReportsCount: 0,
+        recentReports: [],
+      };
+    }
+    throw err;
   }
 }
 
@@ -485,7 +695,8 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
           !p.currentBeneficiaryId &&
           !p.ownerMemberId &&
           !p.cooperativeId &&
-          p.healthStatus === PigHealthStatus.HEALTHY &&
+          (p.healthStatus === PigHealthStatus.HEALTHY ||
+            p.healthStatus === PigHealthStatus.RECOVERED) &&
           (p.status === PigStatus.REGISTERED ||
             p.status === PigStatus.ACTIVE ||
             p.status === PigStatus.RETURNED)
@@ -793,6 +1004,7 @@ export async function addCooperativeMember(formData: FormData): Promise<{
         where: { id: String(previousLeader.id) },
         data: { role: Role.COOPERATIVE_MEMBER },
       });
+      invalidateAuthUserCache(String(previousLeader.id));
       await syncSupabaseAuthUser({
         email: previousLeader.email,
         role: Role.COOPERATIVE_MEMBER,
@@ -994,6 +1206,7 @@ export async function assignCooperativeManager(
         where: { id: String(prev.id) },
         data: { role: Role.COOPERATIVE_MEMBER },
       });
+      invalidateAuthUserCache(String(prev.id));
       await syncSupabaseAuthUser({
         email: prev.email,
         role: Role.COOPERATIVE_MEMBER,
@@ -1031,6 +1244,7 @@ export async function assignCooperativeManager(
         cooperativeId,
       },
     });
+    invalidateAuthUserCache(String(target.id));
     await syncSupabaseAuthUser({
       email: target.email,
       role: Role.COOPERATIVE_LEADER,
@@ -1138,6 +1352,7 @@ export async function assignExistingUserToCooperative(
         role: Role.COOPERATIVE_MEMBER,
       },
     });
+    invalidateAuthUserCache(String(target.id));
     await syncSupabaseAuthUser({
       email: target.email,
       role: Role.COOPERATIVE_MEMBER,
@@ -1215,6 +1430,7 @@ export async function toggleCooperativeMemberActive(userId: string): Promise<{
       where: { id: String(target.id) },
       data: { isActive: nextActive },
     });
+    invalidateAuthUserCache(String(target.id));
     await syncSupabaseAuthUser({
       email: target.email,
       isActive: nextActive,
@@ -1295,6 +1511,7 @@ export async function removeCooperativeMember(userId: string): Promise<{
         role: Role.COOPERATIVE_MEMBER,
       },
     });
+    invalidateAuthUserCache(String(target.id));
     await syncSupabaseAuthUser({
       email: target.email,
       role: Role.COOPERATIVE_MEMBER,

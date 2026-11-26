@@ -3,7 +3,7 @@
 import type { Session } from "next-auth";
 import { useAuthSession } from "@/components/AuthProvider";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
 import { performSignOut } from "@/lib/client-auth";
 import {
   LayoutDashboard,
@@ -22,8 +22,7 @@ import {
   ImageIcon,
   TrendingUp,
   TrendingDown,
-  RefreshCw,
-  Calendar,
+  HeartPulse,
   PlusCircle,
   UserCog,
   Send,
@@ -36,8 +35,73 @@ import {
   ClipboardList,
   PiggyBank,
 } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
+
+const EXACT_ONLY_ROUTES = new Set([
+  "/dashboard",
+  "/dashboard/admin",
+  "/dashboard/gebyian",
+  "/dashboard/field",
+  "/dashboard/vet",
+  "/dashboard/finance",
+]);
+
+function isNavHrefMatch(
+  href: string,
+  pathname: string,
+  searchParams: ReadonlyURLSearchParams | null
+): boolean {
+  const qIndex = href.indexOf("?");
+  const hrefPath = qIndex === -1 ? href : href.slice(0, qIndex);
+  const hrefQuery = qIndex === -1 ? "" : href.slice(qIndex + 1);
+
+  const pathMatches = EXACT_ONLY_ROUTES.has(hrefPath)
+    ? pathname === hrefPath
+    : pathname === hrefPath || pathname.startsWith(hrefPath + "/");
+
+  if (!pathMatches) return false;
+
+  if (hrefQuery) {
+    if (!searchParams) return false;
+    const expected = new URLSearchParams(hrefQuery);
+    for (const [key, val] of expected.entries()) {
+      if (searchParams.get(key) !== val) return false;
+    }
+  }
+
+  return true;
+}
+
+function getSingleActiveHref(
+  navigation: NavItem[],
+  pathname: string,
+  searchParams: ReadonlyURLSearchParams | null
+): string | null {
+  let activeHref: string | null = null;
+  let maxLen = -1;
+
+  for (const item of navigation) {
+    if (item.href && isNavHrefMatch(item.href, pathname, searchParams)) {
+      if (item.href.length > maxLen) {
+        maxLen = item.href.length;
+        activeHref = item.href;
+      }
+    }
+    if (item.children) {
+      for (const sub of item.children) {
+        if (isNavHrefMatch(sub.href, pathname, searchParams)) {
+          if (sub.href.length > maxLen) {
+            maxLen = sub.href.length;
+            activeHref = sub.href;
+          }
+        }
+      }
+    }
+  }
+
+  return activeHref;
+}
 
 type NavItem = {
   name: string;
@@ -133,8 +197,7 @@ const cooperativeMemberNavigation: NavItem[] = [
 const vetNavigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard/vet", icon: LayoutDashboard },
   { name: "Veterinary Records", href: "/dashboard/vet/veterinary", icon: Stethoscope },
-  { name: "Returned Piglets", href: "/dashboard/vet/returned", icon: RefreshCw },
-  { name: "Follow-ups", href: "/dashboard/vet/follow-ups", icon: Calendar },
+  { name: "Bad Status", href: "/dashboard/vet/returned", icon: HeartPulse },
   { name: "Veterinary Reports", href: "/dashboard/vet/reports", icon: FileText },
   { name: "Historical Records", href: "/dashboard/history", icon: History },
   { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
@@ -150,6 +213,138 @@ const financeNavigation: NavItem[] = [
   { name: "Personal Settings", href: "/dashboard/settings", icon: UserCog },
 ];
 
+function SidebarNavList({
+  navigation,
+  isMobile = false,
+  onNavigate,
+}: {
+  navigation: NavItem[];
+  isMobile?: boolean;
+  onNavigate?: () => void;
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+
+  const activeHref = useMemo(
+    () => getSingleActiveHref(navigation, pathname, searchParams),
+    [navigation, pathname, searchParams]
+  );
+
+  const toggleDropdown = (name: string, currentlyOpen: boolean) => {
+    setOpenDropdowns((prev) => ({ ...prev, [name]: !currentlyOpen }));
+  };
+
+  return (
+    <>
+      {navigation.map((item) => {
+        if (item.children) {
+          const isChildActive = item.children.some((child) => child.href === activeHref);
+          const isOpen = openDropdowns[item.name] ?? isChildActive;
+
+          return (
+            <div key={item.name} className="space-y-1">
+              <button
+                type="button"
+                onClick={() => toggleDropdown(item.name, isOpen)}
+                className={`group flex w-full items-center justify-between rounded-lg px-3 ${
+                  isMobile ? "py-2.5" : "py-2"
+                } text-xs font-medium transition ${
+                  isChildActive
+                    ? "bg-white/10 text-white font-semibold border-l-2 border-[#FF8A00]"
+                    : "text-slate-300 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center">
+                  <item.icon className={`mr-2.5 h-4 w-4 ${isChildActive ? "text-[#FF8A00]" : "text-[#FF8A00]/80"}`} />
+                  <span>{item.name}</span>
+                </div>
+                <ChevronDown
+                  className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
+                    isOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {isOpen && (
+                <div className="ml-3.5 space-y-1 border-l border-white/15 pl-3 pt-1">
+                  {item.children.map((sub) => {
+                    const isSubActive = sub.href === activeHref;
+                    return (
+                      <Link
+                        key={sub.name}
+                        href={sub.href}
+                        onClick={onNavigate}
+                        className={`flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                          isSubActive
+                            ? "bg-[#FF8A00]/20 text-[#FF8A00] font-semibold"
+                            : "text-slate-300 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {sub.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        const isActive = item.href === activeHref;
+        return (
+          <Link
+            key={item.name}
+            href={item.href!}
+            onClick={onNavigate}
+            className={`group flex items-center rounded-lg px-3 ${
+              isMobile ? "py-2.5" : "py-2"
+            } text-xs font-medium transition ${
+              isActive
+                ? "bg-white/10 text-white font-semibold shadow-xs border-l-2 border-[#FF8A00]"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <item.icon className={`mr-2.5 h-4 w-4 ${isActive ? "text-[#FF8A00]" : "text-slate-400 group-hover:text-[#FF8A00]"}`} />
+            {item.name}
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+
+function SidebarNavFallback({ navigation, isMobile = false }: { navigation: NavItem[]; isMobile?: boolean }) {
+  return (
+    <>
+      {navigation.map((item) =>
+        item.href ? (
+          <Link
+            key={item.name}
+            href={item.href}
+            className={`group flex items-center rounded-lg px-3 ${
+              isMobile ? "py-2.5" : "py-2"
+            } text-xs font-medium text-slate-300`}
+          >
+            <item.icon className="mr-2.5 h-4 w-4 text-slate-400" />
+            {item.name}
+          </Link>
+        ) : (
+          <div
+            key={item.name}
+            className={`flex items-center rounded-lg px-3 ${
+              isMobile ? "py-2.5" : "py-2"
+            } text-xs font-medium text-slate-300`}
+          >
+            <item.icon className="mr-2.5 h-4 w-4 text-[#FF8A00]/80" />
+            {item.name}
+          </div>
+        )
+      )}
+    </>
+  );
+}
+
 export function DashboardShell({
   children,
   initialSession,
@@ -159,17 +354,7 @@ export function DashboardShell({
 }) {
   const { data: sessionData } = useAuthSession();
   const session = initialSession ?? sessionData ?? null;
-  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => {
-    const isPostActive = pathname.startsWith("/dashboard/gallery") || pathname.startsWith("/dashboard/team");
-    return { Post: isPostActive };
-  });
-
-  const toggleDropdown = (name: string) => {
-    setOpenDropdowns((prev) => ({ ...prev, [name]: !prev[name] }));
-  };
 
   const role = normalizeRoleValue(session?.user?.role as string | undefined);
   let navigation: NavItem[] = [];
@@ -180,88 +365,6 @@ export function DashboardShell({
   if (role === "COOPERATIVE_MEMBER") navigation = cooperativeMemberNavigation;
   if (role === "VETERINARIAN") navigation = vetNavigation;
   if (role === "FINANCE_OFFICER") navigation = financeNavigation;
-
-  const renderNav = (items: NavItem[], isMobile = false) => {
-    return items.map((item) => {
-      if (item.children) {
-        const isChildActive = item.children.some(
-          (child) => pathname === child.href || pathname.startsWith(child.href + "/")
-        );
-        const isOpen = openDropdowns[item.name] ?? isChildActive;
-
-        return (
-          <div key={item.name} className="space-y-1">
-            <button
-              type="button"
-              onClick={() => toggleDropdown(item.name)}
-              className={`group flex w-full items-center justify-between rounded-lg px-3 ${
-                isMobile ? "py-2.5" : "py-2"
-              } text-xs font-medium transition ${
-                isChildActive
-                  ? "bg-white/10 text-white font-semibold border-l-2 border-[#FF8A00]"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <div className="flex items-center">
-                <item.icon className={`mr-2.5 h-4 w-4 ${isChildActive ? "text-[#FF8A00]" : "text-[#FF8A00]/80"}`} />
-                <span>{item.name}</span>
-              </div>
-              <ChevronDown
-                className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
-                  isOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {isOpen && (
-              <div className="ml-3.5 space-y-1 border-l border-white/15 pl-3 pt-1">
-                {item.children.map((sub) => {
-                  const isSubActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
-                  return (
-                    <Link
-                      key={sub.name}
-                      href={sub.href}
-                      prefetch={role === "PROJECT_MANAGER" ? true : false}
-                      onClick={() => isMobile && setMobileMenuOpen(false)}
-                      className={`flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-                        isSubActive
-                          ? "bg-[#FF8A00]/20 text-[#FF8A00] font-semibold"
-                          : "text-slate-300 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {sub.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      const isActive =
-        pathname === item.href ||
-        (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
-      return (
-        <Link
-          key={item.name}
-          href={item.href!}
-          prefetch={role === "PROJECT_MANAGER" ? true : false}
-          onClick={() => isMobile && setMobileMenuOpen(false)}
-          className={`group flex items-center rounded-lg px-3 ${
-            isMobile ? "py-2.5" : "py-2"
-          } text-xs font-medium transition ${
-            isActive
-              ? "bg-white/10 text-white font-semibold shadow-xs border-l-2 border-[#FF8A00]"
-              : "text-slate-300 hover:bg-white/5 hover:text-white"
-          }`}
-        >
-          <item.icon className={`mr-2.5 h-4 w-4 ${isActive ? "text-[#FF8A00]" : "text-slate-400 group-hover:text-[#FF8A00]"}`} />
-          {item.name}
-        </Link>
-      );
-    });
-  };
 
   const userInitial = session?.user?.name ? session.user.name.charAt(0).toUpperCase() : "U";
 
@@ -287,12 +390,14 @@ export function DashboardShell({
           </div>
 
           <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-            {renderNav(navigation)}
+            <Suspense fallback={<SidebarNavFallback navigation={navigation} />}>
+              <SidebarNavList navigation={navigation} />
+            </Suspense>
           </nav>
 
           <div className="border-t border-white/10 bg-[#0d141f] px-4 py-3.5 shrink-0">
             <div className="flex items-center justify-between gap-2">
-              <Link href="/dashboard/settings" prefetch={false} className="flex items-center gap-2.5 min-w-0 group hover:opacity-90 transition">
+              <Link href="/dashboard/settings" className="flex items-center gap-2.5 min-w-0 group hover:opacity-90 transition">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF8A00] text-[#101827] font-extrabold text-xs border border-white/10">
                   {userInitial}
                 </div>
@@ -308,7 +413,6 @@ export function DashboardShell({
               <div className="flex items-center gap-1 shrink-0">
                 <Link
                   href="/dashboard/settings"
-                  prefetch={false}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
                   title="Personal Settings"
                   aria-label="Personal Settings"
@@ -367,7 +471,15 @@ export function DashboardShell({
 
           {mobileMenuOpen && (
             <div className="max-h-[calc(100dvh-57px)] overflow-y-auto border-b border-white/10 bg-[#101827] p-4 lg:hidden text-white">
-              <nav className="space-y-1">{renderNav(navigation, true)}</nav>
+              <nav className="space-y-1">
+                <Suspense fallback={<SidebarNavFallback navigation={navigation} isMobile />}>
+                  <SidebarNavList
+                    navigation={navigation}
+                    isMobile
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+                </Suspense>
+              </nav>
             </div>
           )}
 

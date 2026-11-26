@@ -70,11 +70,15 @@ export async function checkPigVetClearance(
     };
   }
 
-  if (pig.healthStatus !== PigHealthStatus.HEALTHY) {
+  const isHealthyOrRecovered =
+    pig.healthStatus === PigHealthStatus.HEALTHY ||
+    pig.healthStatus === PigHealthStatus.RECOVERED;
+
+  if (!isHealthyOrRecovered) {
     return {
       cleared: false,
       pig,
-      reason: `Veterinary clearance blocked: Pig ${pig.tagNumber} has health status ${pig.healthStatus} (must be HEALTHY).`,
+      reason: `Veterinary clearance blocked: Pig ${pig.tagNumber} has health status ${pig.healthStatus} (must be HEALTHY or RECOVERED).`,
     };
   }
 
@@ -118,16 +122,17 @@ export async function checkPigVetClearance(
     };
   }
 
-  if (mode === "SALE") {
-    const hasExplicitClearance =
-      pig.status === PigStatus.ACTIVE || Boolean(latestExam) || Boolean(latestVetRecord);
-    if (!hasExplicitClearance) {
-      return {
-        cleared: false,
-        pig,
-        reason: `Veterinary clearance required before listing ${pig.tagNumber} on E-Commerce. Complete a veterinary check first.`,
-      };
-    }
+  const hasExplicitClearance =
+    pig.status === PigStatus.ACTIVE || Boolean(latestExam) || Boolean(latestVetRecord);
+  if (!hasExplicitClearance) {
+    return {
+      cleared: false,
+      pig,
+      reason:
+        mode === "SALE"
+          ? `Veterinary clearance required before listing ${pig.tagNumber} on E-Commerce. Complete a veterinary check first.`
+          : `Veterinary clearance required before distributing ${pig.tagNumber}. Complete a veterinary examination first.`,
+    };
   }
 
   return { cleared: true, pig };

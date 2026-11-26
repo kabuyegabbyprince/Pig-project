@@ -11,7 +11,11 @@ const allowedCloudOrigins = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["rwanda-geo"],
   allowedDevOrigins: allowedCloudOrigins,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "25mb",

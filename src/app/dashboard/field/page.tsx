@@ -1,9 +1,8 @@
-import { getServerSession } from "next-auth";
+import { getCachedSession } from "@/lib/session";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
-import { getCooperativesWorkspaceData } from "@/app/actions/cooperative";
+import { getFieldDashboardSummary } from "@/app/actions/cooperative";
 import { prisma } from "@/lib/prisma";
 import {
   getUserAddressProfile,
@@ -33,13 +32,13 @@ export default async function FieldDashboard({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if (!session) {
     redirect("/login");
   }
 
   const [data, params] = await Promise.all([
-    getCooperativesWorkspaceData(),
+    getFieldDashboardSummary(),
     searchParams,
   ]);
   const role = data?.actor.role ?? normalizeRoleValue(session.user?.role);
@@ -69,16 +68,15 @@ export default async function FieldDashboard({
     typeof params.profileError === "string" ? params.profileError : null;
 
   const cooperatives = data?.cooperatives ?? [];
-  const animals = data?.animals ?? [];
-  const memberReports = data?.memberReports ?? [];
   const primaryCoop =
     cooperatives.find((c) => c.id === data?.actor.cooperativeId) ?? cooperatives[0] ?? null;
 
-  const totalMembersCount = cooperatives.reduce((sum, c) => sum + c.memberCount, 0);
-  const pendingReportsCount = memberReports.filter((r) => r.status === "SUBMITTED").length;
-  const escalatedReportsCount = memberReports.filter(
-    (r) => r.status === "ESCALATED_TO_CELL"
-  ).length;
+  const totalMembersCount = data?.totalMembersCount ?? 0;
+  const animalsCount = data?.animalsCount ?? 0;
+  const memberReportsCount = data?.memberReportsCount ?? 0;
+  const pendingReportsCount = data?.pendingReportsCount ?? 0;
+  const escalatedReportsCount = data?.escalatedReportsCount ?? 0;
+  const recentReports = data?.recentReports ?? [];
 
   const quickActions = isMember
     ? [
@@ -216,7 +214,6 @@ export default async function FieldDashboard({
           </div>
           <Link
             href="/dashboard/settings"
-            prefetch={false}
             className="inline-flex items-center gap-2 rounded-xl bg-[#101827] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] transition shrink-0"
           >
             <Settings className="h-3.5 w-3.5 text-[#FF8A00]" />
@@ -291,7 +288,7 @@ export default async function FieldDashboard({
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             {isMember ? "My Tracked Animals" : "Cooperative Animals"}
           </p>
-          <p className="mt-2 text-2xl font-bold text-[#101827]">{animals.length}</p>
+          <p className="mt-2 text-2xl font-bold text-[#101827]">{animalsCount}</p>
           <p className="mt-1 text-xs text-slate-500">Registered with weight &amp; health records</p>
         </div>
 
@@ -302,7 +299,7 @@ export default async function FieldDashboard({
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             {isMember ? "Reports Sent to Manager" : "Member Reports"}
           </p>
-          <p className="mt-2 text-2xl font-bold text-[#101827]">{memberReports.length}</p>
+          <p className="mt-2 text-2xl font-bold text-[#101827]">{memberReportsCount}</p>
           <p className="mt-1 text-xs text-slate-500">
             {pendingReportsCount} awaiting manager review
           </p>
@@ -317,7 +314,6 @@ export default async function FieldDashboard({
             <Link
               key={label}
               href={href}
-              prefetch={false}
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:border-[#FF8A00] hover:bg-orange-50/40 transition-colors"
             >
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white border border-slate-200 text-[#FF8A00]">
@@ -336,7 +332,6 @@ export default async function FieldDashboard({
             <h2 className="text-lg font-bold text-[#101827]">Cooperatives Overview (Max 15 Members)</h2>
             <Link
               href="/dashboard/field/cooperative"
-              prefetch={false}
               className="text-xs font-semibold text-[#FF8A00] hover:underline"
             >
               Manage Cooperatives &amp; Managers →
@@ -362,7 +357,7 @@ export default async function FieldDashboard({
         </div>
       )}
 
-      {(isLeader || isMember) && memberReports.length > 0 && (
+      {(isLeader || isMember) && recentReports.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-lg font-bold text-[#101827]">
@@ -370,14 +365,13 @@ export default async function FieldDashboard({
             </h2>
             <Link
               href="/dashboard/field/member-reports"
-              prefetch={false}
               className="text-xs font-semibold text-[#FF8A00] hover:underline"
             >
               Open Reports Workspace →
             </Link>
           </div>
           <div className="divide-y divide-slate-100">
-            {memberReports.slice(0, 4).map((r) => (
+            {recentReports.map((r) => (
               <div key={r.id} className="py-3 flex items-center justify-between gap-4 text-xs">
                 <div>
                   <p className="font-semibold text-[#101827]">{r.summary}</p>

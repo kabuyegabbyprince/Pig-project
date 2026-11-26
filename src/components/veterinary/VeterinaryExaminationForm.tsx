@@ -11,19 +11,24 @@ interface PigOption {
   id: string;
   tagNumber: string;
   healthStatus: PigHealthStatus;
-  breed: string | null;
+  sex: string | null;
 }
 
 interface VeterinaryExaminationFormProps {
   pigs: PigOption[];
   backHref?: string;
+  initialPigId?: string;
 }
 
-export function VeterinaryExaminationForm({ pigs, backHref = "/dashboard/vet" }: VeterinaryExaminationFormProps) {
+export function VeterinaryExaminationForm({
+  pigs,
+  backHref = "/dashboard/vet",
+  initialPigId = "",
+}: VeterinaryExaminationFormProps) {
   const router = useRouter();
   const today = new Date().toISOString().split("T")[0];
 
-  const [pigId, setPigId] = useState<string>("");
+  const [pigId, setPigId] = useState<string>(initialPigId);
   const [diagnosis, setDiagnosis] = useState<string>("");
   const [healthStatus, setHealthStatus] = useState<string>(PigHealthStatus.HEALTHY);
   const [medication, setMedication] = useState<string>("");
@@ -136,7 +141,7 @@ export function VeterinaryExaminationForm({ pigs, backHref = "/dashboard/vet" }:
                 <option value="">-- Choose Pig from System Registry ({pigs.length} available) --</option>
                 {pigs.map((p) => (
                   <option key={p.id} value={p.id}>
-                    Tag: {p.tagNumber} {p.breed ? `(${p.breed})` : ""} — Status: {p.healthStatus}
+                    Tag: {p.tagNumber} {p.sex ? `(${p.sex})` : ""} — Status: {p.healthStatus}
                   </option>
                 ))}
               </select>

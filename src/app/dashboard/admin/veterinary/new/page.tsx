@@ -3,7 +3,17 @@ import { VeterinaryExaminationForm } from "@/components/veterinary/VeterinaryExa
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminNewVetVisitPage() {
-  const pigs = await getAllPigsForVet();
-  return <VeterinaryExaminationForm pigs={pigs} backHref="/dashboard/admin/veterinary" />;
+export default async function AdminNewVetVisitPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pigId?: string }>;
+}) {
+  const [{ pigId }, pigs] = await Promise.all([searchParams, getAllPigsForVet()]);
+  return (
+    <VeterinaryExaminationForm
+      pigs={pigs}
+      backHref="/dashboard/admin/veterinary"
+      initialPigId={pigId ?? ""}
+    />
+  );
 }

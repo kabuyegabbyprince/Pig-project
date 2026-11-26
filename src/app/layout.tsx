@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { AuthProvider } from "@/components/AuthProvider";
 
 export const viewport: Viewport = {
@@ -24,18 +22,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let session = null;
-  try {
-    session = await getServerSession(authOptions);
-  } catch {
-    session = null;
-  }
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -61,7 +52,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-screen overflow-x-clip font-sans antialiased bg-gray-50 text-gray-900">
-        <AuthProvider session={session}>{children}</AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

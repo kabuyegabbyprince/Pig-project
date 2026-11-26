@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updatePersonalProfile, changeUserPassword } from "@/app/actions/user";
@@ -32,7 +31,7 @@ export default async function PersonalSettingsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if (!session?.user?.id) {
     redirect("/login");
   }
@@ -213,7 +212,7 @@ export default async function PersonalSettingsPage({
                 Address / Administrative Location
               </h3>
               <p className="text-xs text-[#7a8a82] mt-0.5">
-                Select your District, Sector, Cell, and Village from Rwanda administrative divisions.
+                Enter your District, Sector, Cell, and Village.
               </p>
             </div>
 

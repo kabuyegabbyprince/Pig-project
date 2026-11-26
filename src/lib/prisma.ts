@@ -975,11 +975,123 @@ function createSupabasePrisma(): PrismaClient {
     return { data: text ? JSON.parse(text) : null, count };
   }
 
-  async function fetchAllMatching(model: string, where?: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+  function extractWhereFields(where: Record<string, unknown> | undefined, out: Set<string>) {
+    const flat = flattenWhere(where);
+    if (!flat) return;
+    for (const [key, val] of Object.entries(flat)) {
+      if (val === undefined) continue;
+      if ((key === "AND" || key === "OR") && Array.isArray(val)) {
+        for (const sub of val) {
+          if (sub && typeof sub === "object") {
+            extractWhereFields(sub as Record<string, unknown>, out);
+          }
+        }
+        continue;
+      }
+      if (key === "NOT") {
+        if (Array.isArray(val)) {
+          for (const sub of val) {
+            if (sub && typeof sub === "object") {
+              extractWhereFields(sub as Record<string, unknown>, out);
+            }
+          }
+        } else if (val && typeof val === "object") {
+          extractWhereFields(val as Record<string, unknown>, out);
+        }
+        continue;
+      }
+      out.add(key);
+    }
+  }
+
+  function extractOrderByFields(orderBy: unknown, out: Set<string>) {
+    if (!orderBy) return;
+    const specs = Array.isArray(orderBy) ? orderBy : [orderBy];
+    for (const s of specs) {
+      if (s && typeof s === "object") {
+        for (const k of Object.keys(s as Record<string, unknown>)) {
+          out.add(k);
+        }
+      }
+    }
+  }
+
+  function collectRequiredCols(
+    model: string,
+    opts?: {
+      where?: Record<string, unknown>;
+      select?: Record<string, unknown>;
+      orderBy?: unknown;
+      extraFields?: string[];
+      minimalProjection?: boolean;
+    }
+  ): string[] | null {
+    if (!opts?.select && !opts?.minimalProjection && (!opts?.extraFields || opts.extraFields.length === 0)) {
+      return null;
+    }
+
+    const fields = new Set<string>(["id"]);
+    const rels = RELATIONS[model] ?? {};
+    const isUsersTable = model === "user" || model === "backendUser";
+
+    if (opts.select) {
+      for (const [k, v] of Object.entries(opts.select)) {
+        if (!v) continue;
+        if (k === "_count" && typeof v === "object") {
+          const countSel = (v as { select?: Record<string, boolean> }).select ?? {};
+          for (const [relName, enabled] of Object.entries(countSel)) {
+            if (enabled && relName in rels) {
+              fields.add(rels[relName].localField);
+            }
+          }
+          continue;
+        }
+        if (k in rels) {
+          fields.add(rels[k].localField);
+          continue;
+        }
+        fields.add(k);
+      }
+    }
+
+    if (opts.extraFields) {
+      for (const f of opts.extraFields) {
+        fields.add(f);
+      }
+    }
+
+    extractWhereFields(opts.where, fields);
+    extractOrderByFields(opts.orderBy, fields);
+
+    const cols = new Set<string>();
+    for (const f of fields) {
+      if (f in rels) continue;
+      if (isUsersTable && USER_VIRTUAL_FIELDS.has(f)) {
+        cols.add("status");
+        cols.add("updated_at");
+        continue;
+      }
+      cols.add(toCol(model, f));
+    }
+
+    return Array.from(cols);
+  }
+
+  async function fetchAllMatching(
+    model: string,
+    where?: Record<string, unknown>,
+    projOpts?: {
+      select?: Record<string, unknown>;
+      orderBy?: unknown;
+      extraFields?: string[];
+      minimalProjection?: boolean;
+    }
+  ): Promise<Record<string, unknown>[]> {
     const table = TABLE_MAP[model];
     if (!table) return [];
     const params = buildPostgrestFilters(model, where);
-    params.set("select", "*");
+    const cols = collectRequiredCols(model, { where, ...projOpts });
+    params.set("select", cols && cols.length > 0 ? cols.join(",") : "*");
     const { data } = await request(table, "GET", { params });
     const rows = Array.isArray(data) ? data.map((r) => mapRowFromDb(model, r as Record<string, unknown>)) : [];
     return rows.filter((r) => matchesWhere(r, where));
@@ -1038,7 +1150,15 @@ function createSupabasePrisma(): PrismaClient {
         ...(subOpts.where as Record<string, unknown> | undefined),
         [rel.foreignField]: { in: ids },
       };
-      let targetRows = await fetchAllMatching(rel.targetModel, targetWhere);
+      const subSelect =
+        subOpts.select && typeof subOpts.select === "object"
+          ? (subOpts.select as Record<string, unknown>)
+          : undefined;
+      let targetRows = await fetchAllMatching(rel.targetModel, targetWhere, {
+        select: subSelect,
+        orderBy: subOpts.orderBy,
+        extraFields: subSelect ? [rel.foreignField] : undefined,
+      });
       if (subOpts.orderBy) {
         targetRows = sortRows(targetRows, subOpts.orderBy);
       }
@@ -1078,7 +1198,12 @@ function createSupabasePrisma(): PrismaClient {
 
     return {
       async findMany(args: Record<string, unknown> = {}) {
-        let rows = await fetchAllMatching(model, args.where as Record<string, unknown> | undefined);
+        const where = args.where as Record<string, unknown> | undefined;
+        const select = !args.include ? (args.select as Record<string, unknown> | undefined) : undefined;
+        let rows = await fetchAllMatching(model, where, {
+          select,
+          orderBy: args.orderBy,
+        });
         if (args.orderBy) {
           rows = sortRows(rows, args.orderBy);
         }
@@ -1119,12 +1244,23 @@ function createSupabasePrisma(): PrismaClient {
       },
 
       async count(args: Record<string, unknown> = {}) {
-        const rows = await fetchAllMatching(model, args.where as Record<string, unknown> | undefined);
+        const rows = await fetchAllMatching(model, args.where as Record<string, unknown> | undefined, {
+          minimalProjection: true,
+        });
         return rows.length;
       },
 
       async aggregate(args: Record<string, unknown> = {}) {
-        const rows = await fetchAllMatching(model, args.where as Record<string, unknown> | undefined);
+        const sumFields =
+          args._sum && typeof args._sum === "object"
+            ? Object.entries(args._sum as Record<string, boolean>)
+                .filter(([, enabled]) => Boolean(enabled))
+                .map(([field]) => field)
+            : [];
+        const rows = await fetchAllMatching(model, args.where as Record<string, unknown> | undefined, {
+          minimalProjection: true,
+          extraFields: sumFields,
+        });
         const _sum: Record<string, unknown> = {};
         if (args._sum && typeof args._sum === "object") {
           for (const [field, enabled] of Object.entries(args._sum as Record<string, boolean>)) {
