@@ -196,7 +196,7 @@ export function EnrollCooperativeBeneficiaryForm({
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Phone Number
+                  Phone Number (Optional)
                 </label>
                 <input
                   type="text"
@@ -235,7 +235,7 @@ export function EnrollCooperativeBeneficiaryForm({
 
               <div className="sm:col-span-2 pt-2 border-t border-slate-100 space-y-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Member Address (District, Sector, Cell, Village) *
+                  Member Address (District, Sector, Cell, Village — Optional)
                 </p>
                 <LocationPicker
                   initialDistrictName={district}

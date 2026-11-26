@@ -8,10 +8,7 @@ import { getActiveUser } from "@/lib/active-user";
 import { normalizePhone } from "@/lib/phone-utils";
 import { syncSupabaseAuthUser } from "@/lib/supabase-auth";
 import { normalizeRoleValue } from "@/lib/roles";
-import {
-  getUserAddressProfile,
-  saveUserAddressProfile,
-} from "@/lib/user-profile-address";
+import { saveUserAddressProfile } from "@/lib/user-profile-address";
 import { syncBeneficiaryRecordForCoopUser } from "@/app/actions/cooperative";
 
 const MAX_COOPERATIVE_MEMBERS = 15;
@@ -132,12 +129,11 @@ export async function enrollCooperativeBeneficiary(formData: FormData): Promise<
     }
 
     const hashedPassword = await bcrypt.hash(staticPassword, 10);
-    const actorAddress = await getUserAddressProfile(actor.id);
 
-    const memberDistrict = districtName || actorAddress.districtName || null;
-    const memberSector = sectorName || actorAddress.sectorName || null;
-    const memberCell = cellName || actorAddress.cellName || coop.cellName;
-    const memberVillage = villageName || actorAddress.villageName || null;
+    const memberDistrict = districtName || null;
+    const memberSector = sectorName || null;
+    const memberCell = cellName || null;
+    const memberVillage = villageName || null;
     const memberAddress = address || null;
 
     const previousLeader =
@@ -234,7 +230,7 @@ export async function enrollCooperativeBeneficiary(formData: FormData): Promise<
       role: assignedRole,
       isActive: true,
       cooperativeName: coop.name,
-      cellName: memberCell,
+      cellName: memberCell || coop.cellName,
       districtName: memberDistrict,
       sectorName: memberSector,
       villageName: memberVillage,

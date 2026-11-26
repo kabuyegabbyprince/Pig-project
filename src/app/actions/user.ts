@@ -312,16 +312,6 @@ export async function updatePersonalProfile(formData: FormData) {
     const finalNationalId = prevUser?.nationalId || submittedNationalId || null;
 
     if (prevUser?.role === Role.CELL_MANAGER || prevUser?.role === Role.COOPERATIVE_LEADER || prevUser?.role === Role.COOPERATIVE_MEMBER) {
-      if (!phone) {
-        redirect(
-          `${safeReturnTo}?profileError=${encodeURIComponent("Phone number is required.")}`
-        );
-      }
-      if (!districtName || !sectorName || !cellName) {
-        redirect(
-          `${safeReturnTo}?profileError=${encodeURIComponent("Please enter your District, Sector, and Cell address.")}`
-        );
-      }
       if (!finalNationalId) {
         redirect(
           `${safeReturnTo}?profileError=${encodeURIComponent("National ID (Irangamuntu) is required.")}`

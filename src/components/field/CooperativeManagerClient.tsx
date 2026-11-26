@@ -615,10 +615,9 @@ export function CooperativeManagerClient({
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Phone Number *
+                      Phone Number (Optional)
                     </label>
                     <input
-                      required
                       value={memberPhone}
                       onChange={(e) => setMemberPhone(e.target.value)}
                       placeholder="+250 788 000 000"
@@ -657,7 +656,7 @@ export function CooperativeManagerClient({
 
                   <div className="sm:col-span-2 pt-2 border-t border-slate-100 space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                      Member Address (District, Sector, Cell, Village) *
+                      Member Address (District, Sector, Cell, Village — Optional)
                     </p>
                     <LocationPicker
                       key={memberLocationResetKey}
@@ -1105,7 +1104,7 @@ export function CooperativeManagerClient({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Phone Number
+                    Phone Number (Optional)
                   </label>
                   <input
                     value={editPhone}
@@ -1129,7 +1128,7 @@ export function CooperativeManagerClient({
 
               <div className="pt-2 border-t border-slate-100 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Address (District, Sector, Cell, Village) *
+                  Address (District, Sector, Cell, Village — Optional)
                 </p>
                 <LocationPicker
                   key={editingMember.id}

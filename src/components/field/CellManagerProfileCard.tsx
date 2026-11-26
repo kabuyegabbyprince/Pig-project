@@ -51,12 +51,19 @@ export function CellManagerProfileCard({
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-[#FF8A00]">
-                Assigned Cell Address (Stored)
+                Cell Manager Profile (Stored)
               </p>
-              <p className="text-sm font-bold text-[#101827] mt-0.5">{locationSummary}</p>
+              <p className="text-sm font-bold text-[#101827] mt-0.5">
+                {locationSummary || "Duty address not set (optional)"}
+              </p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Phone: {userPhone} {userNationalId ? `· National ID: ${userNationalId}` : ""}
-                {addressProfile.address ? ` · ${addressProfile.address}` : ""}
+                {[
+                  userPhone ? `Phone: ${userPhone}` : null,
+                  userNationalId ? `National ID: ${userNationalId}` : null,
+                  addressProfile.address || null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Profile complete"}
               </p>
             </div>
           </div>
@@ -88,7 +95,7 @@ export function CellManagerProfileCard({
               Complete Cell Manager Profile &amp; Duty Address
             </h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              Enter your phone number, National ID, and exact District, Sector, Cell, and Village so your field operations and cooperative records map to your address.
+              Enter your National ID, and optionally your phone number and District, Sector, Cell, and Village details.
             </p>
           </div>
         </div>
@@ -135,13 +142,12 @@ export function CellManagerProfileCard({
               htmlFor="cm-phone"
               className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
             >
-              Phone Number *
+              Phone Number (Optional)
             </label>
             <input
               id="cm-phone"
               name="phone"
               type="tel"
-              required
               defaultValue={userPhone}
               placeholder="+250 78..."
               className="mt-1.5 block w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"

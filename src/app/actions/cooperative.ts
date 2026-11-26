@@ -986,10 +986,10 @@ export async function addCooperativeMember(formData: FormData): Promise<{
   const requestedRoleRaw = String(formData.get("role") || "COOPERATIVE_MEMBER").trim();
   const staticPassword = String(formData.get("staticPassword") || "");
 
-  if (!cooperativeId || !name || !email || !staticPassword || !nationalId || !districtName || !sectorName || !cellName) {
+  if (!cooperativeId || !name || !email || !staticPassword || !nationalId) {
     return {
       success: false,
-      error: "Cooperative, Full Name, Email, National ID, District, Sector, Cell, and Static Initial Password are required.",
+      error: "Cooperative, Full Name, Email, National ID, and Static Initial Password are required.",
     };
   }
 
@@ -1102,11 +1102,10 @@ export async function addCooperativeMember(formData: FormData): Promise<{
       });
     }
 
-    const actorAddress = await getUserAddressProfile(actor.id);
-    const memberDistrict = districtName || actorAddress.districtName || null;
-    const memberSector = sectorName || actorAddress.sectorName || null;
-    const memberCell = cellName || actorAddress.cellName || coop.cellName;
-    const memberVillage = villageName || actorAddress.villageName || null;
+    const memberDistrict = districtName || null;
+    const memberSector = sectorName || null;
+    const memberCell = cellName || null;
+    const memberVillage = villageName || null;
     const memberAddress = address || null;
 
     const baseMemberData = {
@@ -1173,7 +1172,7 @@ export async function addCooperativeMember(formData: FormData): Promise<{
       role: assignedRole,
       isActive: true,
       cooperativeName: coop.name,
-      cellName: memberCell,
+      cellName: memberCell || coop.cellName,
       districtName: memberDistrict,
       sectorName: memberSector,
       villageName: memberVillage,
@@ -1300,10 +1299,10 @@ export async function updateCooperativeMemberDetails(formData: FormData): Promis
   const villageName = String(formData.get("village") || "").trim();
   const address = String(formData.get("address") || "").trim();
 
-  if (!userId || !name || !districtName || !sectorName || !cellName) {
+  if (!userId || !name) {
     return {
       success: false,
-      error: "Member Name, District, Sector, and Cell are required.",
+      error: "Member Name is required.",
     };
   }
 

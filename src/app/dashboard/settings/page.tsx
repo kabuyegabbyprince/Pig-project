@@ -51,7 +51,7 @@ export default async function PersonalSettingsPage({
   const mustChangePassword = Boolean(user.mustChangePassword);
   const isCellManagerIncomplete =
     user.role === "CELL_MANAGER" &&
-    !isCellManagerProfileComplete(user.phone, addressProfile);
+    !isCellManagerProfileComplete(user.phone, addressProfile, user.nationalId);
   const params = await searchParams;
   const profileSuccess = params.profileSuccess === "1";
   const profileError = typeof params.profileError === "string" ? params.profileError : null;
@@ -96,9 +96,9 @@ export default async function PersonalSettingsPage({
         <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-[#101827]">
           <MapPin className="h-5 w-5 shrink-0 text-[#FF8A00] mt-0.5" />
           <div>
-            <p className="font-bold">Cell Manager Profile &amp; Address Incomplete</p>
+            <p className="font-bold">Cell Manager Profile Incomplete</p>
             <p className="mt-0.5 text-xs text-slate-700">
-              Please provide your phone number and complete your Rwanda address (District, Sector, and Cell) below so your profile is saved in the database.
+              Please provide your National ID below (phone number and Rwanda address are optional) so your profile is saved in the database.
             </p>
           </div>
         </div>
@@ -183,13 +183,12 @@ export default async function PersonalSettingsPage({
 
             <div>
               <label htmlFor="phone" className="block text-xs font-semibold uppercase tracking-wider text-[#5d6d64]">
-                Phone Number {user.role === "CELL_MANAGER" ? "*" : ""}
+                Phone Number (Optional)
               </label>
               <input
                 id="phone"
                 name="phone"
                 type="tel"
-                required={user.role === "CELL_MANAGER"}
                 defaultValue={user.phone ?? ""}
                 placeholder="+250 78..."
                 className="mt-1.5 block w-full rounded-xl border border-[#dfe7df] bg-[#fcfdfc] px-3.5 py-2.5 text-sm text-[#1b2d24] focus:border-[#173d2e] focus:outline-none focus:ring-1 focus:ring-[#173d2e]"
@@ -231,10 +230,10 @@ export default async function PersonalSettingsPage({
           <div className="pt-2 border-t border-[#dfe7df]/70 space-y-4">
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5d6d64]">
-                Address / Administrative Location
+                Address / Administrative Location (Optional)
               </h3>
               <p className="text-xs text-[#7a8a82] mt-0.5">
-                Enter your District, Sector, Cell, and Village.
+                Optionally enter your District, Sector, Cell, and Village.
               </p>
             </div>
 

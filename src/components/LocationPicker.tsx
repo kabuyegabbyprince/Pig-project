@@ -17,6 +17,7 @@ const inputClass =
   "mt-1 block w-full border border-[#d9e1d8] rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-1 focus:ring-[#FF8A00] focus:border-[#FF8A00] sm:text-sm bg-white text-[#1c2b23] transition-colors";
 
 export function LocationPicker({
+  addressRequired = false,
   villageRequired = false,
   initialDistrictId = "",
   initialSectorId = "",
@@ -28,6 +29,7 @@ export function LocationPicker({
   initialVillageName = "",
   onChange,
 }: {
+  addressRequired?: boolean;
   villageRequired?: boolean;
   initialDistrictId?: string;
   initialSectorId?: string;
@@ -76,13 +78,13 @@ export function LocationPicker({
 
       <div>
         <label htmlFor="districtInput" className="block text-sm font-medium text-[#5d6e64]">
-          District *
+          District {addressRequired ? "*" : "(Optional)"}
         </label>
         <input
           id="districtInput"
           name="district"
           type="text"
-          required
+          required={addressRequired}
           value={districtName}
           onChange={(event) => {
             const val = event.target.value;
@@ -96,13 +98,13 @@ export function LocationPicker({
 
       <div>
         <label htmlFor="sectorInput" className="block text-sm font-medium text-[#5d6e64]">
-          Sector *
+          Sector {addressRequired ? "*" : "(Optional)"}
         </label>
         <input
           id="sectorInput"
           name="sector"
           type="text"
-          required
+          required={addressRequired}
           value={sectorName}
           onChange={(event) => {
             const val = event.target.value;
@@ -116,13 +118,13 @@ export function LocationPicker({
 
       <div>
         <label htmlFor="cellInput" className="block text-sm font-medium text-[#5d6e64]">
-          Cell *
+          Cell {addressRequired ? "*" : "(Optional)"}
         </label>
         <input
           id="cellInput"
           name="cell"
           type="text"
-          required
+          required={addressRequired}
           value={cellName}
           onChange={(event) => {
             const val = event.target.value;
