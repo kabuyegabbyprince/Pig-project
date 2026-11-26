@@ -4,17 +4,13 @@ import { existsSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
+import { getSupabaseServerConfig } from "@/lib/supabase-env";
 
 const GALLERY_BUCKET = "gallery";
 export const STORY_FROM_GROUND_CATEGORY = "STORY_FROM_GROUND";
 
 function getSupabaseStorageConfig() {
-  const url = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "");
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_SECRET_KEY?.trim();
-  if (!url || !key) return null;
-  return { url, key };
+  return getSupabaseServerConfig();
 }
 
 function getBucketPublicUrl(supabaseUrl: string, objectPath: string): string {

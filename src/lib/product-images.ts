@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { APP_CONFIG } from "@/lib/config";
+import { getSupabaseServerConfig } from "@/lib/supabase-env";
 
 const PRODUCT_IMAGE_BUCKET = APP_CONFIG.productImageBucket;
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -11,12 +12,7 @@ const ALLOWED_IMAGE_TYPES = new Set([
 ]);
 
 function getSupabaseStorageConfig() {
-  const url = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "");
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_SECRET_KEY?.trim();
-  if (!url || !key) return null;
-  return { url, key };
+  return getSupabaseServerConfig();
 }
 
 export function getProductImagePublicUrl(supabaseUrl: string, objectPath: string): string {

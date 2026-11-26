@@ -1,4 +1,5 @@
 import "server-only";
+import { getSupabaseServerConfig } from "@/lib/supabase-env";
 
 export type SupabaseAuthUser = {
   id: string;
@@ -16,14 +17,10 @@ type SupabaseAuthConfig = {
 };
 
 function getSupabaseAuthConfig(): SupabaseAuthConfig | null {
-  const url = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "");
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_SECRET_KEY?.trim() ||
-    "";
-  const anonKey = process.env.SUPABASE_ANON_KEY?.trim() || serviceKey;
-  if (!url || !serviceKey) return null;
-  return { url, serviceKey, anonKey };
+  const serverCfg = getSupabaseServerConfig();
+  if (!serverCfg) return null;
+  const anonKey = process.env.SUPABASE_ANON_KEY?.trim() || serverCfg.key;
+  return { url: serverCfg.url, serviceKey: serverCfg.key, anonKey };
 }
 
 export async function findSupabaseAuthUserByEmail(

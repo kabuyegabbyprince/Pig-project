@@ -1904,3 +1904,153 @@ END $$;
 
 -- Refresh PostgREST schema cache immediately
 NOTIFY pgrst, 'reload schema';
+
+
+
+
+
+
+
+-- ============================================================================
+-- Pig Project Rwanda — Idempotent Supabase / PostgreSQL Schema Update
+-- Run this script in your Supabase SQL Editor to ensure `public.users`,
+-- `public."Beneficiary"`, `public."Pig"`, and Cooperative workflow tables
+-- persist all cooperative member & cell manager details cleanly.
+-- ============================================================================
+
+-- 1. Users table: National ID, Cooperative membership, Duty/Member Address & Onboarding
+ALTER TABLE IF EXISTS public.users
+  ADD COLUMN IF NOT EXISTS national_id TEXT,
+  ADD COLUMN IF NOT EXISTS cooperative_id TEXT,
+  ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS district_name TEXT,
+  ADD COLUMN IF NOT EXISTS sector_name TEXT,
+  ADD COLUMN IF NOT EXISTS cell_name TEXT,
+  ADD COLUMN IF NOT EXISTS village_name TEXT,
+  ADD COLUMN IF NOT EXISTS address TEXT,
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_national_id_key
+  ON public.users (national_id)
+  WHERE national_id IS NOT NULL AND national_id <> '';
+
+CREATE INDEX IF NOT EXISTS users_cooperative_id_idx
+  ON public.users (cooperative_id);
+
+CREATE INDEX IF NOT EXISTS users_role_idx
+  ON public.users (role);
+
+-- 2. Beneficiary table: ensure cooperative member profile columns exist
+ALTER TABLE IF EXISTS public."Beneficiary"
+  ADD COLUMN IF NOT EXISTS "nationalId" TEXT,
+  ADD COLUMN IF NOT EXISTS "phone" TEXT,
+  ADD COLUMN IF NOT EXISTS "gender" TEXT,
+  ADD COLUMN IF NOT EXISTS "householdSize" INTEGER,
+  ADD COLUMN IF NOT EXISTS "district" TEXT,
+  ADD COLUMN IF NOT EXISTS "sector" TEXT,
+  ADD COLUMN IF NOT EXISTS "cell" TEXT,
+  ADD COLUMN IF NOT EXISTS "village" TEXT,
+  ADD COLUMN IF NOT EXISTS "alternativePhone" TEXT,
+  ADD COLUMN IF NOT EXISTS "savingsGroup" TEXT,
+  ADD COLUMN IF NOT EXISTS "notes" TEXT,
+  ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
+
+CREATE INDEX IF NOT EXISTS beneficiary_national_id_idx
+  ON public."Beneficiary" ("nationalId");
+
+CREATE INDEX IF NOT EXISTS beneficiary_phone_idx
+  ON public."Beneficiary" ("phone");
+
+-- 3. Pig table: cooperative ownership & livestock finance tracking columns
+ALTER TABLE IF EXISTS public."Pig"
+  ADD COLUMN IF NOT EXISTS cooperative_id TEXT,
+  ADD COLUMN IF NOT EXISTS owner_member_id TEXT,
+  ADD COLUMN IF NOT EXISTS owner_member_name TEXT,
+  ADD COLUMN IF NOT EXISTS pig_type TEXT,
+  ADD COLUMN IF NOT EXISTS days_age INTEGER,
+  ADD COLUMN IF NOT EXISTS batch_code TEXT,
+  ADD COLUMN IF NOT EXISTS stocked_by_finance_id TEXT;
+
+CREATE INDEX IF NOT EXISTS pig_cooperative_id_idx
+  ON public."Pig" (cooperative_id);
+
+CREATE INDEX IF NOT EXISTS pig_owner_member_id_idx
+  ON public."Pig" (owner_member_id);
+
+-- 4. Cooperatives table (max 15 members per cooperative)
+CREATE TABLE IF NOT EXISTS public.cooperatives (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  code TEXT,
+  cell_name TEXT NOT NULL,
+  max_members INTEGER NOT NULL DEFAULT 15,
+  leader_user_id TEXT,
+  leader_name TEXT,
+  created_by_id TEXT NOT NULL,
+  created_by_name TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS cooperatives_created_by_id_idx
+  ON public.cooperatives (created_by_id);
+
+CREATE INDEX IF NOT EXISTS cooperatives_leader_user_id_idx
+  ON public.cooperatives (leader_user_id);
+
+-- 5. Cooperative Member Reports table
+CREATE TABLE IF NOT EXISTS public.cooperative_member_reports (
+  id TEXT PRIMARY KEY,
+  cooperative_id TEXT NOT NULL REFERENCES public.cooperatives(id) ON DELETE CASCADE,
+  cooperative_name TEXT NOT NULL,
+  member_id TEXT NOT NULL,
+  member_name TEXT NOT NULL,
+  leader_id TEXT,
+  leader_name TEXT,
+  pig_id TEXT,
+  pig_tag TEXT,
+  report_type TEXT NOT NULL DEFAULT 'ROUTINE_UPDATE',
+  animal_count INTEGER NOT NULL DEFAULT 1,
+  estimated_weight_kg NUMERIC(8, 2),
+  summary TEXT NOT NULL,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'SUBMITTED',
+  leader_notes TEXT,
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS cooperative_member_reports_cooperative_id_idx
+  ON public.cooperative_member_reports (cooperative_id);
+
+CREATE INDEX IF NOT EXISTS cooperative_member_reports_member_id_idx
+  ON public.cooperative_member_reports (member_id);
+
+CREATE INDEX IF NOT EXISTS cooperative_member_reports_status_idx
+  ON public.cooperative_member_reports (status);
+
+-- 6. Cooperative Member Qualification Payments table (16,000 + 2,800 = 18,800 RWF)
+CREATE TABLE IF NOT EXISTS public.cooperative_member_payments (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  cooperative_id TEXT NOT NULL,
+  pig_value_fee NUMERIC(10, 2) NOT NULL DEFAULT 16000.00,
+  tax_fee NUMERIC(10, 2) NOT NULL DEFAULT 2800.00,
+  total_amount NUMERIC(10, 2) NOT NULL DEFAULT 18800.00,
+  momo_reference TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  verified_by_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS cooperative_member_payments_member_id_idx
+  ON public.cooperative_member_payments (member_id);
+
+CREATE INDEX IF NOT EXISTS cooperative_member_payments_cooperative_id_idx
+  ON public.cooperative_member_payments (cooperative_id);
+
+-- 7. Reload PostgREST schema cache so Supabase API immediately sees new columns
+NOTIFY pgrst, 'reload schema';

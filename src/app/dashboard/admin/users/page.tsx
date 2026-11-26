@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Plus, BarChart3 } from "lucide-react";
-import { prisma } from "@/lib/prisma";
+import { prisma, isSupabaseSchemaMissingError } from "@/lib/prisma";
 import {
   UsersManagementClient,
   ManagedUser,
@@ -19,27 +19,57 @@ export default async function UsersManagementPage() {
     redirect("/dashboard");
   }
 
+  async function fetchUsersSafe() {
+    try {
+      return await prisma.user.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          nationalId: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          districtName: true,
+          sectorName: true,
+          cellName: true,
+          villageName: true,
+          address: true,
+          cooperativeId: true,
+        },
+      });
+    } catch (err) {
+      if (isSupabaseSchemaMissingError(err)) {
+        const rows = await prisma.user.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            isActive: true,
+            createdAt: true,
+            districtName: true,
+            sectorName: true,
+            cellName: true,
+            villageName: true,
+            address: true,
+            cooperativeId: true,
+          },
+        });
+        return rows.map((u) => ({ ...u, nationalId: null as string | null }));
+      }
+      throw err;
+    }
+  }
+
   const [rawUsers, rawCooperatives] = await Promise.all([
-    prisma.user.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        nationalId: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        districtName: true,
-        sectorName: true,
-        cellName: true,
-        villageName: true,
-        address: true,
-        cooperativeId: true,
-      },
-    }),
+    fetchUsersSafe(),
     prisma.cooperative
       .findMany({
         select: {

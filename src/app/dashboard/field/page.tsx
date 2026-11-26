@@ -3,13 +3,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
 import { getFieldDashboardSummary } from "@/app/actions/cooperative";
-import { prisma } from "@/lib/prisma";
+import { prisma, isSupabaseSchemaMissingError } from "@/lib/prisma";
 import {
   getUserAddressProfile,
   isCellManagerProfileComplete,
 } from "@/lib/user-profile-address";
 import { CellManagerProfileCard } from "@/components/field/CellManagerProfileCard";
 import {
+  AlertTriangle,
   ArrowLeftCircle,
   ArrowRightCircle,
   Building2,
@@ -25,6 +26,36 @@ import {
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+async function loadCellManagerUserSummary(userId: string) {
+  try {
+    const row = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, phone: true, nationalId: true },
+    });
+    return { user: row, schemaMigrationNeeded: false };
+  } catch (err) {
+    if (isSupabaseSchemaMissingError(err)) {
+      const fallback = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, phone: true },
+      });
+      const linkedBen = await prisma.beneficiary
+        .findFirst({
+          where: { beneficiaryNumber: `COOP-${userId}` },
+          select: { nationalId: true },
+        })
+        .catch(() => null);
+      return {
+        user: fallback
+          ? { ...fallback, nationalId: linkedBen?.nationalId ?? null }
+          : null,
+        schemaMigrationNeeded: true,
+      };
+    }
+    throw err;
+  }
+}
 
 export default async function FieldDashboard({
   searchParams,
@@ -47,15 +78,16 @@ export default async function FieldDashboard({
   const isCellOrAdmin = role === "CELL_MANAGER" || role === "SUPER_ADMIN";
 
   const isCellManager = role === "CELL_MANAGER";
-  const [cellUserRow, cellAddressProfile] = isCellManager && session.user?.id
+
+  const [cellSummaryResult, cellAddressProfile] = isCellManager && session.user?.id
     ? await Promise.all([
-        prisma.user.findUnique({
-          where: { id: session.user.id },
-          select: { name: true, phone: true, nationalId: true },
-        }),
+        loadCellManagerUserSummary(session.user.id),
         getUserAddressProfile(session.user.id),
       ])
-    : [null, null];
+    : [{ user: null, schemaMigrationNeeded: false }, null];
+
+  const cellUserRow = cellSummaryResult.user;
+  const schemaMigrationNeeded = cellSummaryResult.schemaMigrationNeeded;
 
   const isCellProfileComplete =
     isCellManager && cellAddressProfile
@@ -208,6 +240,19 @@ export default async function FieldDashboard({
             <Settings className="h-3.5 w-3.5 text-[#FF8A00]" />
             <span>Change Password</span>
           </Link>
+        </div>
+      )}
+
+      {schemaMigrationNeeded && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-950 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 text-[#FF8A00] shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Database Column Update Pending (update.sql)</p>
+            <p className="mt-0.5 leading-relaxed">
+              The <span className="font-mono font-semibold">users.national_id</span> column is not yet provisioned in Supabase. Execute{" "}
+              <span className="font-mono font-semibold">update.sql</span> in your Supabase SQL Editor so National IDs save directly on user accounts.
+            </p>
+          </div>
         </div>
       )}
 

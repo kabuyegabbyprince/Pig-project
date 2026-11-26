@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { getSupabaseServerConfig } from "@/lib/supabase-env";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -842,6 +843,15 @@ export class SupabaseTableMissingError extends Error {
   }
 }
 
+export class SupabaseColumnMissingError extends Error {
+  table: string;
+  constructor(table: string, detail?: string) {
+    super(detail || `A required column on table "${table}" is not yet provisioned in Supabase.`);
+    this.name = "SupabaseColumnMissingError";
+    this.table = table;
+  }
+}
+
 export function isSupabaseTableMissingError(err: unknown): boolean {
   return (
     err instanceof SupabaseTableMissingError ||
@@ -852,8 +862,18 @@ export function isSupabaseTableMissingError(err: unknown): boolean {
   );
 }
 
+export function isSupabaseColumnMissingError(err: unknown): boolean {
+  return (
+    err instanceof SupabaseColumnMissingError ||
+    (typeof err === "object" &&
+      err !== null &&
+      "name" in err &&
+      (err as { name?: string }).name === "SupabaseColumnMissingError")
+  );
+}
+
 export function isSupabaseSchemaMissingError(err: unknown): boolean {
-  if (isSupabaseTableMissingError(err)) return true;
+  if (isSupabaseTableMissingError(err) || isSupabaseColumnMissingError(err)) return true;
   const msg = err instanceof Error ? err.message : String(err ?? "");
   return (
     msg.includes("42703") ||
@@ -865,12 +885,7 @@ export function isSupabaseSchemaMissingError(err: unknown): boolean {
 }
 
 function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "");
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_SECRET_KEY?.trim();
-  if (!url || !key) return null;
-  return { url, key };
+  return getSupabaseServerConfig();
 }
 
 function buildPostgrestFilters(model: string, where?: Record<string, unknown>): URLSearchParams {
@@ -924,8 +939,6 @@ function buildPostgrestFilters(model: string, where?: Record<string, unknown>): 
 }
 
 function createSupabasePrisma(): PrismaClient {
-  const cfg = getSupabaseConfig()!;
-
   async function request(
     table: string,
     method: "GET" | "POST" | "PATCH" | "DELETE" | "HEAD",
@@ -935,6 +948,10 @@ function createSupabasePrisma(): PrismaClient {
       prefer?: string;
     }
   ): Promise<{ data: unknown; count: number | null }> {
+    const cfg = getSupabaseConfig();
+    if (!cfg) {
+      throw new Error("Supabase configuration is missing.");
+    }
     const qs = options?.params?.toString();
     const endpoint = `${cfg.url}/rest/v1/${table}${qs ? `?${qs}` : ""}`;
     const headers: Record<string, string> = {
@@ -956,7 +973,22 @@ function createSupabasePrisma(): PrismaClient {
 
     if (!res.ok) {
       const errText = await res.text();
-      if (res.status === 404 || errText.includes("PGRST205") || errText.includes("does not exist")) {
+      const isMissingColumn =
+        errText.includes("42703") ||
+        errText.includes("PGRST204") ||
+        /column .* does not exist/i.test(errText) ||
+        /Could not find the .* column/i.test(errText);
+      if (isMissingColumn) {
+        throw new SupabaseColumnMissingError(
+          table,
+          `Supabase column missing on ${table}: ${errText}`
+        );
+      }
+      if (
+        res.status === 404 ||
+        errText.includes("PGRST205") ||
+        /relation .* does not exist/i.test(errText)
+      ) {
         throw new SupabaseTableMissingError(table);
       }
       throw new Error(`Supabase REST error (${res.status}) on ${table}: ${errText}`);

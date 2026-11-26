@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { prisma, isSupabaseSchemaMissingError } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
@@ -103,15 +103,31 @@ export async function createUser(formData: FormData) {
 
   const normalizedPhone = phone ? normalizePhone(phone) : null;
 
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { email },
-        ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
-        ...(cleanNationalId ? [{ nationalId: cleanNationalId }] : []),
-      ],
-    },
-  });
+  let existingUser = null;
+  try {
+    existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+          ...(cleanNationalId ? [{ nationalId: cleanNationalId }] : []),
+        ],
+      },
+    });
+  } catch (err) {
+    if (isSupabaseSchemaMissingError(err)) {
+      existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+          ],
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   if (existingUser) {
     if (existingUser.email === email) {
@@ -132,22 +148,34 @@ export async function createUser(formData: FormData) {
   try {
     let createdUserId = "";
     await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          name,
-          email,
-          phone: normalizedPhone,
-          nationalId: cleanNationalId || null,
-          districtName: districtName || null,
-          sectorName: sectorName || null,
-          cellName: cellName || null,
-          villageName: villageName || null,
-          address: address || null,
-          password: hashedPassword,
-          role,
-          isActive: true,
-        },
-      });
+      const baseData = {
+        name,
+        email,
+        phone: normalizedPhone,
+        districtName: districtName || null,
+        sectorName: sectorName || null,
+        cellName: cellName || null,
+        villageName: villageName || null,
+        address: address || null,
+        password: hashedPassword,
+        role,
+        isActive: true,
+      };
+      let newUser;
+      try {
+        newUser = await tx.user.create({
+          data: {
+            ...baseData,
+            nationalId: cleanNationalId || null,
+          },
+        });
+      } catch (createErr) {
+        if (isSupabaseSchemaMissingError(createErr)) {
+          newUser = await tx.user.create({ data: baseData });
+        } else {
+          throw createErr;
+        }
+      }
       createdUserId = newUser.id;
 
       await tx.auditLog.create({
@@ -239,10 +267,47 @@ export async function updatePersonalProfile(formData: FormData) {
   }
 
   try {
-    const prevUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { email: true, name: true, phone: true, role: true, nationalId: true },
-    });
+    let prevUser: {
+      email: string;
+      name: string;
+      phone: string | null;
+      role: Role;
+      nationalId: string | null;
+      cooperativeId?: string | null;
+      isActive?: boolean;
+    } | null = null;
+
+    try {
+      prevUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          email: true,
+          name: true,
+          phone: true,
+          role: true,
+          nationalId: true,
+          cooperativeId: true,
+          isActive: true,
+        },
+      });
+    } catch (err) {
+      if (isSupabaseSchemaMissingError(err)) {
+        const fallback = await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: {
+            email: true,
+            name: true,
+            phone: true,
+            role: true,
+            cooperativeId: true,
+            isActive: true,
+          },
+        });
+        prevUser = fallback ? { ...fallback, nationalId: null } : null;
+      } else {
+        throw err;
+      }
+    }
 
     const finalNationalId = prevUser?.nationalId || submittedNationalId || null;
 
@@ -279,34 +344,79 @@ export async function updatePersonalProfile(formData: FormData) {
     }
 
     if (!prevUser?.nationalId && submittedNationalId) {
-      const existingWithNid = await prisma.user.findFirst({
-        where: {
-          nationalId: submittedNationalId,
-          NOT: { id: session.user.id },
-        },
-      });
-      if (existingWithNid) {
-        redirect(
-          `${safeReturnTo}?profileError=${encodeURIComponent("National ID is already registered to another user")}`
-        );
+      try {
+        const existingWithNid = await prisma.user.findFirst({
+          where: {
+            nationalId: submittedNationalId,
+            NOT: { id: session.user.id },
+          },
+        });
+        if (existingWithNid) {
+          redirect(
+            `${safeReturnTo}?profileError=${encodeURIComponent("National ID is already registered to another user")}`
+          );
+        }
+      } catch (err) {
+        if (!isSupabaseSchemaMissingError(err)) throw err;
       }
     }
 
     const prevAddress = await getUserAddressProfile(session.user.id);
 
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: {
-        name,
-        phone: phone || null,
-        nationalId: finalNationalId,
-        districtName: districtName || null,
-        sectorName: sectorName || null,
-        cellName: cellName || null,
-        villageName: villageName || null,
-        address: address || null,
-      },
-    });
+    const profileUpdateBase = {
+      name,
+      phone: phone || null,
+      districtName: districtName || null,
+      sectorName: sectorName || null,
+      cellName: cellName || null,
+      villageName: villageName || null,
+      address: address || null,
+    };
+
+    try {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: {
+          ...profileUpdateBase,
+          nationalId: finalNationalId,
+        },
+      });
+    } catch (err) {
+      if (isSupabaseSchemaMissingError(err)) {
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: profileUpdateBase,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    if (
+      prevUser &&
+      (prevUser.role === Role.COOPERATIVE_MEMBER || prevUser.role === Role.COOPERATIVE_LEADER) &&
+      prevUser.cooperativeId
+    ) {
+      const coop = await prisma.cooperative
+        .findUnique({ where: { id: prevUser.cooperativeId } })
+        .catch(() => null);
+      if (coop) {
+        const { syncBeneficiaryRecordForCoopUser } = await import("@/app/actions/cooperative");
+        await syncBeneficiaryRecordForCoopUser({
+          userId: session.user.id,
+          name,
+          phone: phone || null,
+          nationalId: finalNationalId,
+          role: prevUser.role,
+          isActive: Boolean(prevUser.isActive ?? true),
+          cooperativeName: coop.name,
+          cellName: cellName || coop.cellName,
+          districtName: districtName || null,
+          sectorName: sectorName || null,
+          villageName: villageName || null,
+        }).catch(() => null);
+      }
+    }
 
     const nextAddress = {
       districtId,
@@ -644,10 +754,30 @@ export async function updateUserAdminDetails(formData: FormData) {
     return { success: false, error: "Missing required fields (User ID, Name, Email)." };
   }
 
-  const existing = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, nationalId: true, email: true, phone: true, role: true, name: true },
-  });
+  let existing: {
+    id: string;
+    nationalId: string | null;
+    email: string;
+    phone: string | null;
+    role: Role;
+    name: string;
+  } | null = null;
+  try {
+    existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, nationalId: true, email: true, phone: true, role: true, name: true },
+    });
+  } catch (err) {
+    if (isSupabaseSchemaMissingError(err)) {
+      const fallback = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, phone: true, role: true, name: true },
+      });
+      existing = fallback ? { ...fallback, nationalId: null } : null;
+    } else {
+      throw err;
+    }
+  }
 
   if (!existing) {
     return { success: false, error: "User not found." };
@@ -660,11 +790,15 @@ export async function updateUserAdminDetails(formData: FormData) {
     if (submittedNationalId.length !== 16 || !/^\d{16}$/.test(submittedNationalId)) {
       return { success: false, error: "National ID (Irangamuntu) must contain exactly 16 digits." };
     }
-    const duplicate = await prisma.user.findFirst({
-      where: { nationalId: submittedNationalId, NOT: { id: userId } },
-    });
-    if (duplicate) {
-      return { success: false, error: "National ID is already registered to another user." };
+    try {
+      const duplicate = await prisma.user.findFirst({
+        where: { nationalId: submittedNationalId, NOT: { id: userId } },
+      });
+      if (duplicate) {
+        return { success: false, error: "National ID is already registered to another user." };
+      }
+    } catch (err) {
+      if (!isSupabaseSchemaMissingError(err)) throw err;
     }
     finalNationalId = submittedNationalId;
   }
@@ -688,11 +822,10 @@ export async function updateUserAdminDetails(formData: FormData) {
     }
   }
 
-  const updateData: Record<string, unknown> = {
+  const updateDataBase: Record<string, unknown> = {
     name,
     email,
     phone: normalizedPhone,
-    nationalId: finalNationalId,
     districtName: districtName || null,
     sectorName: sectorName || null,
     cellName: cellName || null,
@@ -702,13 +835,28 @@ export async function updateUserAdminDetails(formData: FormData) {
   };
 
   if (role && isAssignableRole(role)) {
-    updateData.role = role;
+    updateDataBase.role = role;
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: updateData,
-  });
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...updateDataBase,
+        nationalId: finalNationalId,
+      },
+    });
+  } catch (err) {
+    if (isSupabaseSchemaMissingError(err)) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: updateDataBase,
+      });
+    } else {
+      throw err;
+    }
+  }
+  const updateData = updateDataBase;
 
   const { saveUserAddressProfile } = await import("@/lib/user-profile-address");
   await saveUserAddressProfile(userId, name, (updateData.role as string) || existing.role, {

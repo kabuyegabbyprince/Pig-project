@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Role } from "@prisma/client";
 import { ArrowLeft, Crown, Loader2, Save, UsersRound } from "lucide-react";
 import { enrollCooperativeBeneficiary } from "@/app/actions/beneficiary";
+import { LocationPicker } from "@/components/LocationPicker";
 
 export type ScopedCoopOption = {
   id: string;
@@ -35,6 +36,11 @@ export function EnrollCooperativeBeneficiaryForm({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [nationalId, setNationalId] = useState("");
+  const [district, setDistrict] = useState("");
+  const [sector, setSector] = useState("");
+  const [cell, setCell] = useState("");
+  const [village, setVillage] = useState("");
+  const [address, setAddress] = useState("");
   const [staticPassword, setStaticPassword] = useState("Coop@2026");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -48,6 +54,11 @@ export function EnrollCooperativeBeneficiaryForm({
     fd.append("email", email);
     fd.append("phone", phone);
     fd.append("nationalId", nationalId);
+    fd.append("district", district);
+    fd.append("sector", sector);
+    fd.append("cell", cell);
+    fd.append("village", village);
+    fd.append("address", address);
     fd.append("staticPassword", staticPassword);
 
     startTransition(async () => {
@@ -220,6 +231,36 @@ export function EnrollCooperativeBeneficiaryForm({
                   onChange={(e) => setStaticPassword(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono text-[#101827] focus:border-[#FF8A00] focus:outline-none"
                 />
+              </div>
+
+              <div className="sm:col-span-2 pt-2 border-t border-slate-100 space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Member Address (District, Sector, Cell, Village) *
+                </p>
+                <LocationPicker
+                  initialDistrictName={district}
+                  initialSectorName={sector}
+                  initialCellName={cell}
+                  initialVillageName={village}
+                  onChange={(loc) => {
+                    setDistrict(loc.districtName);
+                    setSector(loc.sectorName);
+                    setCell(loc.cellName);
+                    setVillage(loc.villageName);
+                  }}
+                />
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Street / Landmark Address (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Isibo, nearby landmark, or household details"
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
 

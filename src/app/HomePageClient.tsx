@@ -248,9 +248,9 @@ export function HomePageClient({
           }}
         />
 
-        {/* Hero content — vertically centred */}
+        {/* Hero content — vertically & horizontally centred */}
         <div className="hero-content-wrap">
-          <div className="app-container mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+          <div className="mx-auto flex w-full max-w-4xl flex-col items-center px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.12]">
               {heroData.title}
             </h1>

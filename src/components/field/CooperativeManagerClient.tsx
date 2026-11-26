@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Copy,
   Crown,
+  Edit3,
   Eye,
   EyeOff,
   IdCard,
@@ -24,6 +25,7 @@ import {
   UserCheck,
   UserPlus,
   UsersRound,
+  X,
 } from "lucide-react";
 import {
   addCooperativeMember,
@@ -32,7 +34,9 @@ import {
   createCooperative,
   removeCooperativeMember,
   toggleCooperativeMemberActive,
+  updateCooperativeMemberDetails,
   type CooperativesWorkspaceData,
+  type SerializedCooperativeMember,
 } from "@/app/actions/cooperative";
 import { LocationPicker } from "@/components/LocationPicker";
 
@@ -75,6 +79,8 @@ export function CooperativeManagerClient({
   const [memberSector, setMemberSector] = useState("");
   const [memberCell, setMemberCell] = useState("");
   const [memberVillage, setMemberVillage] = useState("");
+  const [memberAddress, setMemberAddress] = useState("");
+  const [memberLocationResetKey, setMemberLocationResetKey] = useState(0);
   const [memberRole, setMemberRole] = useState<string>(Role.COOPERATIVE_MEMBER);
   const [staticPassword, setStaticPassword] = useState("Coop@2026");
   const [showPassword, setShowPassword] = useState(true);
@@ -106,6 +112,17 @@ export function CooperativeManagerClient({
 
   // 2-step removal confirm
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+
+  // Edit member modal state
+  const [editingMember, setEditingMember] = useState<SerializedCooperativeMember | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editNationalId, setEditNationalId] = useState("");
+  const [editDistrict, setEditDistrict] = useState("");
+  const [editSector, setEditSector] = useState("");
+  const [editCell, setEditCell] = useState("");
+  const [editVillage, setEditVillage] = useState("");
+  const [editAddress, setEditAddress] = useState("");
 
   const handleCreateCoop = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -162,6 +179,7 @@ export function CooperativeManagerClient({
     fd.append("sector", memberSector);
     fd.append("cell", memberCell);
     fd.append("village", memberVillage);
+    fd.append("address", memberAddress);
     fd.append("role", memberRole);
     fd.append("staticPassword", staticPassword);
 
@@ -190,6 +208,13 @@ export function CooperativeManagerClient({
       setMemberName("");
       setMemberEmail("");
       setMemberPhone("");
+      setMemberNationalId("");
+      setMemberDistrict("");
+      setMemberSector("");
+      setMemberCell("");
+      setMemberVillage("");
+      setMemberAddress("");
+      setMemberLocationResetKey((k) => k + 1);
       setMemberRole(Role.COOPERATIVE_MEMBER);
       startTransition(() => {
         router.refresh();
@@ -275,6 +300,53 @@ export function CooperativeManagerClient({
       }
       setConfirmRemoveId(null);
       setSuccess("Member unlinked from cooperative.");
+      startTransition(() => {
+        router.refresh();
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const openEditMember = (member: SerializedCooperativeMember) => {
+    setError("");
+    setSuccess("");
+    setEditingMember(member);
+    setEditName(member.name);
+    setEditPhone(member.phone ?? "");
+    setEditNationalId(member.nationalId ?? "");
+    setEditDistrict(member.districtName ?? "");
+    setEditSector(member.sectorName ?? "");
+    setEditCell(member.cellName ?? "");
+    setEditVillage(member.villageName ?? "");
+    setEditAddress(member.address ?? "");
+  };
+
+  const handleUpdateMemberDetails = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingMember || pendingAction === "editMember") return;
+    setError("");
+    setSuccess("");
+    const fd = new FormData();
+    fd.append("userId", editingMember.id);
+    fd.append("name", editName);
+    fd.append("phone", editPhone);
+    fd.append("nationalId", editNationalId);
+    fd.append("district", editDistrict);
+    fd.append("sector", editSector);
+    fd.append("cell", editCell);
+    fd.append("village", editVillage);
+    fd.append("address", editAddress);
+
+    setPendingAction("editMember");
+    try {
+      const res = await updateCooperativeMemberDetails(fd);
+      if (!res.success) {
+        setError(res.error || "Failed to update cooperative member details.");
+        return;
+      }
+      setSuccess(`Updated details for ${editName}.`);
+      setEditingMember(null);
       startTransition(() => {
         router.refresh();
       });
@@ -583,11 +655,12 @@ export function CooperativeManagerClient({
                     </select>
                   </div>
 
-                  <div className="sm:col-span-2 pt-2 border-t border-slate-100">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">
+                  <div className="sm:col-span-2 pt-2 border-t border-slate-100 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
                       Member Address (District, Sector, Cell, Village) *
                     </p>
                     <LocationPicker
+                      key={memberLocationResetKey}
                       initialDistrictName={memberDistrict}
                       initialSectorName={memberSector}
                       initialCellName={memberCell}
@@ -599,6 +672,17 @@ export function CooperativeManagerClient({
                         setMemberVillage(loc.villageName);
                       }}
                     />
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                        Landmark / Isibo / Street Address (Optional)
+                      </label>
+                      <input
+                        value={memberAddress}
+                        onChange={(e) => setMemberAddress(e.target.value)}
+                        placeholder="e.g. Isibo ya Ubumwe, near primary school"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                      />
+                    </div>
                   </div>
 
                   <div className="sm:col-span-2">
@@ -854,11 +938,18 @@ export function CooperativeManagerClient({
                               <td className="px-5 py-3 text-xs text-slate-600">
                                 <p>{m.email}</p>
                                 {m.phone && <p className="text-slate-400">{m.phone}</p>}
-                                {(m.districtName || m.sectorName || m.cellName) && (
+                                {(m.districtName || m.sectorName || m.cellName || m.villageName) && (
                                   <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                                    <MapPin className="h-3 w-3 text-slate-400" />
-                                    <span>{[m.districtName, m.sectorName, m.cellName].filter(Boolean).join(" / ")}</span>
+                                    <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                                    <span>
+                                      {[m.districtName, m.sectorName, m.cellName, m.villageName]
+                                        .filter(Boolean)
+                                        .join(" / ")}
+                                    </span>
                                   </p>
+                                )}
+                                {m.address && (
+                                  <p className="text-[11px] text-slate-400 mt-0.5">{m.address}</p>
                                 )}
                               </td>
                               <td className="px-5 py-3">
@@ -899,6 +990,15 @@ export function CooperativeManagerClient({
                               {isCellManagerOrAdmin && (
                                 <td className="px-5 py-3 text-right">
                                     <div className="inline-flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditMember(m)}
+                                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-[#101827] hover:border-[#FF8A00] transition cursor-pointer"
+                                        title="Edit member details"
+                                      >
+                                        <Edit3 className="h-3 w-3 text-[#FF8A00]" />
+                                        <span>Edit</span>
+                                      </button>
                                       {!isManager && m.isActive && (
                                         <button
                                           type="button"
@@ -959,6 +1059,123 @@ export function CooperativeManagerClient({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Edit Cooperative Member Details Modal */}
+      {editingMember && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-coop-member-title"
+        >
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#FF8A00]">
+                  Cooperative Member Record
+                </p>
+                <h2 id="edit-coop-member-title" className="text-lg font-bold text-[#101827]">
+                  Edit Details — {editingMember.name}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingMember(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#101827] cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateMemberDetails} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="+250 788 000 000"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                    National ID (Irangamuntu)
+                  </label>
+                  <input
+                    value={editNationalId}
+                    onChange={(e) => setEditNationalId(e.target.value)}
+                    placeholder="1199..."
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Address (District, Sector, Cell, Village) *
+                </p>
+                <LocationPicker
+                  key={editingMember.id}
+                  initialDistrictName={editDistrict}
+                  initialSectorName={editSector}
+                  initialCellName={editCell}
+                  initialVillageName={editVillage}
+                  onChange={(loc) => {
+                    setEditDistrict(loc.districtName);
+                    setEditSector(loc.sectorName);
+                    setEditCell(loc.cellName);
+                    setEditVillage(loc.villageName);
+                  }}
+                />
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                    Landmark / Isibo / Street Address
+                  </label>
+                  <input
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    placeholder="e.g. Isibo ya Ubumwe"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingMember(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pendingAction === "editMember"}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#FF8A00] px-5 py-2 text-xs font-bold text-[#101827] hover:bg-[#e57c00] disabled:opacity-60 cursor-pointer"
+                >
+                  {pendingAction === "editMember" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>Save Member Details</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

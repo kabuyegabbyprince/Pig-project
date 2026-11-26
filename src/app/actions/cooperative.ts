@@ -19,7 +19,10 @@ import { normalizePhone } from "@/lib/phone-utils";
 import { syncSupabaseAuthUser } from "@/lib/supabase-auth";
 import { normalizeRoleValue } from "@/lib/roles";
 import { checkPigVetClearance } from "@/lib/vet-clearance";
-import { getUserAddressProfile } from "@/lib/user-profile-address";
+import {
+  getUserAddressProfile,
+  saveUserAddressProfile,
+} from "@/lib/user-profile-address";
 
 const MAX_COOPERATIVE_MEMBERS = 15;
 
@@ -314,6 +317,7 @@ export async function ensureCooperativeBeneficiariesSynced() {
         userId: String(m.id),
         name: m.name,
         phone: m.phone ?? null,
+        nationalId: (m as { nationalId?: string | null }).nationalId ?? null,
         role: normRole,
         isActive: Boolean(m.isActive),
         cooperativeName: coop.name,
@@ -529,7 +533,7 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
   const actorRole = normalizeRoleValue(actor.role) || actor.role;
 
   try {
-    const [coopsRaw, usersRaw, pigsRaw, reportsRaw, paymentsRaw] = await Promise.all([
+    const [coopsRaw, usersRaw, pigsRaw, reportsRaw, paymentsRaw, coopBeneficiariesRaw] = await Promise.all([
       prisma.cooperative.findMany({
         orderBy: { createdAt: "desc" },
       }),
@@ -552,11 +556,40 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
           orderBy: { createdAt: "desc" },
         })
         .catch(() => []),
+      prisma.beneficiary
+        .findMany({
+          where: { beneficiaryNumber: { startsWith: "COOP-" } },
+          select: {
+            beneficiaryNumber: true,
+            nationalId: true,
+            districtStr: true,
+            sectorStr: true,
+            cellStr: true,
+            villageStr: true,
+          },
+        })
+        .catch(() => []),
     ]);
 
     const coopNameById = new Map<string, string>();
     for (const c of coopsRaw) {
       coopNameById.set(c.id, c.name);
+    }
+
+    const benByUserId = new Map<
+      string,
+      {
+        nationalId: string | null;
+        districtStr: string | null;
+        sectorStr: string | null;
+        cellStr: string | null;
+        villageStr: string | null;
+      }
+    >();
+    for (const b of coopBeneficiariesRaw) {
+      if (b.beneficiaryNumber.startsWith("COOP-")) {
+        benByUserId.set(b.beneficiaryNumber.slice(5), b);
+      }
     }
 
     // Strict role scoping:
@@ -594,16 +627,17 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
         villageName?: string | null;
         address?: string | null;
       };
+      const benFallback = benByUserId.get(String(u.id));
       return {
         id: String(u.id),
         name: u.name,
         email: u.email,
         phone: u.phone ?? null,
-        nationalId: uRecord.nationalId ?? null,
-        districtName: uRecord.districtName ?? null,
-        sectorName: uRecord.sectorName ?? null,
-        cellName: uRecord.cellName ?? null,
-        villageName: uRecord.villageName ?? null,
+        nationalId: uRecord.nationalId ?? benFallback?.nationalId ?? null,
+        districtName: uRecord.districtName ?? benFallback?.districtStr ?? null,
+        sectorName: uRecord.sectorName ?? benFallback?.sectorStr ?? null,
+        cellName: uRecord.cellName ?? benFallback?.cellStr ?? null,
+        villageName: uRecord.villageName ?? benFallback?.villageStr ?? null,
         address: uRecord.address ?? null,
         role: normalizeRoleValue(u.role) || u.role,
         isActive: Boolean(u.isActive),
@@ -943,11 +977,12 @@ export async function addCooperativeMember(formData: FormData): Promise<{
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const rawPhone = String(formData.get("phone") || "").trim();
-  const nationalId = String(formData.get("nationalId") || "").trim();
+  const nationalId = String(formData.get("nationalId") || "").trim().replace(/\s+/g, "");
   const districtName = String(formData.get("district") || "").trim();
   const sectorName = String(formData.get("sector") || "").trim();
   const cellName = String(formData.get("cell") || "").trim();
   const villageName = String(formData.get("village") || "").trim();
+  const address = String(formData.get("address") || "").trim();
   const requestedRoleRaw = String(formData.get("role") || "COOPERATIVE_MEMBER").trim();
   const staticPassword = String(formData.get("staticPassword") || "");
 
@@ -1001,15 +1036,40 @@ export async function addCooperativeMember(formData: FormData): Promise<{
       };
     }
 
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { nationalId },
-          ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
-        ],
-      },
-    });
+    let existingUser = null;
+    try {
+      existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            { nationalId },
+            ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+          ],
+        },
+      });
+    } catch (err) {
+      if (isSupabaseSchemaMissingError(err)) {
+        existingUser = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email },
+              ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+            ],
+          },
+        });
+        if (!existingUser && nationalId) {
+          const dupBen = await prisma.beneficiary
+            .findFirst({ where: { nationalId } })
+            .catch(() => null);
+          if (dupBen) {
+            return { success: false, error: "A user with this National ID already exists." };
+          }
+        }
+      } else {
+        throw err;
+      }
+    }
+
     if (existingUser) {
       if (existingUser.email === email) {
         return { success: false, error: "A user with this email already exists." };
@@ -1043,24 +1103,57 @@ export async function addCooperativeMember(formData: FormData): Promise<{
     }
 
     const actorAddress = await getUserAddressProfile(actor.id);
+    const memberDistrict = districtName || actorAddress.districtName || null;
+    const memberSector = sectorName || actorAddress.sectorName || null;
+    const memberCell = cellName || actorAddress.cellName || coop.cellName;
+    const memberVillage = villageName || actorAddress.villageName || null;
+    const memberAddress = address || null;
 
-    const createdUser = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone: normalizedPhone,
-        nationalId,
-        password: hashedPassword,
-        role: assignedRole,
-        cooperativeId,
-        mustChangePassword: true,
-        isActive: true,
-        districtName: districtName || actorAddress.districtName || null,
-        sectorName: sectorName || actorAddress.sectorName || null,
-        cellName: cellName || actorAddress.cellName || coop.cellName,
-        villageName: villageName || actorAddress.villageName || null,
-      },
-    });
+    const baseMemberData = {
+      name,
+      email,
+      phone: normalizedPhone,
+      password: hashedPassword,
+      role: assignedRole,
+      cooperativeId,
+      mustChangePassword: true,
+      isActive: true,
+      districtName: memberDistrict,
+      sectorName: memberSector,
+      cellName: memberCell,
+      villageName: memberVillage,
+      address: memberAddress,
+    };
+
+    let createdUser;
+    try {
+      createdUser = await prisma.user.create({
+        data: {
+          ...baseMemberData,
+          nationalId,
+        },
+      });
+    } catch (err) {
+      if (isSupabaseSchemaMissingError(err)) {
+        createdUser = await prisma.user.create({
+          data: baseMemberData,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    await saveUserAddressProfile(String(createdUser.id), name, assignedRole, {
+      districtId: memberDistrict ?? "",
+      districtName: memberDistrict ?? "",
+      sectorId: memberSector ?? "",
+      sectorName: memberSector ?? "",
+      cellId: memberCell ?? "",
+      cellName: memberCell ?? "",
+      villageId: memberVillage ?? "",
+      villageName: memberVillage ?? "",
+      address: memberAddress ?? "",
+    }).catch(() => null);
 
     await syncSupabaseAuthUser({
       email,
@@ -1076,13 +1169,14 @@ export async function addCooperativeMember(formData: FormData): Promise<{
       userId: String(createdUser.id),
       name,
       phone: normalizedPhone,
+      nationalId,
       role: assignedRole,
       isActive: true,
       cooperativeName: coop.name,
-      cellName: actorAddress.cellName || coop.cellName,
-      districtName: actorAddress.districtName || null,
-      sectorName: actorAddress.sectorName || null,
-      villageName: actorAddress.villageName || null,
+      cellName: memberCell,
+      districtName: memberDistrict,
+      sectorName: memberSector,
+      villageName: memberVillage,
       createdById: actor.id,
     });
 
@@ -1101,10 +1195,14 @@ export async function addCooperativeMember(formData: FormData): Promise<{
         userId: String(previousLeader.id),
         name: previousLeader.name,
         phone: previousLeader.phone ?? null,
+        nationalId: (previousLeader as { nationalId?: string | null }).nationalId ?? null,
         role: Role.COOPERATIVE_MEMBER,
         isActive: Boolean(previousLeader.isActive),
         cooperativeName: coop.name,
-        cellName: coop.cellName,
+        cellName: previousLeader.cellName ?? coop.cellName,
+        districtName: previousLeader.districtName ?? null,
+        sectorName: previousLeader.sectorName ?? null,
+        villageName: previousLeader.villageName ?? null,
         createdById: actor.id,
       });
     }
@@ -1119,6 +1217,13 @@ export async function addCooperativeMember(formData: FormData): Promise<{
         newValue: {
           name,
           email,
+          phone: normalizedPhone,
+          nationalId,
+          districtName: memberDistrict,
+          sectorName: memberSector,
+          cellName: memberCell,
+          villageName: memberVillage,
+          address: memberAddress,
           role: assignedRole,
           cooperativeId,
           cooperativeName: coop.name,
@@ -1169,6 +1274,188 @@ export async function addCooperativeMember(formData: FormData): Promise<{
     return {
       success: false,
       error: getFriendlyActionError(err, "Failed to add cooperative member."),
+    };
+  }
+}
+
+export async function updateCooperativeMemberDetails(formData: FormData): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const actor = await getActiveUser([Role.SUPER_ADMIN, Role.CELL_MANAGER]);
+  if (!actor) {
+    return {
+      success: false,
+      error: "Unauthorized: Only Cell Managers or Super Admins can update member details.",
+    };
+  }
+
+  const userId = String(formData.get("userId") || "").trim();
+  const name = String(formData.get("name") || "").trim();
+  const rawPhone = String(formData.get("phone") || "").trim();
+  const rawNationalId = String(formData.get("nationalId") || "").trim().replace(/\s+/g, "");
+  const districtName = String(formData.get("district") || "").trim();
+  const sectorName = String(formData.get("sector") || "").trim();
+  const cellName = String(formData.get("cell") || "").trim();
+  const villageName = String(formData.get("village") || "").trim();
+  const address = String(formData.get("address") || "").trim();
+
+  if (!userId || !name || !districtName || !sectorName || !cellName) {
+    return {
+      success: false,
+      error: "Member Name, District, Sector, and Cell are required.",
+    };
+  }
+
+  const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
+
+  try {
+    const actorRole = normalizeRoleValue(actor.role) || actor.role;
+    const target = await prisma.user.findUnique({ where: { id: userId } });
+    if (!target || target.deletedAt) {
+      return { success: false, error: "Cooperative member not found." };
+    }
+    const normRole = normalizeRoleValue(target.role);
+    if (normRole !== Role.COOPERATIVE_LEADER && normRole !== Role.COOPERATIVE_MEMBER) {
+      return { success: false, error: "Only cooperative member accounts can be edited here." };
+    }
+
+    const coop = target.cooperativeId
+      ? await prisma.cooperative.findUnique({ where: { id: target.cooperativeId } })
+      : null;
+
+    if (actorRole === Role.CELL_MANAGER) {
+      if (!coop || String(coop.createdById) !== String(actor.id)) {
+        return {
+          success: false,
+          error: "Access denied: You can only edit members of cooperatives you created.",
+        };
+      }
+    }
+
+    if (normalizedPhone) {
+      const dupPhone = await prisma.user.findFirst({
+        where: { phone: normalizedPhone, NOT: { id: userId } },
+      });
+      if (dupPhone) {
+        return { success: false, error: "Another user already uses this phone number." };
+      }
+    }
+
+    const finalNationalId =
+      rawNationalId || (target as { nationalId?: string | null }).nationalId || null;
+
+    if (finalNationalId) {
+      try {
+        const dupNid = await prisma.user.findFirst({
+          where: { nationalId: finalNationalId, NOT: { id: userId } },
+        });
+        if (dupNid) {
+          return { success: false, error: "Another user already uses this National ID." };
+        }
+      } catch (err) {
+        if (!isSupabaseSchemaMissingError(err)) throw err;
+      }
+    }
+
+    const updateBase = {
+      name,
+      phone: normalizedPhone,
+      districtName: districtName || null,
+      sectorName: sectorName || null,
+      cellName: cellName || null,
+      villageName: villageName || null,
+      address: address || null,
+    };
+
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...updateBase,
+          nationalId: finalNationalId,
+        },
+      });
+    } catch (err) {
+      if (isSupabaseSchemaMissingError(err)) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: updateBase,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    if (coop && coop.leaderUserId === String(target.id) && coop.leaderName !== name) {
+      await prisma.cooperative.update({
+        where: { id: coop.id },
+        data: { leaderName: name },
+      });
+    }
+
+    await saveUserAddressProfile(String(target.id), name, normRole, {
+      districtId: districtName,
+      districtName,
+      sectorId: sectorName,
+      sectorName,
+      cellId: cellName,
+      cellName,
+      villageId: villageName,
+      villageName,
+      address,
+    }).catch(() => null);
+
+    invalidateAuthUserCache(String(target.id));
+    await syncSupabaseAuthUser({
+      email: target.email,
+      name,
+      phone: normalizedPhone,
+    });
+
+    if (coop) {
+      await syncBeneficiaryRecordForCoopUser({
+        userId: String(target.id),
+        name,
+        phone: normalizedPhone,
+        nationalId: finalNationalId,
+        role: normRole,
+        isActive: Boolean(target.isActive),
+        cooperativeName: coop.name,
+        cellName: cellName || coop.cellName,
+        districtName: districtName || null,
+        sectorName: sectorName || null,
+        villageName: villageName || null,
+        createdById: coop.createdById,
+      });
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        role: actor.role,
+        action: "UPDATED",
+        entity: "USER",
+        entityId: String(target.id),
+        newValue: {
+          name,
+          phone: normalizedPhone,
+          nationalId: finalNationalId,
+          districtName,
+          sectorName,
+          cellName,
+          villageName,
+          address,
+        },
+      },
+    });
+
+    revalidateAllCooperativePaths();
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: getFriendlyActionError(err, "Failed to update cooperative member details."),
     };
   }
 }
@@ -1247,10 +1534,14 @@ export async function assignCooperativeManager(
         userId: String(prev.id),
         name: prev.name,
         phone: prev.phone ?? null,
+        nationalId: (prev as { nationalId?: string | null }).nationalId ?? null,
         role: Role.COOPERATIVE_MEMBER,
         isActive: Boolean(prev.isActive),
         cooperativeName: coop.name,
-        cellName: coop.cellName,
+        cellName: prev.cellName ?? coop.cellName,
+        districtName: prev.districtName ?? null,
+        sectorName: prev.sectorName ?? null,
+        villageName: prev.villageName ?? null,
         createdById: actor.id,
       });
       try {
@@ -1285,10 +1576,14 @@ export async function assignCooperativeManager(
       userId: String(target.id),
       name: target.name,
       phone: target.phone ?? null,
+      nationalId: (target as { nationalId?: string | null }).nationalId ?? null,
       role: Role.COOPERATIVE_LEADER,
       isActive: Boolean(target.isActive),
       cooperativeName: coop.name,
-      cellName: coop.cellName,
+      cellName: target.cellName ?? coop.cellName,
+      districtName: target.districtName ?? null,
+      sectorName: target.sectorName ?? null,
+      villageName: target.villageName ?? null,
       createdById: actor.id,
     });
 
@@ -1393,10 +1688,14 @@ export async function assignExistingUserToCooperative(
       userId: String(target.id),
       name: target.name,
       phone: target.phone ?? null,
+      nationalId: (target as { nationalId?: string | null }).nationalId ?? null,
       role: Role.COOPERATIVE_MEMBER,
       isActive: Boolean(target.isActive),
       cooperativeName: coop.name,
-      cellName: coop.cellName,
+      cellName: target.cellName ?? coop.cellName,
+      districtName: target.districtName ?? null,
+      sectorName: target.sectorName ?? null,
+      villageName: target.villageName ?? null,
       createdById: actor.id,
     });
 
@@ -1474,10 +1773,14 @@ export async function toggleCooperativeMemberActive(userId: string): Promise<{
           userId: String(target.id),
           name: target.name,
           phone: target.phone ?? null,
+          nationalId: (target as { nationalId?: string | null }).nationalId ?? null,
           role: norm,
           isActive: nextActive,
           cooperativeName: targetCoop.name,
-          cellName: targetCoop.cellName,
+          cellName: target.cellName ?? targetCoop.cellName,
+          districtName: target.districtName ?? null,
+          sectorName: target.sectorName ?? null,
+          villageName: target.villageName ?? null,
           createdById: targetCoop.createdById,
         });
       }
@@ -2397,7 +2700,12 @@ export async function distributePigToCooperativeMember(formData: FormData): Prom
             beneficiaryNumber: coopMemberBeneficiaryNumber,
             fullName: member.name,
             phone: member.phone ?? null,
-            cellStr: coop.cellName,
+            nationalId: (member as { nationalId?: string | null }).nationalId ?? null,
+            districtStr: member.districtName ?? null,
+            sectorStr: member.sectorName ?? null,
+            cellStr: member.cellName ?? coop.cellName,
+            villageStr: member.villageName ?? null,
+            savingsGroup: coop.name,
             status: BeneficiaryStatus.PIGLET_RECEIVED,
             registrationDate: now,
             createdById: actor.id,
@@ -2410,7 +2718,12 @@ export async function distributePigToCooperativeMember(formData: FormData): Prom
           data: {
             fullName: member.name,
             phone: member.phone ?? beneficiary.phone,
-            cellStr: coop.cellName,
+            nationalId: (member as { nationalId?: string | null }).nationalId ?? beneficiary.nationalId,
+            districtStr: member.districtName ?? beneficiary.districtStr,
+            sectorStr: member.sectorName ?? beneficiary.sectorStr,
+            cellStr: member.cellName ?? beneficiary.cellStr ?? coop.cellName,
+            villageStr: member.villageName ?? beneficiary.villageStr,
+            savingsGroup: coop.name,
             status: BeneficiaryStatus.PIGLET_RECEIVED,
           },
         });
