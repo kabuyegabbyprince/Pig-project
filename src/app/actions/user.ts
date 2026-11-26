@@ -87,6 +87,18 @@ export async function createUser(formData: FormData) {
     }
   }
 
+  const nationalIdRaw = String(formData.get("nationalId") || "").trim();
+  const districtName = String(formData.get("district") || formData.get("districtName") || "").trim();
+  const sectorName = String(formData.get("sector") || formData.get("sectorName") || "").trim();
+  const cellName = String(formData.get("cell") || formData.get("cellName") || "").trim();
+  const villageName = String(formData.get("village") || formData.get("villageName") || "").trim();
+  const address = String(formData.get("address") || "").trim();
+
+  const cleanNationalId = nationalIdRaw.replace(/\s+/g, "");
+  if (cleanNationalId && (cleanNationalId.length !== 16 || !/^\d{16}$/.test(cleanNationalId))) {
+    redirect(`${formErrorPath}?error=${encodeURIComponent("National ID (Irangamuntu) must contain exactly 16 digits.")}`);
+  }
+
   const role = requestedRole;
 
   const normalizedPhone = phone ? normalizePhone(phone) : null;
@@ -96,6 +108,7 @@ export async function createUser(formData: FormData) {
       OR: [
         { email },
         ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+        ...(cleanNationalId ? [{ nationalId: cleanNationalId }] : []),
       ],
     },
   });
@@ -107,6 +120,10 @@ export async function createUser(formData: FormData) {
 
     if (normalizedPhone && existingUser.phone === normalizedPhone) {
       redirect(`${formErrorPath}?error=A+user+with+this+phone+number+already+exists`);
+    }
+
+    if (cleanNationalId && existingUser.nationalId === cleanNationalId) {
+      redirect(`${formErrorPath}?error=A+user+with+this+National+ID+already+exists`);
     }
   }
 
@@ -120,6 +137,12 @@ export async function createUser(formData: FormData) {
           name,
           email,
           phone: normalizedPhone,
+          nationalId: cleanNationalId || null,
+          districtName: districtName || null,
+          sectorName: sectorName || null,
+          cellName: cellName || null,
+          villageName: villageName || null,
+          address: address || null,
           password: hashedPassword,
           role,
           isActive: true,
@@ -134,10 +157,25 @@ export async function createUser(formData: FormData) {
           entityId: newUser.id,
           userId: actor.id,
           role: actor.role,
-          newValue: { name, email, role },
+          newValue: { name, email, role, nationalId: cleanNationalId, districtName, sectorName, cellName },
         },
       });
     });
+
+    if (cleanNationalId || districtName || sectorName || cellName || villageName || address) {
+      const { saveUserAddressProfile } = await import("@/lib/user-profile-address");
+      await saveUserAddressProfile(createdUserId, name, role, {
+        districtId: districtName,
+        districtName,
+        sectorId: sectorName,
+        sectorName,
+        cellId: cellName,
+        cellName,
+        villageId: villageName,
+        villageName,
+        address,
+      }).catch(() => null);
+    }
 
     await syncSupabaseAuthUser({
       email,
@@ -582,4 +620,128 @@ export async function toggleUserActive(userId: string) {
     return { success: false, error: "Failed to update user status." };
   }
 }
+
+export async function updateUserAdminDetails(formData: FormData) {
+  const actor = await getActiveUser([Role.SUPER_ADMIN]);
+  if (!actor) {
+    return { success: false, error: "Unauthorized: Only Super Admins can edit user profiles." };
+  }
+
+  const userId = String(formData.get("userId") || "").trim();
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const phone = String(formData.get("phone") || "").trim();
+  const submittedNationalId = String(formData.get("nationalId") || "").trim().replace(/\s+/g, "");
+  const districtName = String(formData.get("district") || formData.get("districtName") || "").trim();
+  const sectorName = String(formData.get("sector") || formData.get("sectorName") || "").trim();
+  const cellName = String(formData.get("cell") || formData.get("cellName") || "").trim();
+  const villageName = String(formData.get("village") || formData.get("villageName") || "").trim();
+  const address = String(formData.get("address") || "").trim();
+  const role = String(formData.get("role") || "").trim();
+  const cooperativeId = String(formData.get("cooperativeId") || "").trim() || null;
+
+  if (!userId || !name || !email) {
+    return { success: false, error: "Missing required fields (User ID, Name, Email)." };
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, nationalId: true, email: true, phone: true, role: true, name: true },
+  });
+
+  if (!existing) {
+    return { success: false, error: "User not found." };
+  }
+
+  // National ID locked rule:
+  // If user already has a nationalId, prevent modifying it!
+  let finalNationalId = existing.nationalId;
+  if (!existing.nationalId && submittedNationalId) {
+    if (submittedNationalId.length !== 16 || !/^\d{16}$/.test(submittedNationalId)) {
+      return { success: false, error: "National ID (Irangamuntu) must contain exactly 16 digits." };
+    }
+    const duplicate = await prisma.user.findFirst({
+      where: { nationalId: submittedNationalId, NOT: { id: userId } },
+    });
+    if (duplicate) {
+      return { success: false, error: "National ID is already registered to another user." };
+    }
+    finalNationalId = submittedNationalId;
+  }
+
+  const normalizedPhone = phone ? normalizePhone(phone) : null;
+  if (normalizedPhone) {
+    const duplicatePhone = await prisma.user.findFirst({
+      where: { phone: normalizedPhone, NOT: { id: userId } },
+    });
+    if (duplicatePhone) {
+      return { success: false, error: "Phone number is already registered to another user." };
+    }
+  }
+
+  if (email !== existing.email) {
+    const duplicateEmail = await prisma.user.findFirst({
+      where: { email, NOT: { id: userId } },
+    });
+    if (duplicateEmail) {
+      return { success: false, error: "Email is already registered to another user." };
+    }
+  }
+
+  const updateData: Record<string, unknown> = {
+    name,
+    email,
+    phone: normalizedPhone,
+    nationalId: finalNationalId,
+    districtName: districtName || null,
+    sectorName: sectorName || null,
+    cellName: cellName || null,
+    villageName: villageName || null,
+    address: address || null,
+    cooperativeId,
+  };
+
+  if (role && isAssignableRole(role)) {
+    updateData.role = role;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: updateData,
+  });
+
+  const { saveUserAddressProfile } = await import("@/lib/user-profile-address");
+  await saveUserAddressProfile(userId, name, (updateData.role as string) || existing.role, {
+    districtId: districtName,
+    districtName,
+    sectorId: sectorName,
+    sectorName,
+    cellId: cellName,
+    cellName,
+    villageId: villageName,
+    villageName,
+    address,
+  }).catch(() => null);
+
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATED",
+      entity: "USER",
+      entityId: userId,
+      userId: actor.id,
+      role: actor.role,
+      previousValue: { name: existing.name, role: existing.role, nationalId: existing.nationalId },
+      newValue: { name, role: updateData.role || existing.role, nationalId: finalNationalId, districtName, sectorName, cellName },
+    },
+  });
+
+  invalidateAuthUserCache(userId);
+  revalidatePath("/dashboard/admin");
+  revalidatePath("/dashboard/admin/users");
+  revalidatePath("/dashboard/field/cooperative");
+  revalidatePath("/dashboard/settings");
+
+  return { success: true, message: "User details updated successfully." };
+}
+
 

@@ -239,6 +239,7 @@ export function StorefrontClient({
             </Link>
             <Link
               href="/login"
+              prefetch={false}
               className="inline-flex items-center gap-1.5 rounded-xl bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1f2937]"
             >
               <span>Staff Login</span>

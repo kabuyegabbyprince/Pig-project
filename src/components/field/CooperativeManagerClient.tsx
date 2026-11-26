@@ -13,8 +13,10 @@ import {
   Crown,
   Eye,
   EyeOff,
+  IdCard,
   KeyRound,
   Loader2,
+  MapPin,
   PiggyBank,
   RefreshCw,
   ShieldCheck,
@@ -828,8 +830,8 @@ export function CooperativeManagerClient({
                           const isManager = m.role === Role.COOPERATIVE_LEADER;
                           return (
                             <tr key={m.id} className="hover:bg-slate-50/70">
-                              <td className="px-5 py-3 font-semibold">
-                                <div className="flex items-center gap-2">
+                              <td className="px-5 py-3">
+                                <div className="font-semibold text-[#101827] flex items-center gap-2">
                                   <span>{m.name}</span>
                                   {isManager && (
                                     <Crown
@@ -838,10 +840,26 @@ export function CooperativeManagerClient({
                                     />
                                   )}
                                 </div>
+                                {m.nationalId ? (
+                                  <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1 mt-0.5">
+                                    <IdCard className="h-3 w-3 text-[#FF8A00]" />
+                                    <span>{m.nationalId}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-amber-600 font-medium mt-0.5">
+                                    National ID pending
+                                  </div>
+                                )}
                               </td>
                               <td className="px-5 py-3 text-xs text-slate-600">
                                 <p>{m.email}</p>
                                 {m.phone && <p className="text-slate-400">{m.phone}</p>}
+                                {(m.districtName || m.sectorName || m.cellName) && (
+                                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
+                                    <MapPin className="h-3 w-3 text-slate-400" />
+                                    <span>{[m.districtName, m.sectorName, m.cellName].filter(Boolean).join(" / ")}</span>
+                                  </p>
+                                )}
                               </td>
                               <td className="px-5 py-3">
                                 <span

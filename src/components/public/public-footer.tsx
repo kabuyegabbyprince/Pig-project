@@ -66,7 +66,7 @@ export default function PublicFooter() {
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link href="/login" className="hover:text-slate-900 transition-colors">
+                <Link href="/login" prefetch={false} className="hover:text-slate-900 transition-colors">
                   Staff Login
                 </Link>
               </li>

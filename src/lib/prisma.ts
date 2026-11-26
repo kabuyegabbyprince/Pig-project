@@ -90,6 +90,7 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     updatedAt: "updated_at",
   },
   user: {
+    nationalId: "national_id",
     cooperativeId: "cooperative_id",
     mustChangePassword: "must_change_password",
     districtName: "district_name",
@@ -157,6 +158,7 @@ const FIELD_TO_COL: Record<string, Record<string, string>> = {
     transactionDate: "date",
   },
   backendUser: {
+    nationalId: "national_id",
     cooperativeId: "cooperative_id",
     mustChangePassword: "must_change_password",
     districtName: "district_name",
@@ -561,6 +563,7 @@ function mapRowFromDb(model: string, row: Record<string, unknown>): Record<strin
     if (!("assignedVillageId" in out)) out.assignedVillageId = null;
     if (!("cooperativeId" in out)) out.cooperativeId = null;
     if (!("mustChangePassword" in out)) out.mustChangePassword = false;
+    if (!("nationalId" in out)) out.nationalId = null;
     if (!("districtName" in out)) out.districtName = null;
     if (!("sectorName" in out)) out.sectorName = null;
     if (!("cellName" in out)) out.cellName = null;

@@ -151,6 +151,7 @@ export function HomePageClient({
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <Link
               href="/login"
+              prefetch={false}
               className="hidden sm:inline-block text-sm font-medium text-white/80 hover:text-white px-2.5 py-1.5 transition-colors"
             >
               Staff Login
@@ -206,6 +207,7 @@ export function HomePageClient({
               })}
               <Link
                 href="/login"
+                prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className="mt-1 rounded-lg px-4 py-2.5 text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
@@ -566,7 +568,7 @@ export function HomePageClient({
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">Operations</h4>
               <ul className="space-y-2 text-xs">
-                <li><Link href="/login"   className="hover:text-slate-900 transition-colors">Staff Login</Link></li>
+                <li><Link href="/login" prefetch={false} className="hover:text-slate-900 transition-colors">Staff Login</Link></li>
 
                 <li><Link href="/contact" className="hover:text-slate-900 transition-colors">Contact Support</Link></li>
                 <li><span className="text-slate-400">Value Protocols, Rwanda</span></li>

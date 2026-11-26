@@ -38,6 +38,12 @@ export type SerializedCooperativeMember = {
   name: string;
   email: string;
   phone: string | null;
+  nationalId: string | null;
+  districtName: string | null;
+  sectorName: string | null;
+  cellName: string | null;
+  villageName: string | null;
+  address: string | null;
   role: Role;
   isActive: boolean;
   mustChangePassword: boolean;
@@ -579,21 +585,37 @@ export async function getCooperativesWorkspaceData(): Promise<CooperativesWorksp
       }
     }
 
-    const serializeMember = (u: (typeof usersRaw)[number]): SerializedCooperativeMember => ({
-      id: String(u.id),
-      name: u.name,
-      email: u.email,
-      phone: u.phone ?? null,
-      role: normalizeRoleValue(u.role) || u.role,
-      isActive: Boolean(u.isActive),
-      mustChangePassword: Boolean(u.mustChangePassword),
-      cooperativeId: u.cooperativeId ?? null,
-      animalCount: animalCountByOwner.get(String(u.id)) ?? 0,
-      createdAt:
-        u.createdAt instanceof Date
-          ? u.createdAt.toISOString()
-          : new Date(u.createdAt).toISOString(),
-    });
+    const serializeMember = (u: (typeof usersRaw)[number]): SerializedCooperativeMember => {
+      const uRecord = u as unknown as {
+        nationalId?: string | null;
+        districtName?: string | null;
+        sectorName?: string | null;
+        cellName?: string | null;
+        villageName?: string | null;
+        address?: string | null;
+      };
+      return {
+        id: String(u.id),
+        name: u.name,
+        email: u.email,
+        phone: u.phone ?? null,
+        nationalId: uRecord.nationalId ?? null,
+        districtName: uRecord.districtName ?? null,
+        sectorName: uRecord.sectorName ?? null,
+        cellName: uRecord.cellName ?? null,
+        villageName: uRecord.villageName ?? null,
+        address: uRecord.address ?? null,
+        role: normalizeRoleValue(u.role) || u.role,
+        isActive: Boolean(u.isActive),
+        mustChangePassword: Boolean(u.mustChangePassword),
+        cooperativeId: u.cooperativeId ?? null,
+        animalCount: animalCountByOwner.get(String(u.id)) ?? 0,
+        createdAt:
+          u.createdAt instanceof Date
+            ? u.createdAt.toISOString()
+            : new Date(u.createdAt).toISOString(),
+      };
+    };
 
     const serializedUsers = usersRaw.map(serializeMember);
     const userById = new Map<string, SerializedCooperativeMember>();

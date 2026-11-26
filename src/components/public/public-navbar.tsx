@@ -67,6 +67,7 @@ export default function PublicNavbar({ activePath }: { activePath: string }) {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Link
             href="/login"
+            prefetch={false}
             className="hidden sm:inline-block whitespace-nowrap shrink-0 text-sm font-medium text-white/80 hover:text-white px-2.5 py-1.5 transition-colors"
           >
             Staff Login
@@ -120,6 +121,7 @@ export default function PublicNavbar({ activePath }: { activePath: string }) {
             })}
             <Link
               href="/login"
+              prefetch={false}
               onClick={() => setMobileOpen(false)}
               className="mt-1 rounded-lg px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             >

@@ -11,6 +11,7 @@ import {
   CELL_MANAGER_COOP_ROLE_OPTIONS,
   normalizeRoleValue,
 } from "@/lib/roles";
+import { LocationPicker } from "@/components/LocationPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -78,64 +79,115 @@ export default async function NewUserPage({
         <form action={createUser} className="space-y-6">
           <input type="hidden" name="returnTo" value={backHref} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-[#101827] mb-1">Full Name *</label>
-              <input
-                type="text"
-                name="name"
-                required
-                className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
-                placeholder="Jane Doe"
-              />
+          <div className="space-y-6">
+            <div className="border-b border-slate-100 pb-4">
+              <h3 className="text-sm font-bold text-[#101827]">Account Credentials &amp; Role</h3>
+              <p className="text-xs text-slate-500">Basic identification, sign-in access, and workspace privileges.</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#101827] mb-1">Email (Username) *</label>
-              <input
-                type="text"
-                name="email"
-                required
-                className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
-                placeholder="jane@valueprotocols.rw"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-[#101827] mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
+                  placeholder="Jane Doe"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#101827] mb-1">Email (Username) *</label>
+                <input
+                  type="text"
+                  name="email"
+                  required
+                  className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
+                  placeholder="jane@valueprotocols.rw"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#101827] mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  name="phone"
+                  className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
+                  placeholder="+250 780 000 000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#101827] mb-1">
+                  National ID Number (Irangamuntu)
+                </label>
+                <input
+                  type="text"
+                  name="nationalId"
+                  maxLength={16}
+                  pattern="\d{16}"
+                  className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border font-mono"
+                  placeholder="1 1990 8 0000000 0 00 (16 digits)"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Rwandan 16-digit National Identification Number. Locked once saved.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#101827] mb-1">Initial Password *</label>
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#101827] mb-1">System Role *</label>
+                <select
+                  name="role"
+                  required
+                  className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border bg-white text-[#101827] cursor-pointer"
+                >
+                  <option value="">-- Select Staff Role --</option>
+                  {availableRoleOptions.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#101827] mb-1">Phone Number</label>
-              <input
-                type="text"
-                name="phone"
-                className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
-                placeholder="+250 780 000 000"
-              />
-            </div>
+            <div className="border-t border-slate-100 pt-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-[#101827]">
+                  Duty Station / Residence Location (Rwanda)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Geographical assignment across District, Sector, Cell, and Village tiers.
+                </p>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#101827] mb-1">Initial Password *</label>
-              <input
-                type="password"
-                name="password"
-                required
-                className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
-                placeholder="••••••••"
-              />
-            </div>
+              <div className="space-y-4">
+                <LocationPicker villageRequired={false} />
 
-            <div>
-              <label className="block text-sm font-medium text-[#101827] mb-1">System Role *</label>
-              <select
-                name="role"
-                required
-                className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border bg-white text-[#101827] cursor-pointer"
-              >
-                <option value="">-- Select Staff Role --</option>
-                {availableRoleOptions.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
+                <div>
+                  <label className="block text-sm font-medium text-[#101827] mb-1">
+                    Specific Street / Landmark Address
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    className="w-full rounded-lg border-slate-200 shadow-xs focus:border-[#FF8A00] focus:ring-2 focus:ring-[#FF8A00]/20 outline-none sm:text-sm p-2.5 border"
+                    placeholder="e.g. Near Cell Office, House No. 12"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

@@ -15,10 +15,14 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/pplog-.png", type: "image/png" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
       { url: "/favicon.ico", type: "image/x-icon" },
     ],
     shortcut: "/pplog-.png",
-    apple: "/pplog-.png",
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/pplog-.png", type: "image/png" },
+    ],
   },
 };
 
@@ -31,6 +35,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/png" href="/pplog-.png" />
+        <link rel="shortcut icon" type="image/png" href="/pplog-.png" />
         <link rel="apple-touch-icon" href="/pplog-.png" />
         <script
           dangerouslySetInnerHTML={{
