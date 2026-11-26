@@ -96,6 +96,7 @@ model User {
   name        String
   email       String    @unique
   phone       String?   @unique
+  nationalId  String?   @unique @map("national_id")
   password    String
   role        Role      @default(COOPERATIVE_MEMBER)
   isActive    Boolean   @default(true) @map("active")

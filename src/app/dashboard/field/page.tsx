@@ -51,7 +51,7 @@ export default async function FieldDashboard({
     ? await Promise.all([
         prisma.user.findUnique({
           where: { id: session.user.id },
-          select: { name: true, phone: true },
+          select: { name: true, phone: true, nationalId: true },
         }),
         getUserAddressProfile(session.user.id),
       ])
@@ -59,7 +59,7 @@ export default async function FieldDashboard({
 
   const isCellProfileComplete =
     isCellManager && cellAddressProfile
-      ? isCellManagerProfileComplete(cellUserRow?.phone, cellAddressProfile)
+      ? isCellManagerProfileComplete(cellUserRow?.phone, cellAddressProfile, cellUserRow?.nationalId)
       : true;
 
   const profileSuccess = params.profileSuccess === "1";
@@ -216,6 +216,7 @@ export default async function FieldDashboard({
         <CellManagerProfileCard
           userName={cellUserRow?.name || data?.actor.name || session.user?.name || ""}
           userPhone={cellUserRow?.phone ?? ""}
+          userNationalId={cellUserRow?.nationalId ?? ""}
           addressProfile={cellAddressProfile}
           isComplete={isCellProfileComplete}
           profileSuccess={profileSuccess}

@@ -32,6 +32,7 @@ import {
   toggleCooperativeMemberActive,
   type CooperativesWorkspaceData,
 } from "@/app/actions/cooperative";
+import { LocationPicker } from "@/components/LocationPicker";
 
 const MAX_COOPERATIVE_MEMBERS = 15;
 
@@ -67,6 +68,11 @@ export function CooperativeManagerClient({
   const [memberName, setMemberName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
   const [memberPhone, setMemberPhone] = useState("");
+  const [memberNationalId, setMemberNationalId] = useState("");
+  const [memberDistrict, setMemberDistrict] = useState("");
+  const [memberSector, setMemberSector] = useState("");
+  const [memberCell, setMemberCell] = useState("");
+  const [memberVillage, setMemberVillage] = useState("");
   const [memberRole, setMemberRole] = useState<string>(Role.COOPERATIVE_MEMBER);
   const [staticPassword, setStaticPassword] = useState("Coop@2026");
   const [showPassword, setShowPassword] = useState(true);
@@ -149,6 +155,11 @@ export function CooperativeManagerClient({
     fd.append("name", memberName);
     fd.append("email", memberEmail);
     fd.append("phone", memberPhone);
+    fd.append("nationalId", memberNationalId);
+    fd.append("district", memberDistrict);
+    fd.append("sector", memberSector);
+    fd.append("cell", memberCell);
+    fd.append("village", memberVillage);
     fd.append("role", memberRole);
     fd.append("staticPassword", staticPassword);
 
@@ -530,12 +541,26 @@ export function CooperativeManagerClient({
 
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                      Phone Number
+                      Phone Number *
                     </label>
                     <input
+                      required
                       value={memberPhone}
                       onChange={(e) => setMemberPhone(e.target.value)}
                       placeholder="+250 788 000 000"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                      National ID (Irangamuntu) *
+                    </label>
+                    <input
+                      required
+                      value={memberNationalId}
+                      onChange={(e) => setMemberNationalId(e.target.value)}
+                      placeholder="1199..."
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
                     />
                   </div>
@@ -554,6 +579,24 @@ export function CooperativeManagerClient({
                         Cooperative Manager (Replaces current manager if any)
                       </option>
                     </select>
+                  </div>
+
+                  <div className="sm:col-span-2 pt-2 border-t border-slate-100">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">
+                      Member Address (District, Sector, Cell, Village) *
+                    </p>
+                    <LocationPicker
+                      initialDistrictName={memberDistrict}
+                      initialSectorName={memberSector}
+                      initialCellName={memberCell}
+                      initialVillageName={memberVillage}
+                      onChange={(loc) => {
+                        setMemberDistrict(loc.districtName);
+                        setMemberSector(loc.sectorName);
+                        setMemberCell(loc.cellName);
+                        setMemberVillage(loc.villageName);
+                      }}
+                    />
                   </div>
 
                   <div className="sm:col-span-2">

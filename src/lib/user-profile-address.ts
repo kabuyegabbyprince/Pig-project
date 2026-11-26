@@ -34,10 +34,12 @@ function getAddressKey(userId: string) {
 
 export function isCellManagerProfileComplete(
   phone: string | null | undefined,
-  addr: UserAddressProfile
+  addr: UserAddressProfile,
+  nid?: string | null | undefined
 ): boolean {
   return Boolean(
     phone?.trim() &&
+      nid?.trim() &&
       addr.districtName.trim() &&
       addr.sectorName.trim() &&
       addr.cellName.trim()

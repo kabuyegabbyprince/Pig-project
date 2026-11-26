@@ -184,6 +184,7 @@ export async function updatePersonalProfile(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const rawPhone = String(formData.get("phone") || "").trim();
   const phone = rawPhone ? normalizePhone(rawPhone) : "";
+  const submittedNationalId = String(formData.get("nationalId") || "").trim();
 
   const districtName = String(formData.get("district") || "").trim();
   const sectorName = String(formData.get("sector") || "").trim();
@@ -202,18 +203,25 @@ export async function updatePersonalProfile(formData: FormData) {
   try {
     const prevUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { email: true, name: true, phone: true, role: true },
+      select: { email: true, name: true, phone: true, role: true, nationalId: true },
     });
 
-    if (prevUser?.role === Role.CELL_MANAGER) {
+    const finalNationalId = prevUser?.nationalId || submittedNationalId || null;
+
+    if (prevUser?.role === Role.CELL_MANAGER || prevUser?.role === Role.COOPERATIVE_LEADER || prevUser?.role === Role.COOPERATIVE_MEMBER) {
       if (!phone) {
         redirect(
-          `${safeReturnTo}?profileError=${encodeURIComponent("Phone number is required for Cell Managers.")}`
+          `${safeReturnTo}?profileError=${encodeURIComponent("Phone number is required.")}`
         );
       }
       if (!districtName || !sectorName || !cellName) {
         redirect(
           `${safeReturnTo}?profileError=${encodeURIComponent("Please enter your District, Sector, and Cell address.")}`
+        );
+      }
+      if (!finalNationalId) {
+        redirect(
+          `${safeReturnTo}?profileError=${encodeURIComponent("National ID (Irangamuntu) is required.")}`
         );
       }
     }
@@ -232,6 +240,20 @@ export async function updatePersonalProfile(formData: FormData) {
       }
     }
 
+    if (!prevUser?.nationalId && submittedNationalId) {
+      const existingWithNid = await prisma.user.findFirst({
+        where: {
+          nationalId: submittedNationalId,
+          NOT: { id: session.user.id },
+        },
+      });
+      if (existingWithNid) {
+        redirect(
+          `${safeReturnTo}?profileError=${encodeURIComponent("National ID is already registered to another user")}`
+        );
+      }
+    }
+
     const prevAddress = await getUserAddressProfile(session.user.id);
 
     await prisma.user.update({
@@ -239,6 +261,12 @@ export async function updatePersonalProfile(formData: FormData) {
       data: {
         name,
         phone: phone || null,
+        nationalId: finalNationalId,
+        districtName: districtName || null,
+        sectorName: sectorName || null,
+        cellName: cellName || null,
+        villageName: villageName || null,
+        address: address || null,
       },
     });
 

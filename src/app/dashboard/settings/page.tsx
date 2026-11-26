@@ -197,6 +197,28 @@ export default async function PersonalSettingsPage({
             </div>
 
             <div>
+              <label htmlFor="nationalId" className="block text-xs font-semibold uppercase tracking-wider text-[#5d6d64]">
+                National ID (Irangamuntu) {user.role !== "SUPER_ADMIN" ? "*" : ""}
+              </label>
+              <input
+                id="nationalId"
+                name="nationalId"
+                type="text"
+                required={user.role !== "SUPER_ADMIN"}
+                readOnly={Boolean(user.nationalId)}
+                disabled={Boolean(user.nationalId)}
+                defaultValue={user.nationalId ?? ""}
+                placeholder="1199..."
+                className={`mt-1.5 block w-full rounded-xl border border-[#dfe7df] px-3.5 py-2.5 text-sm ${
+                  user.nationalId ? "bg-[#f3f5f1] text-[#7a8a82] cursor-not-allowed" : "bg-[#fcfdfc] text-[#1b2d24]"
+                } focus:border-[#173d2e] focus:outline-none focus:ring-1 focus:ring-[#173d2e]`}
+              />
+              {user.nationalId && (
+                <p className="mt-1 text-[11px] text-slate-400">National ID cannot be changed once set.</p>
+              )}
+            </div>
+
+            <div>
               <span className="block text-xs font-semibold uppercase tracking-wider text-[#5d6d64]">
                 Assigned Role
               </span>

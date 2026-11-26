@@ -921,13 +921,18 @@ export async function addCooperativeMember(formData: FormData): Promise<{
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const rawPhone = String(formData.get("phone") || "").trim();
+  const nationalId = String(formData.get("nationalId") || "").trim();
+  const districtName = String(formData.get("district") || "").trim();
+  const sectorName = String(formData.get("sector") || "").trim();
+  const cellName = String(formData.get("cell") || "").trim();
+  const villageName = String(formData.get("village") || "").trim();
   const requestedRoleRaw = String(formData.get("role") || "COOPERATIVE_MEMBER").trim();
   const staticPassword = String(formData.get("staticPassword") || "");
 
-  if (!cooperativeId || !name || !email || !staticPassword) {
+  if (!cooperativeId || !name || !email || !staticPassword || !nationalId || !districtName || !sectorName || !cellName) {
     return {
       success: false,
-      error: "Cooperative, Full Name, Email, and Static Initial Password are required.",
+      error: "Cooperative, Full Name, Email, National ID, District, Sector, Cell, and Static Initial Password are required.",
     };
   }
 
@@ -978,6 +983,7 @@ export async function addCooperativeMember(formData: FormData): Promise<{
       where: {
         OR: [
           { email },
+          { nationalId },
           ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
         ],
       },
@@ -985,6 +991,9 @@ export async function addCooperativeMember(formData: FormData): Promise<{
     if (existingUser) {
       if (existingUser.email === email) {
         return { success: false, error: "A user with this email already exists." };
+      }
+      if (existingUser.nationalId === nationalId) {
+        return { success: false, error: "A user with this National ID already exists." };
       }
       if (normalizedPhone && existingUser.phone === normalizedPhone) {
         return { success: false, error: "A user with this phone number already exists." };
@@ -1018,15 +1027,16 @@ export async function addCooperativeMember(formData: FormData): Promise<{
         name,
         email,
         phone: normalizedPhone,
+        nationalId,
         password: hashedPassword,
         role: assignedRole,
         cooperativeId,
         mustChangePassword: true,
         isActive: true,
-        districtName: actorAddress.districtName || null,
-        sectorName: actorAddress.sectorName || null,
-        cellName: actorAddress.cellName || coop.cellName,
-        villageName: actorAddress.villageName || null,
+        districtName: districtName || actorAddress.districtName || null,
+        sectorName: sectorName || actorAddress.sectorName || null,
+        cellName: cellName || actorAddress.cellName || coop.cellName,
+        villageName: villageName || actorAddress.villageName || null,
       },
     });
 

@@ -10,6 +10,7 @@ import type { UserAddressProfile } from "@/lib/user-profile-address";
 export function CellManagerProfileCard({
   userName,
   userPhone,
+  userNationalId,
   addressProfile,
   isComplete,
   profileSuccess,
@@ -17,6 +18,7 @@ export function CellManagerProfileCard({
 }: {
   userName: string;
   userPhone: string;
+  userNationalId?: string | null;
   addressProfile: UserAddressProfile;
   isComplete: boolean;
   profileSuccess: boolean;
@@ -53,7 +55,7 @@ export function CellManagerProfileCard({
               </p>
               <p className="text-sm font-bold text-[#101827] mt-0.5">{locationSummary}</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Phone: {userPhone}
+                Phone: {userPhone} {userNationalId ? `· National ID: ${userNationalId}` : ""}
                 {addressProfile.address ? ` · ${addressProfile.address}` : ""}
               </p>
             </div>
@@ -86,7 +88,7 @@ export function CellManagerProfileCard({
               Complete Cell Manager Profile &amp; Duty Address
             </h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              Enter your phone number and enter your exact District, Sector, Cell, and Village so your field operations and cooperative records map to your address.
+              Enter your phone number, National ID, and exact District, Sector, Cell, and Village so your field operations and cooperative records map to your address.
             </p>
           </div>
         </div>
@@ -110,7 +112,7 @@ export function CellManagerProfileCard({
       <form action={updatePersonalProfile} className="space-y-5">
         <input type="hidden" name="returnTo" value="/dashboard/field" />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label
               htmlFor="cm-name"
@@ -144,6 +146,31 @@ export function CellManagerProfileCard({
               placeholder="+250 78..."
               className="mt-1.5 block w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-[#101827] focus:border-[#FF8A00] focus:outline-none"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="cm-nid"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
+            >
+              National ID (Irangamuntu) *
+            </label>
+            <input
+              id="cm-nid"
+              name="nationalId"
+              type="text"
+              required
+              readOnly={Boolean(userNationalId)}
+              disabled={Boolean(userNationalId)}
+              defaultValue={userNationalId ?? ""}
+              placeholder="1199..."
+              className={`mt-1.5 block w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm ${
+                userNationalId ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "text-[#101827]"
+              } focus:border-[#FF8A00] focus:outline-none`}
+            />
+            {userNationalId && (
+              <p className="mt-1 text-[11px] text-slate-400">National ID cannot be changed once set.</p>
+            )}
           </div>
         </div>
 
