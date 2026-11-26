@@ -227,12 +227,6 @@ export default async function AdminDashboardOverview() {
       icon: ShoppingBag,
     },
     {
-      title: "Beneficiaries",
-      description: "Inspect and manage rural households enrolled in the program.",
-      href: "/dashboard/admin/beneficiaries",
-      icon: Users,
-    },
-    {
       title: "Pig Register & Stock",
       description: "Register new pigs, track ear tags, weights, and herd status.",
       href: "/dashboard/admin/pigs",

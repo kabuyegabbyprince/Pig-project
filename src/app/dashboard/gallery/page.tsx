@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteGalleryItem, toggleGalleryItemPublished } from "@/app/actions/gallery";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { STORY_FROM_GROUND_CATEGORY } from "@/lib/gallery";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,10 @@ export default async function GalleryManagementPage() {
     redirect("/dashboard");
   }
 
-  const items = await prisma.galleryItem.findMany({
+  const allItems = await prisma.galleryItem.findMany({
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
   });
+  const items = allItems.filter((item) => item.category !== STORY_FROM_GROUND_CATEGORY);
 
   return (
     <div className="space-y-6">

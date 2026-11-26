@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
 
 const GALLERY_BUCKET = "gallery";
-const IMAGE_EXTENSION_RE = /\.(jpe?g|png|webp|gif|avif)$/i;
+export const STORY_FROM_GROUND_CATEGORY = "STORY_FROM_GROUND";
 
 function getSupabaseStorageConfig() {
   const url = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "");
@@ -27,18 +27,6 @@ function extractBucketObjectPath(imageUrl: string): string | null {
   const idx = imageUrl.indexOf(marker);
   if (idx === -1) return null;
   return decodeURIComponent(imageUrl.slice(idx + marker.length));
-}
-
-function formatBucketObjectTitle(name: string): string {
-  const base = name.split("/").pop() || name;
-  const withoutExt = base.replace(/\.[^.]+$/, "");
-  const withoutUuidPrefix = withoutExt.replace(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[-_]?/i,
-    ""
-  );
-  const cleaned = (withoutUuidPrefix || withoutExt).replace(/[-_]+/g, " ").trim();
-  if (!cleaned) return "Field Documentation";
-  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function resolveGalleryImageUrl(imageUrl: string | null | undefined): string | null {
@@ -146,100 +134,70 @@ export async function deleteFromGalleryBucket(imageUrl: string | null | undefine
   }).catch(() => undefined);
 }
 
-type StorageObjectEntry = {
-  id?: string | null;
-  name?: string;
-  created_at?: string;
-  updated_at?: string;
-  metadata?: {
-    mimetype?: string;
-  } | null;
-};
-
-async function listGalleryBucketObjects(): Promise<GalleryItem[]> {
-  const config = getSupabaseStorageConfig();
-  if (!config) return [];
-
+function normalizeImageUrlKey(url: string): string {
+  const trimmed = url.trim();
   try {
-    const res = await fetch(`${config.url}/storage/v1/object/list/${GALLERY_BUCKET}`, {
-      method: "POST",
-      headers: {
-        apikey: config.key,
-        Authorization: `Bearer ${config.key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prefix: "",
-        limit: 100,
-        offset: 0,
-        sortBy: { column: "created_at", order: "desc" },
-      }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!res.ok) return [];
-    const data = (await res.json()) as unknown;
-    if (!Array.isArray(data)) return [];
-
-    return (data as StorageObjectEntry[])
-      .filter((entry) => {
-        if (!entry.id || !entry.name || entry.name === ".emptyFolderPlaceholder") return false;
-        const mime = entry.metadata?.mimetype ?? "";
-        return mime.startsWith("image/") || IMAGE_EXTENSION_RE.test(entry.name);
-      })
-      .map((entry, idx) => {
-        const name = entry.name as string;
-        const createdAt = entry.created_at ? new Date(entry.created_at) : new Date();
-        const updatedAt = entry.updated_at ? new Date(entry.updated_at) : createdAt;
-        return {
-          id: `bucket-${entry.id || idx}`,
-          title: formatBucketObjectTitle(name),
-          description: null,
-          imageUrl: getBucketPublicUrl(config.url, name),
-          category: "Field Gallery",
-          location: null,
-          photoDate: createdAt,
-          photographer: null,
-          displayOrder: idx,
-          isPublished: true,
-          createdAt,
-          updatedAt,
-        };
-      });
+    const parsed = new URL(trimmed);
+    return `${parsed.origin}${decodeURIComponent(parsed.pathname)}`.toLowerCase();
   } catch {
-    return [];
+    return decodeURIComponent(trimmed).toLowerCase();
   }
 }
 
 export async function getPublishedGalleryItems(limit?: number): Promise<GalleryItem[]> {
-  const [dbItems, bucketItems] = await Promise.all([
-    prisma.galleryItem
-      .findMany({
-        where: { isPublished: true },
-        orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
-      })
-      .catch(() => [] as GalleryItem[]),
-    listGalleryBucketObjects(),
-  ]);
+  const dbItems = await prisma.galleryItem
+    .findMany({
+      where: { isPublished: true },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
+    })
+    .catch(() => [] as GalleryItem[]);
 
   const resolvedDbItems: GalleryItem[] = [];
   const seenUrls = new Set<string>();
 
   for (const item of dbItems) {
+    if (item.category === STORY_FROM_GROUND_CATEGORY) continue;
     const resolvedUrl = resolveGalleryImageUrl(item.imageUrl);
     if (!resolvedUrl) continue;
-    seenUrls.add(resolvedUrl);
+
+    const urlKey = normalizeImageUrlKey(resolvedUrl);
+    if (seenUrls.has(urlKey)) continue;
+    seenUrls.add(urlKey);
+
     resolvedDbItems.push({ ...item, imageUrl: resolvedUrl });
   }
 
-  const merged = [...resolvedDbItems];
-  for (const bucketItem of bucketItems) {
-    if (!seenUrls.has(bucketItem.imageUrl)) {
-      seenUrls.add(bucketItem.imageUrl);
-      merged.push(bucketItem);
-    }
+  return typeof limit === "number" ? resolvedDbItems.slice(0, limit) : resolvedDbItems;
+}
+
+export async function getPublishedGroundStories(limit?: number): Promise<GalleryItem[]> {
+  const dbStories = await prisma.galleryItem
+    .findMany({
+      where: {
+        isPublished: true,
+        category: STORY_FROM_GROUND_CATEGORY,
+      },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
+    })
+    .catch(() => [] as GalleryItem[]);
+
+  const resolved: GalleryItem[] = [];
+  const seenUrls = new Set<string>();
+
+  for (const item of dbStories) {
+    const resolvedUrl = resolveGalleryImageUrl(item.imageUrl);
+    if (!resolvedUrl) continue;
+
+    const urlKey = normalizeImageUrlKey(resolvedUrl);
+    if (seenUrls.has(urlKey)) continue;
+    seenUrls.add(urlKey);
+
+    resolved.push({
+      ...item,
+      imageUrl: resolvedUrl,
+      description: item.description?.trim() ? item.description.trim() : "it works",
+    });
   }
 
-  return typeof limit === "number" ? merged.slice(0, limit) : merged;
+  return typeof limit === "number" ? resolved.slice(0, limit) : resolved;
 }

@@ -34,6 +34,7 @@ interface HomePageClientProps {
   returnedPiglets: number;
   teamMembers: TeamMember[];
   galleryItems: GalleryItem[];
+  stories?: GalleryItem[];
 }
 
 const NAV_LINKS = [
@@ -54,6 +55,7 @@ export function HomePageClient({
   returnedPiglets,
   teamMembers,
   galleryItems,
+  stories = [],
 }: HomePageClientProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -439,32 +441,46 @@ export function HomePageClient({
               </Link>
             </div>
 
-            {galleryItems.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center text-slate-500">
-                <p className="text-sm font-medium">Our gallery is being updated. Please check back soon.</p>
-              </div>
-            ) : (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {galleryItems.map((item) => (
-                  <article
-                    key={item.id}
-                    className="group overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs hover:border-slate-300 hover:shadow-sm transition-all"
-                  >
-                    <div className="aspect-[4/3] overflow-hidden bg-slate-100">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    </div>
-                    <div className="p-5">
-                      <h3 className="text-base font-bold text-slate-900">{item.title}</h3>
-                      {item.location && <p className="mt-1 text-xs text-slate-500">{item.location}</p>}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+            {(() => {
+              const displayedStories = stories.length > 0 ? stories : galleryItems;
+              const showingGroundStories = stories.length > 0;
+              if (displayedStories.length === 0) {
+                return (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center text-slate-500">
+                    <p className="text-sm font-medium">Our stories are being updated. Please check back soon.</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {displayedStories.map((item) => {
+                    const comment = showingGroundStories
+                      ? item.description?.trim() || "it works"
+                      : item.description?.trim() || item.location || "";
+                    return (
+                      <article
+                        key={item.id}
+                        className="group overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs hover:border-slate-300 hover:shadow-sm transition-all"
+                      >
+                        <div className="aspect-[4/3] overflow-hidden bg-slate-100">
+                          <img
+                            src={item.imageUrl}
+                            alt={item.title}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        </div>
+                        <div className="p-5">
+                          <h3 className="text-base font-bold text-slate-900">{item.title}</h3>
+                          {comment && (
+                            <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{comment}</p>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </section>
 

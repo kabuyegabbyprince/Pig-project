@@ -5,12 +5,25 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
+import { getCachedSession } from "@/lib/session";
 import { deleteFromGalleryBucket, uploadToGalleryBucket } from "@/lib/gallery";
+import { existsSync } from "node:fs";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 
 const fileIsAllowed = (file: File | null) => {
   if (!file || file.size === 0) return true;
   const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
   return allowedTypes.includes(file.type) && file.size <= 5 * 1024 * 1024;
+};
+
+const deleteLocalGalleryImage = async (imageUrl: string | null | undefined) => {
+  if (!imageUrl || !imageUrl.startsWith("/uploads/gallery/")) return;
+  const filePath = join(process.cwd(), "public", imageUrl);
+  if (existsSync(filePath)) {
+    await unlink(filePath).catch(() => undefined);
+  }
 };
 
 const saveGalleryImage = async (file: File | null, existingImageUrl?: string | null) => {
@@ -22,18 +35,38 @@ const saveGalleryImage = async (file: File | null, existingImageUrl?: string | n
     throw new Error("Only JPG, PNG, and WebP images up to 5 MB are allowed.");
   }
 
-  const publicUrl = await uploadToGalleryBucket(file);
+  let publicUrl: string;
+  try {
+    publicUrl = await uploadToGalleryBucket(file);
+  } catch {
+    const uploadDir = join(process.cwd(), "public", "uploads", "gallery");
+    await mkdir(uploadDir, { recursive: true });
+    const extension = file.name.includes(".")
+      ? file.name.split(".").pop()?.toLowerCase() || "jpg"
+      : "jpg";
+    const fileName = `${randomUUID()}.${extension}`;
+    const filePath = join(uploadDir, fileName);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await writeFile(filePath, buffer);
+    publicUrl = `/uploads/gallery/${fileName}`;
+  }
+
   if (existingImageUrl && existingImageUrl !== publicUrl) {
-    await deleteFromGalleryBucket(existingImageUrl);
+    await deleteFromGalleryBucket(existingImageUrl).catch(() => undefined);
+    await deleteLocalGalleryImage(existingImageUrl);
   }
 
   return publicUrl;
 };
 
 const ensureAdminOnly = async () => {
+  const session = await getCachedSession();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
   const user = await getActiveUser([Role.SUPER_ADMIN]);
   if (!user) {
-    throw new Error("Unauthorized");
+    redirect("/dashboard");
   }
   return user;
 };
@@ -72,15 +105,17 @@ export async function createGalleryItem(formData: FormData) {
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      action: "CREATED",
-      entity: "GALLERY_ITEM",
-      entityId: item.id,
-      user: { connect: { id: user.id } },
-      newValue: { title: item.title, imageUrl: item.imageUrl, category: item.category },
-    },
-  });
+  await prisma.auditLog
+    .create({
+      data: {
+        action: "CREATED",
+        entity: "GALLERY_ITEM",
+        entityId: item.id,
+        user: { connect: { id: user.id } },
+        newValue: { title: item.title, imageUrl: item.imageUrl, category: item.category },
+      },
+    })
+    .catch((err) => console.error("Gallery audit log error:", err));
 
   revalidatePath("/");
   revalidatePath("/gallery");
@@ -104,7 +139,7 @@ export async function updateGalleryItem(id: string, formData: FormData) {
 
   if (!title) throw new Error("Title is required.");
 
-  const imageUrl = await saveGalleryImage(photo, existing.imageUrl) ?? existing.imageUrl;
+  const imageUrl = (await saveGalleryImage(photo, existing.imageUrl)) ?? existing.imageUrl;
   if (!imageUrl) {
     throw new Error("The gallery image could not be saved.");
   }
@@ -124,15 +159,17 @@ export async function updateGalleryItem(id: string, formData: FormData) {
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      action: "UPDATED",
-      entity: "GALLERY_ITEM",
-      entityId: updated.id,
-      user: { connect: { id: user.id } },
-      newValue: { title: updated.title, imageUrl: updated.imageUrl, category: updated.category },
-    },
-  });
+  await prisma.auditLog
+    .create({
+      data: {
+        action: "UPDATED",
+        entity: "GALLERY_ITEM",
+        entityId: updated.id,
+        user: { connect: { id: user.id } },
+        newValue: { title: updated.title, imageUrl: updated.imageUrl, category: updated.category },
+      },
+    })
+    .catch((err) => console.error("Gallery audit log error:", err));
 
   revalidatePath("/");
   revalidatePath("/gallery");
@@ -143,20 +180,25 @@ export async function updateGalleryItem(id: string, formData: FormData) {
 export async function deleteGalleryItem(id: string) {
   const user = await ensureAdminOnly();
   const item = await prisma.galleryItem.findUnique({ where: { id } });
-  if (!item) throw new Error("Gallery item not found.");
+  if (!item) {
+    redirect("/dashboard/gallery");
+  }
 
-  await deleteFromGalleryBucket(item.imageUrl);
+  await deleteFromGalleryBucket(item.imageUrl).catch(() => undefined);
+  await deleteLocalGalleryImage(item.imageUrl);
 
   await prisma.galleryItem.delete({ where: { id } });
-  await prisma.auditLog.create({
-    data: {
-      action: "DELETED",
-      entity: "GALLERY_ITEM",
-      entityId: id,
-      user: { connect: { id: user.id } },
-      newValue: { title: item.title, deleted: true },
-    },
-  });
+  await prisma.auditLog
+    .create({
+      data: {
+        action: "DELETED",
+        entity: "GALLERY_ITEM",
+        entityId: id,
+        user: { connect: { id: user.id } },
+        newValue: { title: item.title, deleted: true },
+      },
+    })
+    .catch((err) => console.error("Gallery audit log error:", err));
 
   revalidatePath("/");
   revalidatePath("/gallery");
@@ -167,22 +209,24 @@ export async function deleteGalleryItem(id: string) {
 export async function toggleGalleryItemPublished(id: string) {
   const user = await ensureAdminOnly();
   const item = await prisma.galleryItem.findUnique({ where: { id } });
-  if (!item) throw new Error("Gallery item not found.");
+  if (!item) return;
 
   const updated = await prisma.galleryItem.update({
     where: { id },
     data: { isPublished: !item.isPublished },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      action: updated.isPublished ? "PUBLISHED" : "UNPUBLISHED",
-      entity: "GALLERY_ITEM",
-      entityId: item.id,
-      user: { connect: { id: user.id } },
-      newValue: { title: item.title, isPublished: updated.isPublished },
-    },
-  });
+  await prisma.auditLog
+    .create({
+      data: {
+        action: updated.isPublished ? "PUBLISHED" : "UNPUBLISHED",
+        entity: "GALLERY_ITEM",
+        entityId: item.id,
+        user: { connect: { id: user.id } },
+        newValue: { title: item.title, isPublished: updated.isPublished },
+      },
+    })
+    .catch((err) => console.error("Gallery audit log error:", err));
 
   revalidatePath("/");
   revalidatePath("/gallery");

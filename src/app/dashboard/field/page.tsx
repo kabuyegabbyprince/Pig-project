@@ -20,7 +20,6 @@ import {
   PiggyBank,
   Settings,
   Tag,
-  Users,
   UsersRound,
   Wheat,
 } from "lucide-react";
@@ -114,11 +113,6 @@ export default async function FieldDashboard({
             icon: PiggyBank,
           },
           {
-            label: "Beneficiaries",
-            href: "/dashboard/field/beneficiaries",
-            icon: Users,
-          },
-          {
             label: "Record Distribution",
             href: "/dashboard/field/distributions",
             icon: ArrowRightCircle,
@@ -159,11 +153,6 @@ export default async function FieldDashboard({
             label: "Member & Coop Animals",
             href: "/dashboard/field/my-animals",
             icon: PiggyBank,
-          },
-          {
-            label: "Enroll Member / Beneficiary",
-            href: "/dashboard/field/beneficiaries/new",
-            icon: Users,
           },
           {
             label: "Record Distribution",

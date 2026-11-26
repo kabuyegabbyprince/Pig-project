@@ -41,9 +41,14 @@ export function CooperativeManagerClient({
   data: CooperativesWorkspaceData;
 }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const isCreatingCoop = pendingAction === "createCoop";
+  const isAddingMember = pendingAction === "addMember";
+  const isAssigningUser = pendingAction === "assignUser";
 
   const isCellManagerOrAdmin =
     data.actor.role === Role.CELL_MANAGER || data.actor.role === Role.SUPER_ADMIN;
@@ -94,8 +99,10 @@ export function CooperativeManagerClient({
   // 2-step removal confirm
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
-  const handleCreateCoop = (e: React.FormEvent) => {
+  const handleCreateCoop = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (isCreatingCoop) return;
     setError("");
     setSuccess("");
     const fd = new FormData();
@@ -103,7 +110,8 @@ export function CooperativeManagerClient({
     fd.append("code", coopCode);
     fd.append("cellName", cellName);
 
-    startTransition(async () => {
+    setPendingAction("createCoop");
+    try {
       const res = await createCooperative(fd);
       if (!res.success) {
         setError(res.error || "Could not create cooperative.");
@@ -119,12 +127,18 @@ export function CooperativeManagerClient({
       setCoopName("");
       setCoopCode("");
       setCellName("");
-      router.refresh();
-    });
+      startTransition(() => {
+        router.refresh();
+      });
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (isAddingMember) return;
     setError("");
     setSuccess("");
     setCopiedCreds(false);
@@ -149,7 +163,8 @@ export function CooperativeManagerClient({
           : "Cooperative Member",
     };
 
-    startTransition(async () => {
+    setPendingAction("addMember");
+    try {
       const res = await addCooperativeMember(fd);
       if (!res.success) {
         setError(res.error || "Could not add cooperative member.");
@@ -163,18 +178,23 @@ export function CooperativeManagerClient({
       setMemberEmail("");
       setMemberPhone("");
       setMemberRole(Role.COOPERATIVE_MEMBER);
-      router.refresh();
-    });
+      startTransition(() => {
+        router.refresh();
+      });
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const handleAssignManager = (cooperativeId: string, memberUserId: string) => {
+  const handleAssignManager = async (cooperativeId: string, memberUserId: string) => {
     if (!memberUserId) {
       setError("Select a cooperative member to appoint as Cooperative Manager.");
       return;
     }
     setError("");
     setSuccess("");
-    startTransition(async () => {
+    setPendingAction(`manager:${cooperativeId}`);
+    try {
       const res = await assignCooperativeManager(cooperativeId, memberUserId);
       if (!res.success) {
         setError(res.error || "Could not change Cooperative Manager.");
@@ -183,43 +203,58 @@ export function CooperativeManagerClient({
       setSuccess(
         "Cooperative Manager updated! The selected member now holds the Cooperative Manager role and the previous manager was moved back to Cooperative Member."
       );
-      router.refresh();
-    });
+      startTransition(() => {
+        router.refresh();
+      });
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const handleLinkExistingUser = () => {
+  const handleLinkExistingUser = async () => {
     if (!assignCoopId || !assignUserId) return;
     setError("");
     setSuccess("");
-    startTransition(async () => {
+    setPendingAction("assignUser");
+    try {
       const res = await assignExistingUserToCooperative(assignCoopId, assignUserId);
       if (!res.success) {
         setError(res.error || "Could not assign user.");
         return;
       }
       setSuccess("User assigned to cooperative.");
-      router.refresh();
-    });
+      startTransition(() => {
+        router.refresh();
+      });
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const handleToggleActive = (userId: string) => {
+  const handleToggleActive = async (userId: string) => {
     setError("");
     setSuccess("");
-    startTransition(async () => {
+    setPendingAction(`toggle:${userId}`);
+    try {
       const res = await toggleCooperativeMemberActive(userId);
       if (!res.success) {
         setError(res.error || "Failed to update account status.");
         return;
       }
       setSuccess("Member account status updated.");
-      router.refresh();
-    });
+      startTransition(() => {
+        router.refresh();
+      });
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const handleRemoveMember = (userId: string) => {
+  const handleRemoveMember = async (userId: string) => {
     setError("");
     setSuccess("");
-    startTransition(async () => {
+    setPendingAction(`remove:${userId}`);
+    try {
       const res = await removeCooperativeMember(userId);
       if (!res.success) {
         setError(res.error || "Failed to remove member from cooperative.");
@@ -227,8 +262,12 @@ export function CooperativeManagerClient({
       }
       setConfirmRemoveId(null);
       setSuccess("Member unlinked from cooperative.");
-      router.refresh();
-    });
+      startTransition(() => {
+        router.refresh();
+      });
+    } finally {
+      setPendingAction(null);
+    }
   };
 
   const copyCredentials = async () => {
@@ -341,6 +380,7 @@ export function CooperativeManagerClient({
         <div className="grid gap-6 lg:grid-cols-12">
           {/* Create Cooperative Form */}
           <form
+            id="create-cooperative-form"
             onSubmit={handleCreateCoop}
             className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
           >
@@ -399,10 +439,10 @@ export function CooperativeManagerClient({
 
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isCreatingCoop}
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#101827] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1f2937] disabled:opacity-60 transition cursor-pointer"
             >
-              {isPending ? (
+              {isCreatingCoop ? (
                 <Loader2 className="h-4 w-4 animate-spin text-[#FF8A00]" />
               ) : (
                 <Building2 className="h-4 w-4 text-[#FF8A00]" />
@@ -413,6 +453,7 @@ export function CooperativeManagerClient({
 
           {/* Add Cooperative Member + Static Password Form */}
           <form
+            id="add-cooperative-member-form"
             onSubmit={handleAddMember}
             className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
           >
@@ -545,10 +586,10 @@ export function CooperativeManagerClient({
                       </div>
                       <button
                         type="submit"
-                        disabled={isPending || !selectedCoopId}
+                        disabled={isAddingMember || !selectedCoopId}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF8A00] px-5 py-2 text-sm font-bold text-[#101827] hover:bg-[#e57c00] disabled:opacity-60 transition cursor-pointer shrink-0"
                       >
-                        {isPending ? (
+                        {isAddingMember ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <UserPlus className="h-4 w-4" />
@@ -601,10 +642,14 @@ export function CooperativeManagerClient({
             <button
               type="button"
               onClick={handleLinkExistingUser}
-              disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] cursor-pointer"
+              disabled={isAssigningUser}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#101827] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#1f2937] disabled:opacity-60 cursor-pointer"
             >
-              <UserCheck className="h-3.5 w-3.5 text-[#FF8A00]" />
+              {isAssigningUser ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-[#FF8A00]" />
+              ) : (
+                <UserCheck className="h-3.5 w-3.5 text-[#FF8A00]" />
+              )}
               <span>Assign to Cooperative</span>
             </button>
           </div>
@@ -693,14 +738,18 @@ export function CooperativeManagerClient({
                       <button
                         type="button"
                         disabled={
-                          isPending ||
+                          pendingAction === `manager:${coop.id}` ||
                           !selectedManagerId ||
                           selectedManagerId === coop.leaderUserId
                         }
                         onClick={() => handleAssignManager(coop.id, selectedManagerId)}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-[#101827] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1f2937] disabled:opacity-50 transition cursor-pointer"
                       >
-                        <RefreshCw className="h-3.5 w-3.5 text-[#FF8A00]" />
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 text-[#FF8A00] ${
+                            pendingAction === `manager:${coop.id}` ? "animate-spin" : ""
+                          }`}
+                        />
                         <span>Set Cooperative Manager</span>
                       </button>
                     </div>
@@ -788,35 +837,35 @@ export function CooperativeManagerClient({
                               </td>
                               {isCellManagerOrAdmin && (
                                 <td className="px-5 py-3 text-right">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    {!isManager && m.isActive && (
-                                      <button
-                                        type="button"
-                                        disabled={isPending}
-                                        onClick={() => handleAssignManager(coop.id, m.id)}
-                                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-[#101827] hover:border-[#FF8A00] transition cursor-pointer"
-                                      >
-                                        Make Manager
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      disabled={isPending}
-                                      onClick={() => handleToggleActive(m.id)}
-                                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-                                    >
-                                      {m.isActive ? "Suspend" : "Activate"}
-                                    </button>
-                                    {confirmRemoveId === m.id ? (
-                                      <div className="inline-flex items-center gap-1">
+                                    <div className="inline-flex items-center gap-1.5">
+                                      {!isManager && m.isActive && (
                                         <button
                                           type="button"
-                                          disabled={isPending}
-                                          onClick={() => handleRemoveMember(m.id)}
-                                          className="rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700 cursor-pointer"
+                                          disabled={pendingAction === `manager:${coop.id}`}
+                                          onClick={() => handleAssignManager(coop.id, m.id)}
+                                          className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-[#101827] hover:border-[#FF8A00] disabled:opacity-60 transition cursor-pointer"
                                         >
-                                          Confirm
+                                          Make Manager
                                         </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        disabled={pendingAction === `toggle:${m.id}`}
+                                        onClick={() => handleToggleActive(m.id)}
+                                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-60 transition cursor-pointer"
+                                      >
+                                        {m.isActive ? "Suspend" : "Activate"}
+                                      </button>
+                                      {confirmRemoveId === m.id ? (
+                                        <div className="inline-flex items-center gap-1">
+                                          <button
+                                            type="button"
+                                            disabled={pendingAction === `remove:${m.id}`}
+                                            onClick={() => handleRemoveMember(m.id)}
+                                            className="rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700 disabled:opacity-60 cursor-pointer"
+                                          >
+                                            Confirm
+                                          </button>
                                         <button
                                           type="button"
                                           onClick={() => setConfirmRemoveId(null)}

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { getActiveUser } from "@/lib/active-user";
+import { getCachedSession } from "@/lib/session";
 import { existsSync } from "node:fs";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -47,8 +48,10 @@ async function saveMemberPhoto(file: File | null, existingPhotoUrl?: string | nu
 }
 
 async function ensureAdmin() {
+  const session = await getCachedSession();
+  if (!session?.user?.id) redirect("/login");
   const user = await getActiveUser([Role.SUPER_ADMIN]);
-  if (!user) throw new Error("Unauthorized");
+  if (!user) redirect("/dashboard");
   return user;
 }
 

@@ -1,6 +1,6 @@
 import type { GalleryItem, TeamMember, WebsiteContent } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getPublishedGalleryItems } from "@/lib/gallery";
+import { getPublishedGalleryItems, getPublishedGroundStories } from "@/lib/gallery";
 import { HomePageClient } from "./HomePageClient";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,7 @@ export default async function PublicHomePage() {
   let returnedPiglets = 0;
   let teamMembers: TeamMember[] = [];
   let galleryItems: GalleryItem[] = [];
+  let stories: GalleryItem[] = [];
   let heroContent: WebsiteContent | null = null;
 
   try {
@@ -28,6 +29,7 @@ export default async function PublicHomePage() {
       returnedPiglets,
       teamMembers,
       galleryItems,
+      stories,
       heroContent,
     ] = await Promise.all([
       prisma.beneficiary.count(),
@@ -40,6 +42,7 @@ export default async function PublicHomePage() {
         take: 4,
       }),
       getPublishedGalleryItems(3),
+      getPublishedGroundStories(6),
       prisma.websiteContent.findFirst({
         where: { page: "home", section: "hero" },
       }),
@@ -70,6 +73,7 @@ export default async function PublicHomePage() {
       returnedPiglets={returnedPiglets}
       teamMembers={teamMembers}
       galleryItems={galleryItems}
+      stories={stories}
     />
   );
 }
