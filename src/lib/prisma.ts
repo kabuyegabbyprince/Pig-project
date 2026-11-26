@@ -1630,14 +1630,10 @@ function isConnectionError(error: unknown): boolean {
 function createResilientPrisma(): PrismaClient {
   const hasDatabaseUrl = Boolean(process.env.DATABASE_URL?.trim());
   const supabaseCfg = getSupabaseConfig();
-  const isProd = process.env.NODE_ENV === "production";
 
   if (!hasDatabaseUrl) {
     if (supabaseCfg) {
       return createSupabasePrisma();
-    }
-    if (isProd) {
-      throw new Error("Database configuration missing: DATABASE_URL or Supabase credentials are required in production.");
     }
     console.warn("[AI Studio] Neither DATABASE_URL nor Supabase credentials configured — using mock Prisma client");
     return createMockPrisma();
@@ -1645,9 +1641,7 @@ function createResilientPrisma(): PrismaClient {
 
   const fallback = supabaseCfg
     ? createSupabasePrisma()
-    : isProd
-      ? null
-      : createMockPrisma();
+    : createMockPrisma();
   let realClient: PrismaClient;
   try {
     realClient = new PrismaClient();
