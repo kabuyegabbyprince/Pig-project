@@ -24,6 +24,7 @@ import { FeedSalesVerificationClient } from "@/components/finance/FeedSalesVerif
 import { getFinanceWorkspaceData } from "@/app/actions/livestock-finance";
 import { FinanceMoMoSettingsCard } from "@/components/finance/FinanceMoMoSettingsCard";
 import { MemberPaymentsApprovalCard } from "@/components/finance/MemberPaymentsApprovalCard";
+import { CooperativeMembersStatusCard } from "@/components/finance/CooperativeMembersStatusCard";
 import type { SerializedCellFeedSale } from "@/app/actions/ecommerce";
 
 export const dynamic = "force-dynamic";
@@ -217,6 +218,11 @@ export default async function FinanceDashboard() {
       {/* Cooperative Member Qualification Payments Manual Approval Queue */}
       {livestockData && (
         <MemberPaymentsApprovalCard memberPayments={livestockData.memberPayments} />
+      )}
+
+      {/* All Cooperatives, Members & Full Lifecycle Statuses (Paid / Pig Received / Returned) */}
+      {livestockData && (
+        <CooperativeMembersStatusCard cooperatives={livestockData.cooperativesOverview} />
       )}
 
       {/* Veterinary Health & Handover Clearance Summary */}

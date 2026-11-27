@@ -362,7 +362,7 @@ export function DashboardShell({
 
   return (
     <div className="min-h-screen w-full overflow-x-clip bg-[#F5F5F5] text-[#101827] antialiased">
-      <div className="flex h-screen w-full overflow-hidden">
+      <div className="flex min-h-screen w-full lg:h-screen lg:overflow-hidden">
         {/* Fixed Deep Navy sidebar (laptops & large desktops >=1024px) */}
         <aside className="dashboard-sidebar hidden w-64 shrink-0 border-r border-[#101827]/10 bg-[#101827] text-white lg:flex lg:flex-col shadow-sm">
           <div className="flex h-16 items-center border-b border-white/10 px-5 shrink-0">
@@ -424,9 +424,9 @@ export function DashboardShell({
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto h-screen bg-[#F5F5F5]">
+        <div className="flex min-w-0 flex-1 flex-col bg-[#F5F5F5] lg:h-screen lg:overflow-y-auto">
           {/* Mobile & Tablet Header (<1024px) */}
-          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-md lg:hidden">
+          <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md lg:hidden">
             <div className="flex items-center justify-between gap-3 px-4 py-2.5">
               <Link href="/" prefetch={false} className="flex items-center gap-2.5 min-w-0">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white border border-slate-200 p-1">
@@ -462,7 +462,7 @@ export function DashboardShell({
           </header>
 
           {mobileMenuOpen && (
-            <div className="max-h-[calc(100dvh-57px)] overflow-y-auto border-b border-white/10 bg-[#101827] p-4 lg:hidden text-white">
+            <div className="sticky top-[57px] z-30 max-h-[calc(100dvh-57px)] overflow-y-auto border-b border-white/10 bg-[#101827] p-4 lg:hidden text-white">
               <nav className="space-y-1">
                 <Suspense fallback={<SidebarNavFallback navigation={navigation} isMobile />}>
                   <SidebarNavList

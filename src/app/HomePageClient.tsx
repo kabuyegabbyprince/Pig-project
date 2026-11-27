@@ -71,10 +71,10 @@ export function HomePageClient({
   };
 
   const impactStats = [
-    { value: totalBeneficiaries,  label: "Families Supported" },
-    { value: totalPigsDistributed,label: "Pigs Distributed" },
-    { value: litterbornCount,     label: "Piglets Born" },
-    { value: returnedPiglets,     label: "Piglets Returned" },
+    { value: totalBeneficiaries,   label: "Families Supported" },
+    { value: totalPigsDistributed, label: "Pigs Assigned to People" },
+    { value: litterbornCount,      label: "Piglets Born" },
+    { value: returnedPiglets,      label: "Pigs / Piglets Returned" },
   ];
 
   const steps = [
@@ -97,20 +97,21 @@ export function HomePageClient({
 
   return (
     <div
-      style={{ margin: 0, padding: 0, overflowX: "hidden" }}
+      style={{ margin: 0, padding: 0, overflowX: "clip" }}
       className="bg-white text-slate-900 antialiased"
     >
       {/* ══════════════════════════════════════════════
           FIXED NAVBAR — stays on screen at all times
           ══════════════════════════════════════════════ */}
       <header
+        className="site-fixed-header"
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           zIndex: 100,
-          background: "rgba(16,24,39,0.85)",
+          background: "rgba(16,24,39,0.88)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           borderBottom: "1px solid rgba(255,255,255,0.10)",
@@ -226,9 +227,8 @@ export function HomePageClient({
         {/* Full-bleed background image */}
         <div
           aria-hidden="true"
+          className="hero-bg-layer"
           style={{
-            position: "absolute",
-            inset: 0,
             backgroundImage: `url(${heroData.imageUrl})`,
             backgroundSize: "cover",
             backgroundPosition: "center center",
@@ -239,9 +239,8 @@ export function HomePageClient({
         {/* Dark gradient overlay */}
         <div
           aria-hidden="true"
+          className="hero-bg-layer"
           style={{
-            position: "absolute",
-            inset: 0,
             background:
               "linear-gradient(165deg, rgba(16,24,39,0.88) 0%, rgba(10,14,23,0.95) 100%)",
             zIndex: 1,
@@ -294,8 +293,8 @@ export function HomePageClient({
         <div className="hero-stat-chips">
           {[
             { value: totalBeneficiaries, label: "Families" },
-            { value: totalPigsDistributed, label: "Pigs Distributed" },
-            { value: litterbornCount, label: "Piglets Born" },
+            { value: totalPigsDistributed, label: "Pigs Assigned" },
+            { value: returnedPiglets, label: "Returned Pigs" },
           ].map((s) => (
             <div key={s.label} className="hero-stat-chip">
               <p className="text-lg sm:text-[1.375rem] font-extrabold text-white leading-none">

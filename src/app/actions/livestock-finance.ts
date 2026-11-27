@@ -12,6 +12,7 @@ import {
   PigStatus,
   Prisma,
   RevolvingStatus,
+  Role,
 } from "@prisma/client";
 import { randomUUID } from "crypto";
 import {
@@ -20,6 +21,8 @@ import {
   MOMO_SETTING_KEY,
   type SerializedBatchSummary,
   type SerializedDistributionAuditRow,
+  type SerializedFinanceCooperativeMemberRow,
+  type SerializedFinanceCooperativeOverview,
   type SerializedFinancePigStock,
   type SerializedFinanceWorkspaceData,
   type SerializedMemberPaymentRecord,
@@ -88,10 +91,22 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
       })
       .catch(catchSchemaMissing([], "PigDistribution")),
     prisma.cooperative
-      .findMany()
+      .findMany({ orderBy: { createdAt: "desc" } })
       .catch(catchSchemaMissing([], "cooperatives")),
     prisma.user
-      .findMany({ where: { deletedAt: null } })
+      .findMany({
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          cooperativeId: true,
+          isActive: true,
+          createdAt: true,
+        },
+      })
       .catch(catchSchemaMissing([], "users")),
     prisma.revolvingCycle
       .findMany({ orderBy: [{ status: "asc" }, { startDate: "desc" }] })
@@ -149,12 +164,32 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
     }
   }
 
+  const benByCoopMemberId = new Map<string, (typeof beneficiariesRaw)[number]>();
+  for (const b of beneficiariesRaw) {
+    if (b.beneficiaryNumber.startsWith("COOP-")) {
+      benByCoopMemberId.set(b.beneficiaryNumber.slice(5), b);
+    }
+  }
+
   const returnsByBeneficiaryId = new Map<string, number>();
+  const lastReturnDateByBeneficiaryId = new Map<string, string>();
   for (const r of returnsRaw) {
     returnsByBeneficiaryId.set(
       r.beneficiaryId,
       (returnsByBeneficiaryId.get(r.beneficiaryId) ?? 0) + Number(r.quantity || 0)
     );
+    const iso = toIsoString(r.returnDate ?? r.createdAt);
+    const prev = lastReturnDateByBeneficiaryId.get(r.beneficiaryId);
+    if (!prev || iso > prev) {
+      lastReturnDateByBeneficiaryId.set(r.beneficiaryId, iso);
+    }
+  }
+
+  const cycleByBeneficiaryId = new Map<string, (typeof cyclesRaw)[number]>();
+  for (const c of cyclesRaw) {
+    if (!cycleByBeneficiaryId.has(c.beneficiaryId)) {
+      cycleByBeneficiaryId.set(c.beneficiaryId, c);
+    }
   }
 
   const distByBeneficiaryId = new Map<string, (typeof distributionsRaw)[number]>();
@@ -165,9 +200,13 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
   }
 
   const pigByBeneficiaryId = new Map<string, (typeof pigsRaw)[number]>();
+  const pigByOwnerMemberId = new Map<string, (typeof pigsRaw)[number]>();
   for (const p of pigsRaw) {
     if (p.currentBeneficiaryId && !pigByBeneficiaryId.has(p.currentBeneficiaryId)) {
       pigByBeneficiaryId.set(p.currentBeneficiaryId, p);
+    }
+    if (p.ownerMemberId && !pigByOwnerMemberId.has(String(p.ownerMemberId))) {
+      pigByOwnerMemberId.set(String(p.ownerMemberId), p);
     }
   }
 
@@ -456,6 +495,123 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
     };
   });
 
+  const cooperativesOverview: SerializedFinanceCooperativeOverview[] = coopsRaw.map((coop) => {
+    const coopId = String(coop.id);
+    const coopMembersRaw = usersRaw.filter((u) => {
+      const uRole = String(u.role || "").toUpperCase();
+      const isCoopAccount =
+        uRole === Role.COOPERATIVE_LEADER || uRole === Role.COOPERATIVE_MEMBER;
+      if (!isCoopAccount) return false;
+      return (
+        String(u.cooperativeId ?? "") === coopId ||
+        (coop.leaderUserId ? String(u.id) === String(coop.leaderUserId) : false)
+      );
+    });
+
+    coopMembersRaw.sort((a, b) => {
+      const aLeader = String(a.role).toUpperCase() === Role.COOPERATIVE_LEADER;
+      const bLeader = String(b.role).toUpperCase() === Role.COOPERATIVE_LEADER;
+      if (aLeader && !bLeader) return -1;
+      if (!aLeader && bLeader) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    let paidCount = 0;
+    let pendingPaymentCount = 0;
+    let unpaidCount = 0;
+    let receivedPigCount = 0;
+    let returnedMembersCount = 0;
+    let totalReturnedPiglets = 0;
+
+    const members: SerializedFinanceCooperativeMemberRow[] = coopMembersRaw.map((member) => {
+      const memberId = String(member.id);
+      const payment = paymentByMemberId.get(memberId);
+      const rawPayStatus = payment ? String(payment.status || "").toUpperCase() : "UNPAID";
+      const paymentStatus: SerializedFinanceCooperativeMemberRow["paymentStatus"] =
+        rawPayStatus === "VERIFIED"
+          ? "VERIFIED"
+          : rawPayStatus === "PENDING"
+            ? "PENDING"
+            : rawPayStatus === "REJECTED"
+              ? "REJECTED"
+              : "UNPAID";
+
+      if (paymentStatus === "VERIFIED") paidCount += 1;
+      else if (paymentStatus === "PENDING") pendingPaymentCount += 1;
+      else unpaidCount += 1;
+
+      const linkedBen = benByCoopMemberId.get(memberId);
+      const benId = linkedBen ? String(linkedBen.id) : null;
+      const dist = benId ? distByBeneficiaryId.get(benId) : undefined;
+      const directPig =
+        pigByOwnerMemberId.get(memberId) ??
+        (benId ? pigByBeneficiaryId.get(benId) : undefined) ??
+        dist?.pig ??
+        null;
+
+      const receivedPig = Boolean(dist || directPig);
+      if (receivedPig) receivedPigCount += 1;
+
+      const returnedCount = benId ? returnsByBeneficiaryId.get(benId) ?? 0 : 0;
+      const hasReturned = returnedCount > 0;
+      if (hasReturned) {
+        returnedMembersCount += 1;
+        totalReturnedPiglets += returnedCount;
+      }
+
+      const cycle = benId ? cycleByBeneficiaryId.get(benId) : undefined;
+      const expectedReturn = cycle?.expectedReturn ?? 2;
+      const lastReturnDate = benId ? lastReturnDateByBeneficiaryId.get(benId) ?? null : null;
+
+      return {
+        memberId,
+        memberName: member.name,
+        memberEmail: member.email,
+        memberPhone: member.phone ?? null,
+        memberRole: String(member.role),
+        cooperativeId: coopId,
+        cooperativeName: coop.name,
+        cellManagerName: coop.createdByName ?? null,
+        paymentStatus,
+        paymentAmount: payment ? payment.totalAmount.toString() : null,
+        momoReference: payment?.momoReference ?? null,
+        paymentDate: payment ? toIsoString(payment.createdAt) : null,
+        receivedPig,
+        pigTag: directPig?.tagNumber ?? null,
+        pigStatus: directPig?.status ? String(directPig.status) : null,
+        pigHealthStatus: directPig?.healthStatus ? String(directPig.healthStatus) : null,
+        pigReceivedDate: dist
+          ? toIsoString(dist.distributionDate)
+          : directPig
+            ? toIsoString(directPig.dateReceived ?? directPig.createdAt)
+            : null,
+        hasReturned,
+        returnedCount,
+        expectedReturn,
+        revolvingStatus: cycle ? String(cycle.status) : null,
+        lastReturnDate,
+      };
+    });
+
+    return {
+      id: coopId,
+      name: coop.name,
+      code: coop.code ?? null,
+      cellName: coop.cellName,
+      cellManagerName: coop.createdByName ?? null,
+      leaderName: coop.leaderName ?? null,
+      maxMembers: coop.maxMembers || 15,
+      memberCount: members.length,
+      paidCount,
+      pendingPaymentCount,
+      unpaidCount,
+      receivedPigCount,
+      returnedMembersCount,
+      totalReturnedPiglets,
+      members,
+    };
+  });
+
   return {
     schemaMissing,
     schemaWarning,
@@ -469,6 +625,7 @@ export async function getFinanceWorkspaceData(): Promise<SerializedFinanceWorksp
     memberPayments,
     auditRows,
     pigCycles,
+    cooperativesOverview,
   };
 }
 

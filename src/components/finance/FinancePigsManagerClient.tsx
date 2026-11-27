@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Trash2,
   Users,
+  UsersRound,
   Wallet,
   Stethoscope,
   HeartPulse,
@@ -33,8 +34,15 @@ import {
 } from "@/lib/finance-types";
 import { formatRwf } from "@/lib/format-rwf";
 import { MemberPaymentsApprovalCard } from "@/components/finance/MemberPaymentsApprovalCard";
+import { CooperativeMembersStatusCard } from "@/components/finance/CooperativeMembersStatusCard";
 
-type TabKey = "INVENTORY" | "PAYMENTS" | "RECIPIENTS" | "CYCLES" | "VET_CLEARANCE";
+type TabKey =
+  | "INVENTORY"
+  | "COOPERATIVES"
+  | "PAYMENTS"
+  | "RECIPIENTS"
+  | "CYCLES"
+  | "VET_CLEARANCE";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -371,6 +379,19 @@ export function FinancePigsManagerClient({
 
         <button
           type="button"
+          onClick={() => setActiveTab("COOPERATIVES")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            activeTab === "COOPERATIVES"
+              ? "bg-[#101827] text-white"
+              : "bg-white border border-slate-200 text-slate-700 hover:border-[#FF8A00]"
+          }`}
+        >
+          <UsersRound className="h-4 w-4 text-[#FF8A00]" />
+          All Cooperatives &amp; Members ({data.cooperativesOverview.length})
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("VET_CLEARANCE")}
           className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
             activeTab === "VET_CLEARANCE"
@@ -392,6 +413,11 @@ export function FinancePigsManagerClient({
           Cleared)
         </button>
       </div>
+
+      {/* TAB: ALL COOPERATIVES & MEMBERS */}
+      {activeTab === "COOPERATIVES" && (
+        <CooperativeMembersStatusCard cooperatives={data.cooperativesOverview} />
+      )}
 
       {/* TAB: MEMBER PAYMENT APPROVALS */}
       {activeTab === "PAYMENTS" && (

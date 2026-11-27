@@ -102,6 +102,49 @@ export type SerializedPigCycleRow = {
   notes: string | null;
 };
 
+export type SerializedFinanceCooperativeMemberRow = {
+  memberId: string;
+  memberName: string;
+  memberEmail: string;
+  memberPhone: string | null;
+  memberRole: string;
+  cooperativeId: string;
+  cooperativeName: string;
+  cellManagerName: string | null;
+  paymentStatus: "VERIFIED" | "PENDING" | "REJECTED" | "UNPAID";
+  paymentAmount: string | null;
+  momoReference: string | null;
+  paymentDate: string | null;
+  receivedPig: boolean;
+  pigTag: string | null;
+  pigStatus: string | null;
+  pigHealthStatus: string | null;
+  pigReceivedDate: string | null;
+  hasReturned: boolean;
+  returnedCount: number;
+  expectedReturn: number;
+  revolvingStatus: string | null;
+  lastReturnDate: string | null;
+};
+
+export type SerializedFinanceCooperativeOverview = {
+  id: string;
+  name: string;
+  code: string | null;
+  cellName: string;
+  cellManagerName: string | null;
+  leaderName: string | null;
+  maxMembers: number;
+  memberCount: number;
+  paidCount: number;
+  pendingPaymentCount: number;
+  unpaidCount: number;
+  receivedPigCount: number;
+  returnedMembersCount: number;
+  totalReturnedPiglets: number;
+  members: SerializedFinanceCooperativeMemberRow[];
+};
+
 export type SerializedFinanceWorkspaceData = {
   schemaMissing: boolean;
   schemaWarning: string | null;
@@ -115,4 +158,5 @@ export type SerializedFinanceWorkspaceData = {
   memberPayments: SerializedMemberPaymentRecord[];
   auditRows: SerializedDistributionAuditRow[];
   pigCycles: SerializedPigCycleRow[];
+  cooperativesOverview: SerializedFinanceCooperativeOverview[];
 };

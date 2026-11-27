@@ -1,22 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
   ArrowLeft, Save, CheckCircle2, AlertTriangle, 
   HeartPulse, Activity, ShieldCheck, AlertCircle, Loader2, ArrowLeftCircle
 } from "lucide-react";
-import { recordBatchPigReturn } from "@/app/actions/returns";
+import { recordBatchPigReturn, type BeneficiaryReturnOption } from "@/app/actions/returns";
 
 interface PigReturnFormProps {
   backHref?: string;
-  beneficiaries?: Array<{
-    id: string;
-    fullName: string;
-    beneficiaryNumber: string;
-    districtStr: string | null;
-  }>;
+  beneficiaries?: BeneficiaryReturnOption[];
 }
 
 export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficiaries = [] }: PigReturnFormProps) {
@@ -28,11 +23,46 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
   const [sickPiglets, setSickPiglets] = useState<string>("0");
   const [diseaseDescription, setDiseaseDescription] = useState<string>("");
   const [treatmentDescription, setTreatmentDescription] = useState<string>("");
+  const [selectedCooperativeId, setSelectedCooperativeId] = useState<string>("ALL");
   const [selectedBeneficiaryId, setSelectedBeneficiaryId] = useState<string>("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const cooperativeOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    for (const b of beneficiaries) {
+      const existing = map.get(b.cooperativeId);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(b.cooperativeId, {
+          id: b.cooperativeId,
+          name: b.cooperativeName,
+          count: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [beneficiaries]);
+
+  const filteredBeneficiaries = useMemo(() => {
+    if (selectedCooperativeId === "ALL") return beneficiaries;
+    return beneficiaries.filter((b) => b.cooperativeId === selectedCooperativeId);
+  }, [beneficiaries, selectedCooperativeId]);
+
+  const handleCooperativeChange = (coopId: string) => {
+    setSelectedCooperativeId(coopId);
+    if (coopId !== "ALL") {
+      const stillValid = beneficiaries.some(
+        (b) => b.id === selectedBeneficiaryId && b.cooperativeId === coopId
+      );
+      if (!stillValid) {
+        setSelectedBeneficiaryId("");
+      }
+    }
+  };
 
   const numTotal = parseInt(quantity, 10) || 0;
   const numSick = parseInt(sickPiglets, 10) || 0;
@@ -43,6 +73,11 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    if (!selectedBeneficiaryId) {
+      setErrorMessage("Please select a person who was given a pig.");
+      return;
+    }
 
     if (numTotal < 1) {
       setErrorMessage("Please enter the number of piglets returned (at least 1).");
@@ -68,9 +103,7 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
       formData.set("healthyPiglets", String(numHealthy));
       formData.set("diseaseDescription", diseaseDescription);
       formData.set("treatmentDescription", treatmentDescription);
-      if (selectedBeneficiaryId) {
-        formData.set("beneficiaryId", selectedBeneficiaryId);
-      }
+      formData.set("beneficiaryId", selectedBeneficiaryId);
 
       const result = await recordBatchPigReturn(formData);
       if (result && !result.success) {
@@ -104,7 +137,7 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Record Piglet Returns</h1>
           <p className="mt-1 text-xs text-slate-500">
-            Register revolving piglets returned by beneficiaries and record health assessments.
+            Register revolving piglets returned by cooperative members who received pigs and record health assessments.
           </p>
         </div>
       </div>
@@ -146,30 +179,61 @@ export function PigReturnForm({ backHref = "/dashboard/field/returns", beneficia
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-8">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             
-            {/* Beneficiary selection if available */}
-            {beneficiaries.length > 0 && (
-              <div className="sm:col-span-2">
-                <label htmlFor="beneficiaryId" className="block text-sm font-semibold text-[#1c2b23]">
-                  Beneficiary <span className="text-xs font-normal text-[#5d6e64]">(Optional)</span>
-                </label>
-                <select
-                  id="beneficiaryId"
-                  value={selectedBeneficiaryId}
-                  onChange={(e) => setSelectedBeneficiaryId(e.target.value)}
-                  className="mt-2 block w-full rounded-xl border border-[#d9e1d8] bg-white px-3.5 py-2.5 text-[#1c2b23] shadow-sm focus:border-[#2c5a43] focus:outline-none focus:ring-2 focus:ring-[#2c5a43]/20 sm:text-sm font-medium"
-                >
-                  <option value="">-- General Revolving Pool / Any Beneficiary --</option>
-                  {beneficiaries.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.fullName} ({b.beneficiaryNumber}){b.districtStr ? ` - ${b.districtStr}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1.5 text-xs text-[#5d6e64]">
-                  Select the returning beneficiary to link to their revolving fund contract.
-                </p>
-              </div>
-            )}
+            {/* Cooperative Filter Input */}
+            <div>
+              <label htmlFor="cooperativeFilter" className="block text-sm font-semibold text-[#1c2b23]">
+                Filter by Cooperative
+              </label>
+              <select
+                id="cooperativeFilter"
+                value={selectedCooperativeId}
+                onChange={(e) => handleCooperativeChange(e.target.value)}
+                className="mt-2 block w-full rounded-xl border border-[#d9e1d8] bg-white px-3.5 py-2.5 text-[#1c2b23] shadow-sm focus:border-[#2c5a43] focus:outline-none focus:ring-2 focus:ring-[#2c5a43]/20 sm:text-sm font-medium"
+              >
+                <option value="ALL">
+                  All Cooperatives ({beneficiaries.length} {beneficiaries.length === 1 ? "person" : "people"} given pigs)
+                </option>
+                {cooperativeOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.count} {c.count === 1 ? "recipient" : "recipients"})
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-[#5d6e64]">
+                Narrow the list below to members in a specific cooperative.
+              </p>
+            </div>
+
+            {/* Beneficiary selection (only people given pigs) */}
+            <div>
+              <label htmlFor="beneficiaryId" className="block text-sm font-semibold text-[#1c2b23]">
+                Person Given Pigs <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="beneficiaryId"
+                required
+                value={selectedBeneficiaryId}
+                onChange={(e) => setSelectedBeneficiaryId(e.target.value)}
+                disabled={filteredBeneficiaries.length === 0}
+                className="mt-2 block w-full rounded-xl border border-[#d9e1d8] bg-white px-3.5 py-2.5 text-[#1c2b23] shadow-sm focus:border-[#2c5a43] focus:outline-none focus:ring-2 focus:ring-[#2c5a43]/20 disabled:bg-slate-50 disabled:text-slate-400 sm:text-sm font-medium"
+              >
+                <option value="">
+                  {filteredBeneficiaries.length === 0
+                    ? "-- No people given pigs found --"
+                    : "-- Select Person Given a Pig --"}
+                </option>
+                {filteredBeneficiaries.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.fullName} — {b.cooperativeName} (Pig: {b.pigTags.join(", ")})
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-[#5d6e64]">
+                {filteredBeneficiaries.length === 0
+                  ? "Only people who have already received a pig appear in this dropdown."
+                  : "Shows only beneficiaries/members who have been distributed a pig."}
+              </p>
+            </div>
 
             {/* 1. Number of Piglets Returned */}
             <div>

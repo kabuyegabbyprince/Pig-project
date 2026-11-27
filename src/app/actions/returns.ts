@@ -16,7 +16,18 @@ export type PigReturnDateSummary = {
   treatmentDescription: string;
 };
 
-export async function getBeneficiaryReturnOptions() {
+export type BeneficiaryReturnOption = {
+  id: string;
+  fullName: string;
+  beneficiaryNumber: string;
+  districtStr: string | null;
+  savingsGroup: string | null;
+  cooperativeId: string;
+  cooperativeName: string;
+  pigTags: string[];
+};
+
+export async function getBeneficiaryReturnOptions(): Promise<BeneficiaryReturnOption[]> {
   await ensureCooperativeBeneficiariesSynced();
 
   const actor = await getActiveUser([
@@ -35,7 +46,7 @@ export async function getBeneficiaryReturnOptions() {
     select: { cooperativeId: true },
   });
 
-  const [beneficiaries, members, cooperatives] = await Promise.all([
+  const [beneficiaries, members, cooperatives, distributions, assignedPigs] = await Promise.all([
     prisma.beneficiary.findMany({
       where: { deletedAt: null, beneficiaryNumber: { startsWith: "COOP-" } },
       select: {
@@ -56,31 +67,103 @@ export async function getBeneficiaryReturnOptions() {
       select: { id: true, role: true, cooperativeId: true },
     }),
     prisma.cooperative.findMany({
-      select: { id: true, createdById: true },
+      select: { id: true, name: true, createdById: true },
+    }),
+    prisma.pigDistribution.findMany({
+      select: { beneficiaryId: true, pigId: true },
+    }),
+    prisma.pig.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        tagNumber: true,
+        currentBeneficiaryId: true,
+        ownerMemberId: true,
+        status: true,
+      },
     }),
   ]);
 
-  const memberById = new Map(members.map((m) => [m.id, m]));
-  const coopById = new Map(cooperatives.map((c) => [c.id, c]));
+  const memberById = new Map(members.map((m) => [String(m.id), m]));
+  const coopById = new Map(cooperatives.map((c) => [String(c.id), c]));
+  const pigTagById = new Map(assignedPigs.map((p) => [String(p.id), p.tagNumber]));
 
-  return beneficiaries.filter((b) => {
+  const pigTagsByBeneficiaryId = new Map<string, Set<string>>();
+  const addPigTagForBeneficiary = (beneficiaryId: string, tag: string) => {
+    if (!pigTagsByBeneficiaryId.has(beneficiaryId)) {
+      pigTagsByBeneficiaryId.set(beneficiaryId, new Set<string>());
+    }
+    pigTagsByBeneficiaryId.get(beneficiaryId)!.add(tag);
+  };
+
+  for (const d of distributions) {
+    if (!d.beneficiaryId) continue;
+    const tag = d.pigId ? pigTagById.get(String(d.pigId)) || "Assigned Pig" : "Assigned Pig";
+    addPigTagForBeneficiary(String(d.beneficiaryId), tag);
+  }
+
+  const pigTagsByMemberId = new Map<string, Set<string>>();
+  for (const p of assignedPigs) {
+    if (p.currentBeneficiaryId) {
+      addPigTagForBeneficiary(String(p.currentBeneficiaryId), p.tagNumber);
+    }
+    if (p.ownerMemberId) {
+      const mId = String(p.ownerMemberId);
+      if (!pigTagsByMemberId.has(mId)) {
+        pigTagsByMemberId.set(mId, new Set<string>());
+      }
+      pigTagsByMemberId.get(mId)!.add(p.tagNumber);
+    }
+  }
+
+  const options: BeneficiaryReturnOption[] = [];
+
+  for (const b of beneficiaries) {
     const memberId = b.beneficiaryNumber.replace(/^COOP-/, "");
     const member = memberById.get(memberId);
-    if (!member || !member.cooperativeId) return false;
-    const coop = coopById.get(member.cooperativeId);
-    if (!coop) return false;
+    if (!member || !member.cooperativeId) continue;
+    const coop = coopById.get(String(member.cooperativeId));
+    if (!coop) continue;
 
-    if (actorRole === Role.CELL_MANAGER) {
-      return String(coop.createdById) === String(actor.id);
+    if (actorRole === Role.CELL_MANAGER && String(coop.createdById) !== String(actor.id)) {
+      continue;
     }
-    if (actorRole === Role.COOPERATIVE_LEADER) {
-      return String(coop.id) === String(fullActor?.cooperativeId ?? "");
+    if (
+      actorRole === Role.COOPERATIVE_LEADER &&
+      String(coop.id) !== String(fullActor?.cooperativeId ?? "")
+    ) {
+      continue;
     }
-    if (actorRole === Role.COOPERATIVE_MEMBER) {
-      return String(member.id) === String(actor.id);
+    if (actorRole === Role.COOPERATIVE_MEMBER && String(member.id) !== String(actor.id)) {
+      continue;
     }
-    return true;
-  });
+
+    const tags = new Set<string>();
+    const benTags = pigTagsByBeneficiaryId.get(String(b.id));
+    if (benTags) {
+      for (const t of benTags) tags.add(t);
+    }
+    const memTags = pigTagsByMemberId.get(memberId);
+    if (memTags) {
+      for (const t of memTags) tags.add(t);
+    }
+
+    // Only include people who have actually been given at least one pig
+    if (tags.size === 0) continue;
+
+    options.push({
+      id: b.id,
+      fullName: b.fullName,
+      beneficiaryNumber: b.beneficiaryNumber,
+      districtStr: b.districtStr,
+      savingsGroup: b.savingsGroup,
+      cooperativeId: String(coop.id),
+      cooperativeName: coop.name,
+      pigTags: Array.from(tags),
+    });
+  }
+
+  return options;
 }
 
 export async function recordBatchPigReturn(formData: FormData) {

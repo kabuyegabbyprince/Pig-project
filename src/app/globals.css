@@ -89,58 +89,75 @@ a {
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Section anchor offset — accounts for the fixed 64px navbar */
-section[id] {
-  scroll-margin-top: 64px;
+:root {
+  --header-offset: 68px;
 }
 
-/* Hero responsive shell & media queries */
+/* Section anchor offset — accounts for fixed navbar across breakpoints */
+section[id] {
+  scroll-margin-top: calc(var(--header-offset) + 8px);
+}
+
+/* Hero responsive shell & media queries — prevents divs flowing behind header or clipping */
 .hero-section {
   position: relative;
+  isolation: isolate;
   width: 100%;
   min-height: 100dvh;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.hero-bg-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .hero-content-wrap {
   position: relative;
   z-index: 10;
   width: 100%;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5.5rem 1rem 2rem;
+  padding: calc(var(--header-offset) + 1.5rem) 1rem 1.75rem;
 }
 
 .hero-stat-chips {
   position: relative;
   z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
   gap: 0.75rem;
   width: 100%;
-  max-width: 56rem;
+  max-width: 38rem;
   margin-inline: auto;
   padding: 0 1rem 2rem;
 }
 
 .hero-stat-chip {
+  position: relative;
+  z-index: 1;
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 0.875rem;
-  padding: 0.75rem 1.25rem;
+  padding: 0.875rem 1.125rem;
   text-align: center;
-  min-width: 112px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
 }
 
 /* ==========================================================================
@@ -149,15 +166,31 @@ section[id] {
 
 /* Very narrow smartphones (<= 379px) */
 @media (max-width: 379px) {
+  :root {
+    --header-offset: 62px;
+  }
+
+  .hero-stat-chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0 0.75rem 1.25rem;
+  }
+
+  .hero-stat-chip:last-child {
+    grid-column: span 2;
+  }
+
   .hero-stat-chip {
-    flex: 1 1 calc(50% - 0.5rem);
-    min-width: 0;
-    padding: 0.625rem 0.75rem;
+    padding: 0.65rem 0.75rem;
   }
 }
 
 /* Smartphones (< 640px) */
 @media (max-width: 639px) {
+  :root {
+    --header-offset: 64px;
+  }
+
   html[data-text-size="default"] {
     font-size: 15px;
   }
@@ -168,17 +201,16 @@ section[id] {
   }
 
   .hero-content-wrap {
-    padding: 5.25rem 1rem 1.25rem;
+    padding: calc(var(--header-offset) + 1.25rem) 1rem 1.25rem;
   }
 
   .hero-stat-chips {
     gap: 0.5rem;
-    padding: 0 0.75rem 1.25rem;
+    padding: 0 0.75rem 1.5rem;
   }
 
   .hero-stat-chip {
-    padding: 0.65rem 0.9rem;
-    min-width: 88px;
+    padding: 0.7rem 0.65rem;
   }
 
   .dashboard-main {
@@ -186,21 +218,35 @@ section[id] {
   }
 }
 
-/* Short or landscape viewports (phones turned sideways, small netbooks) */
-@media (max-height: 680px) {
+/* Short or landscape viewports (phones turned sideways, compact laptops <= 700px tall) */
+@media (max-height: 700px) {
   .hero-section {
     height: auto;
     min-height: 100svh;
   }
 
   .hero-content-wrap {
-    padding-top: 5rem;
+    padding-top: calc(var(--header-offset) + 1rem);
+    padding-bottom: 1.25rem;
+  }
+
+  .hero-stat-chips {
     padding-bottom: 1.25rem;
   }
 }
 
 /* Tablets (640px - 1023px) */
 @media (min-width: 640px) and (max-width: 1023px) {
+  :root {
+    --header-offset: 72px;
+  }
+
+  .hero-stat-chips {
+    max-width: 40rem;
+    gap: 0.875rem;
+    padding: 0 1.5rem 2rem;
+  }
+
   .dashboard-main {
     padding: 1.25rem 1.5rem;
   }
@@ -212,6 +258,10 @@ section[id] {
 
 /* Laptops & Standard Desktops (1024px - 1439px) */
 @media (min-width: 1024px) and (max-width: 1439px) {
+  :root {
+    --header-offset: 76px;
+  }
+
   .dashboard-sidebar {
     width: 15rem;
   }
@@ -245,6 +295,16 @@ section[id] {
 }
 
 @media (min-width: 1440px) {
+  :root {
+    --header-offset: 78px;
+  }
+
+  .hero-stat-chips {
+    max-width: 44rem;
+    gap: 1rem;
+    padding-bottom: 2.5rem;
+  }
+
   .dashboard-sidebar {
     width: 16.5rem;
   }
