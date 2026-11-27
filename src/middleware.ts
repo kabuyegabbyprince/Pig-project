@@ -25,6 +25,16 @@ const FIELD_ROLES = new Set([
 
 const FINANCE_ROLES = new Set(["FINANCE_OFFICER"]);
 
+const withNoStoreHeaders = (res: NextResponse) => {
+  res.headers.set(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+  );
+  res.headers.set("Pragma", "no-cache");
+  res.headers.set("Expires", "0");
+  return res;
+};
+
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
@@ -39,13 +49,14 @@ export default withAuth(
           headers: {
             "x-action-redirect": `${targetPath};push`,
             "content-type": "text/plain",
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
           },
         });
       }
-      return NextResponse.redirect(new URL(targetPath, req.url));
+      return withNoStoreHeaders(NextResponse.redirect(new URL(targetPath, req.url)));
     };
 
-    if (path.startsWith("/dashboard") && !role) {
+    if (path.startsWith("/dashboard") && (!token?.id || !role)) {
       return redirectResponse("/login");
     }
 
@@ -140,6 +151,8 @@ export default withAuth(
     ) {
       return redirectResponse("/dashboard");
     }
+
+    return withNoStoreHeaders(NextResponse.next());
   },
   {
     secret: getNextAuthSecret(),
@@ -157,7 +170,8 @@ export default withAuth(
           return true;
         }
         if (req.nextUrl.pathname.startsWith("/dashboard")) {
-          return !!token;
+          const role = normalizeRole(typeof token?.role === "string" ? token.role : undefined);
+          return Boolean(token?.id) && Boolean(role);
         }
         return true;
       },

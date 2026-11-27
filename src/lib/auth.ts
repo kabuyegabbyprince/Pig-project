@@ -56,6 +56,11 @@ type BackendLoginResponse = {
 };
 
 export const authOptions: NextAuthOptions = {
+  session: {
+    strategy: "jwt",
+    maxAge: 8 * 60 * 60,
+    updateAge: 15 * 60,
+  },
   cookies: {
     sessionToken: {
       name: "next-auth.session-token",
@@ -456,6 +461,25 @@ export const authOptions: NextAuthOptions = {
           });
         } catch (err) {
           console.error("Failed to record login audit log:", err);
+        }
+      }
+    },
+    async signOut({ token }) {
+      const userId = token?.id ? String(token.id) : undefined;
+      invalidateAuthUserCache(userId);
+      if (userId) {
+        try {
+          await prisma.auditLog.create({
+            data: {
+              userId,
+              role: typeof token?.role === "string" ? token.role : null,
+              action: "LOGOUT",
+              entity: "AUTH",
+              entityId: userId,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to record logout audit log:", err);
         }
       }
     },

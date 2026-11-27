@@ -105,6 +105,6 @@ export async function performSignOut(callbackPath = "/login"): Promise<void> {
   } catch {
     // Still redirect cleanly to login if session is already expired
   } finally {
-    window.location.assign(callbackPath);
+    window.location.replace(callbackPath);
   }
 }

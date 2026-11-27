@@ -32,7 +32,7 @@ import {
   ClipboardList,
   PiggyBank,
 } from "lucide-react";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { getRoleLabel, normalizeRoleValue } from "@/lib/roles";
 
 const EXACT_ONLY_ROUTES = new Set([
@@ -347,6 +347,16 @@ export function DashboardShell({
   const { data: sessionData } = useAuthSession();
   const session = initialSession ?? sessionData ?? null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   const role = normalizeRoleValue(session?.user?.role as string | undefined);
   let navigation: NavItem[] = [];

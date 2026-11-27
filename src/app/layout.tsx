@@ -14,14 +14,13 @@ export const metadata: Metadata = {
   description: "Comprehensive livestock management, beneficiary tracking, and revolving fund system for the Pig Project in Rwanda.",
   icons: {
     icon: [
-      { url: "/pplog-.png", type: "image/png" },
-      { url: "/icon.png", type: "image/png", sizes: "32x32" },
-      { url: "/favicon.ico", type: "image/x-icon" },
+      { url: "/icon.png?v=3", sizes: "256x256", type: "image/png" },
+      { url: "/favicon.ico?v=3", type: "image/x-icon" },
+      { url: "/pplog-.png?v=3", type: "image/png" },
     ],
-    shortcut: "/pplog-.png",
+    shortcut: "/icon.png?v=3",
     apple: [
-      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
-      { url: "/pplog-.png", type: "image/png" },
+      { url: "/apple-icon.png?v=3", sizes: "180x180", type: "image/png" },
     ],
   },
 };
@@ -34,9 +33,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" type="image/png" href="/pplog-.png" />
-        <link rel="shortcut icon" type="image/png" href="/pplog-.png" />
-        <link rel="apple-touch-icon" href="/pplog-.png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
